@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    environment:
+      RABBITMQ_DEFAULT_VHOST: "master"
+      RABBITMQ_DEFAULT_USER: "dev"
+      RABBITMQ_DEFAULT_PASS: "dev"
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    ports:
+      - 8090:15672
+      - 5672:5672
+
+  crdb:
+   image: cockroachdb/cockroach:latest-v22.2
+   ports:
+     - "26257:26257"
+     - "8080:8080"
+   command: start-single-node --insecure
+   volumes:
+     - "crdb:/cockroach/cockroach-data"
+
+volumes:
+  crdb:
+  rabbitmq:
