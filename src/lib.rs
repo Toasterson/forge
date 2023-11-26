@@ -25,7 +25,7 @@ use seaography::{Builder, BuilderContext};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, log};
+use tracing::{debug, error, info, log, trace};
 
 pub use activities::*;
 use migration::{Migrator, MigratorTrait};
@@ -322,7 +322,8 @@ async fn handle_message(
                             state: ActiveValue::Set(mr.action),
                             api_kind: ActiveValue::Set("github".to_string()),
                         };
-                        dbmr.save(database).await?;
+                        let res = dbmr.insert(database).await?;
+                        trace!("saved merge request: {:?}", res);
                         let job = Job {
                             patch: mr.patch,
                             ref_name: mr.head.ref_name,
@@ -332,6 +333,7 @@ async fn handle_message(
                             tags: None,
                             job_type: Some(KnownJobs::CheckForChangedComponents),
                         };
+                        trace!("sending job: {:?}", job);
                         let payload = serde_json::to_vec(&job)?;
                         job_channel
                             .basic_publish(
