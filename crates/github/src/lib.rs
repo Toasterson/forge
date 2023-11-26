@@ -3,16 +3,19 @@ use std::collections::HashMap;
 use axum::{
     body::Bytes,
     extract::{
-        rejection::{BytesRejection, JsonRejection, TypedHeaderRejection},
-        FromRequest, TypedHeader,
+        FromRequest,
+        rejection::{BytesRejection, JsonRejection, TypedHeaderRejection}, TypedHeader,
     },
     http::StatusCode,
     response::IntoResponse,
 };
-use headers::Signature;
 use serde::Deserialize;
 use thiserror::Error;
 use tracing::trace;
+
+use headers::Signature;
+
+use crate::headers::Event;
 
 pub mod headers {
     use axum::{headers::Header, http::HeaderName};
@@ -21,15 +24,16 @@ pub mod headers {
     pub static SIGNATURE: HeaderName = HeaderName::from_static("x-hub-signature-256");
 
     pub struct Signature(String);
+
     impl Header for Signature {
-        fn name() -> &'static axum::http::HeaderName {
+        fn name() -> &'static HeaderName {
             &SIGNATURE
         }
 
         fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
-        where
-            Self: Sized,
-            I: Iterator<Item = &'i axum::http::HeaderValue>,
+            where
+                Self: Sized,
+                I: Iterator<Item=&'i axum::http::HeaderValue>,
         {
             let value = values.next().ok_or_else(axum::headers::Error::invalid)?;
             Ok(Signature(
@@ -53,16 +57,18 @@ pub mod headers {
     pub enum Event {
         Ping,
         Push,
+        PullRequest,
     }
+
     impl Header for Event {
         fn name() -> &'static HeaderName {
             &EVENT
         }
 
         fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
-        where
-            Self: Sized,
-            I: Iterator<Item = &'i axum::http::HeaderValue>,
+            where
+                Self: Sized,
+                I: Iterator<Item=&'i axum::http::HeaderValue>,
         {
             let value = values.next().ok_or_else(axum::headers::Error::invalid)?;
             match value
@@ -71,6 +77,7 @@ pub mod headers {
             {
                 "push" => Ok(Self::Push),
                 "ping" => Ok(Self::Ping),
+                "pull_request" => Ok(Self::PullRequest),
                 _ => Err(axum::headers::Error::invalid()),
             }
         }
@@ -101,15 +108,18 @@ pub struct GitHubWebhookRequest {
 }
 
 impl GitHubWebhookRequest {
-    pub fn get_kind(&self) -> headers::Event {
+    pub fn get_kind(&self) -> Event {
         self.event_kind.clone()
     }
 
     pub fn get_event(&self) -> Result<GitHubEvent, GitHubError> {
         trace!("Parsing github event {}", self.event_kind);
         match self.event_kind {
-            headers::Event::Ping => Ok(GitHubEvent::Ping(serde_json::from_slice(&self.body)?)),
-            headers::Event::Push => Ok(GitHubEvent::Push(serde_json::from_slice(&self.body)?)),
+            Event::Ping => Ok(GitHubEvent::Ping(serde_json::from_slice(&self.body)?)),
+            Event::Push => Ok(GitHubEvent::Push(serde_json::from_slice(&self.body)?)),
+            Event::PullRequest => Ok(GitHubEvent::PullRequest(serde_json::from_slice(
+                &self.body,
+            )?)),
         }
     }
 }
@@ -184,12 +194,67 @@ impl IntoResponse for GitHubError {
             Self::BytesRejection { status, message } => (status, message),
             err => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
         }
-        .into_response()
+            .into_response()
     }
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PullRequest {}
+pub struct PullRequest {
+    /// The pull request number.
+    pub number: i32,
+    /// The actual pull_request struct
+    pub pull_request: PullRequestObject,
+    /// The repository on GitHub where the event occurred. Webhook payloads contain the repository property when the event occurs from activity in a repository.
+    pub repository: Repository,
+    /// action that this event represents
+    pub action: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PullRequestObject {
+    pub url: String,
+    pub id: i32,
+    pub patch_url: String,
+    pub node_id: String,
+    /// Number uniquely identifying the pull request within its repository.
+    pub number: i32,
+    /// State of this Pull Request. Either open or closed.
+    pub state: PullRequestState,
+    pub locked: bool,
+    /// The title of the pull request.
+    pub title: String,
+    /// A GitHub user.
+    pub user: HashMap<String, serde_json::Value>,
+    /// body of the message
+    pub body: Option<String>,
+    pub head: CommitRef,
+    pub base: CommitRef,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CommitRef {
+    pub sha: String,
+    #[serde(rename = "ref")]
+    pub ref_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct User {
+    pub name: Option<String>,
+    pub email: String,
+    pub login: String,
+    pub id: i32,
+    pub url: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PullRequestState {
+    Open,
+    Closed,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Issue {}

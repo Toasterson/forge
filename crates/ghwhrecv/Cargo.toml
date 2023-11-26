@@ -20,3 +20,5 @@ hyper.workspace = true
 github.workspace = true
 strum.workspace = true
 forge.workspace = true
+url.workspace = true
+log = "0.4.20"

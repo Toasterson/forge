@@ -1,8 +1,8 @@
 use axum::{
     extract::State,
+    Json,
     response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
+    Router, routing::{get, post},
 };
 use clap::Parser;
 use config::{Environment, File};
@@ -11,11 +11,13 @@ use deadpool_lapin::lapin::{
     protocol::basic::AMQPProperties,
     types::FieldTable,
 };
-use github::{GitHubError, GitHubEvent, GitHubWebhookRequest};
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::{debug, error, info};
+
+use forge::{CommitRef, Scheme};
+use github::{GitHubError, GitHubEvent, GitHubWebhookRequest};
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum Error {
@@ -42,6 +44,9 @@ pub enum Error {
 
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    ParseError(#[from] url::ParseError),
 }
 
 impl IntoResponse for Error {
@@ -63,7 +68,10 @@ type Result<T> = miette::Result<T, Error>;
 pub struct Config {
     amqp: deadpool_lapin::Config,
     listen: String,
-    ci_inbox: String,
+    job_inbox: String,
+    inbox: String,
+    domain: String,
+    scheme: String,
 }
 
 #[derive(Parser)]
@@ -73,14 +81,16 @@ pub struct Args {
 
 pub fn load_config(args: Args) -> Result<Config> {
     let cfg = config::Config::builder()
-        .add_source(File::with_name("/etc/forge/ghwhrecv.yaml").required(false))
+        .add_source(File::with_name("/etc/forge/ghwhrecv").required(false))
         .add_source(
             Environment::with_prefix("WEBHOOK")
                 .separator("_")
                 .prefix_separator("__"),
         )
         .set_default("listen", "0.0.0.0:3000")?
-        .set_default("ci_inbox", "CI_INBOX")?
+        .set_default("job_inbox", "JOB_INBOX")?
+        .set_default("inbox", "INBOX")?
+        .set_default("scheme", Scheme::HTTPS.to_string())?
         .set_override_option("amqp.url", args.rabbitmq_url)?
         .build()?;
 
@@ -90,19 +100,21 @@ pub fn load_config(args: Args) -> Result<Config> {
 #[derive(Debug, Clone)]
 struct AppState {
     amqp: deadpool_lapin::Pool,
-    ci_inbox: String,
+    inbox: String,
+    base_url: String,
 }
 
 pub async fn listen(cfg: Config) -> Result<()> {
-    tracing::debug!("Opening RabbitMQ Connection");
+    debug!("Opening RabbitMQ Connection");
     let state = AppState {
         amqp: cfg
             .amqp
             .create_pool(Some(deadpool_lapin::Runtime::Tokio1))?,
-        ci_inbox: cfg.ci_inbox,
+        inbox: cfg.inbox,
+        base_url: format!("{}://{}", Scheme::from(cfg.scheme), cfg.domain),
     };
     let conn = state.amqp.get().await?;
-    tracing::debug!(
+    debug!(
         "Connected to {} as {}",
         conn.status().vhost(),
         conn.status().username()
@@ -110,14 +122,14 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     let channel = conn.create_channel().await?;
 
-    tracing::debug!(
+    debug!(
         "Defining inbox: {} queue from channel id {}",
-        &state.ci_inbox,
+        &state.inbox,
         channel.id()
     );
     channel
         .queue_declare(
-            &state.ci_inbox,
+            &state.inbox,
             QueueDeclareOptions::default(),
             FieldTable::default(),
         )
@@ -148,7 +160,48 @@ async fn health_check() -> Json<HealthResponse> {
 async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest) -> Result<()> {
     debug!("Received Webhook: {}", req.get_kind());
     match req.get_event()? {
-        GitHubEvent::PullRequest(_) => todo!(),
+        GitHubEvent::PullRequest(event) => {
+            // Implement a function that creates a PullRequest struct of type forge::PullRequest from
+            // the event and sends it to the forge.
+            info!("Received PullRequest event from Github");
+            debug!("event: {:?}", event);
+            let conn = state.amqp.get().await?;
+            let event_msg = forge::Event::Create(forge::ActivityEnvelope {
+                actor: format!("{}/actors/github", &state.base_url).parse()?,
+                to: vec![format!("{}/actors/forge", &state.base_url).parse()?],
+                cc: vec![],
+                object: forge::Object::MergeRequest(forge::MergeRequest {
+                    action: event.action,
+                    number: event.number as u64,
+                    title: event.pull_request.title,
+                    body: event.pull_request.body,
+                    head: CommitRef {
+                        sha: event.pull_request.head.sha,
+                        ref_name: event.pull_request.head.ref_name,
+                    },
+                    base: CommitRef {
+                        sha: event.pull_request.base.sha,
+                        ref_name: event.pull_request.base.ref_name,
+                    },
+                    origin_url: Some(event.pull_request.url),
+                    repository: event.repository.git_url,
+                    patch: Some(event.pull_request.patch_url.parse()?),
+                }),
+            });
+            debug!("forge event: {:?}", event_msg);
+            let msg = serde_json::to_vec(&event_msg)?;
+            let channel = conn.create_channel().await?;
+            channel
+                .basic_publish(
+                    "",
+                    &state.inbox,
+                    BasicPublishOptions::default(),
+                    &msg,
+                    AMQPProperties::default(),
+                )
+                .await?;
+            Ok(())
+        }
         GitHubEvent::Issue(_) => todo!(),
         GitHubEvent::IssueComment(_) => todo!(),
         GitHubEvent::Status(_) => todo!(),
@@ -156,20 +209,23 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
             info!("Received Push event from Github");
             debug!("event: {:?}", event);
             let conn = state.amqp.get().await?;
-            let event_msg = forge::Event::Create(forge::Object::Job(forge::Job {
-                before: event.before,
-                after: event.after,
-                ref_name: event.ref_name,
-                repository: event.repository.git_url,
-                tags: Some(vec!["push".to_owned()]),
-                conf_ref: None,
-            }));
+            let event_msg = forge::Event::Create(forge::ActivityEnvelope {
+                actor: format!("{}/actors/github", &state.base_url).parse()?,
+                to: vec![format!("{}/actors/forge", &state.base_url).parse()?],
+                cc: vec![],
+                object: forge::Object::Push(forge::Push {
+                    before: event.before,
+                    after: event.after,
+                    ref_name: event.ref_name,
+                    repository: event.repository.git_url,
+                }),
+            });
             let msg = serde_json::to_vec(&event_msg)?;
             let channel = conn.create_channel().await?;
             channel
                 .basic_publish(
                     "",
-                    &state.ci_inbox,
+                    &state.inbox,
                     BasicPublishOptions::default(),
                     &msg,
                     AMQPProperties::default(),
@@ -182,6 +238,6 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
 }
 
 #[derive(Serialize, Default)]
-struct ResturnValue {
+struct ReturnValue {
     error: Option<String>,
 }
