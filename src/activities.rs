@@ -159,5 +159,4 @@ pub struct Job {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum KnownJobs {
     CheckForChangedComponents,
-
 }

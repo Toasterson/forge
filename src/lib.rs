@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use axum::{Json, Router};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
+use axum::{Json, Router};
 use clap::Parser;
 use config::Environment;
-use deadpool_lapin::lapin::Channel;
 use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::options::{
     BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,
@@ -15,6 +14,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::types::FieldTable;
+use deadpool_lapin::lapin::Channel;
 use deadpool_lapin::Pool;
 use futures::{join, StreamExt};
 use miette::Diagnostic;
@@ -192,7 +192,12 @@ pub async fn listen(cfg: Config) -> Result<()> {
     Ok(())
 }
 
-async fn rabbitmq_listen(pool: Pool, connection_string: String, inbox_name: &str, job_inbox_name: &str) -> Result<()> {
+async fn rabbitmq_listen(
+    pool: Pool,
+    connection_string: String,
+    inbox_name: &str,
+    job_inbox_name: &str,
+) -> Result<()> {
     let mut retry_interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
     let database = Database::connect(connection_string).await?;
     loop {

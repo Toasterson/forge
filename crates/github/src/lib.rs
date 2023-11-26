@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use axum::{
     body::Bytes,
     extract::{
-        FromRequest,
-        rejection::{BytesRejection, JsonRejection, TypedHeaderRejection}, TypedHeader,
+        rejection::{BytesRejection, JsonRejection, TypedHeaderRejection},
+        FromRequest, TypedHeader,
     },
     http::StatusCode,
     response::IntoResponse,
@@ -31,9 +31,9 @@ pub mod headers {
         }
 
         fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
-            where
-                Self: Sized,
-                I: Iterator<Item=&'i axum::http::HeaderValue>,
+        where
+            Self: Sized,
+            I: Iterator<Item = &'i axum::http::HeaderValue>,
         {
             let value = values.next().ok_or_else(axum::headers::Error::invalid)?;
             Ok(Signature(
@@ -66,9 +66,9 @@ pub mod headers {
         }
 
         fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
-            where
-                Self: Sized,
-                I: Iterator<Item=&'i axum::http::HeaderValue>,
+        where
+            Self: Sized,
+            I: Iterator<Item = &'i axum::http::HeaderValue>,
         {
             let value = values.next().ok_or_else(axum::headers::Error::invalid)?;
             match value
@@ -194,7 +194,7 @@ impl IntoResponse for GitHubError {
             Self::BytesRejection { status, message } => (status, message),
             err => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
         }
-            .into_response()
+        .into_response()
     }
 }
 

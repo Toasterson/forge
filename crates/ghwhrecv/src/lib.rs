@@ -1,8 +1,8 @@
 use axum::{
     extract::State,
-    Json,
     response::IntoResponse,
-    Router, routing::{get, post},
+    routing::{get, post},
+    Json, Router,
 };
 use clap::Parser;
 use config::{Environment, File};
