@@ -170,7 +170,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                 actor: format!("{}/actors/github", &state.base_url).parse()?,
                 to: vec![format!("{}/actors/forge", &state.base_url).parse()?],
                 cc: vec![],
-                object: forge::Object::MergeRequest(forge::MergeRequest {
+                object: forge::ActivityObject::MergeRequest(forge::MergeRequest {
                     action: event.action,
                     number: event.number as u64,
                     title: event.pull_request.title,
@@ -213,7 +213,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                 actor: format!("{}/actors/github", &state.base_url).parse()?,
                 to: vec![format!("{}/actors/forge", &state.base_url).parse()?],
                 cc: vec![],
-                object: forge::Object::Push(forge::Push {
+                object: forge::ActivityObject::Push(forge::Push {
                     before: event.before,
                     after: event.after,
                     ref_name: event.ref_name,

@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use async_graphql::{dataloader::DataLoader, dynamic::*};
+use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::response::{Html, IntoResponse};
 use axum::routing::get;
-use axum::{Json, Router};
+use axum::{Extension, Json, Router};
 use clap::Parser;
 use config::Environment;
 use deadpool_lapin::lapin::message::Delivery;
@@ -19,6 +21,7 @@ use deadpool_lapin::Pool;
 use futures::{join, StreamExt};
 use miette::Diagnostic;
 use sea_orm::{ActiveValue, Database, DatabaseConnection};
+use seaography::{Builder, BuilderContext};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -29,6 +32,8 @@ use migration::{Migrator, MigratorTrait};
 
 mod activities;
 mod entity;
+
+lazy_static::lazy_static! { static ref CONTEXT : BuilderContext = BuilderContext :: default () ; }
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -64,6 +69,9 @@ pub enum Error {
     #[error(transparent)]
     SeaOrm(#[from] sea_orm::DbErr),
 
+    #[error(transparent)]
+    GraphQLDynamicSchema(#[from] async_graphql::dynamic::SchemaError),
+
     #[error("{0}")]
     String(String),
 }
@@ -85,6 +93,16 @@ pub struct Config {
     pub job_inbox: String,
     pub inbox: String,
     pub connection_string: String,
+    pub graphql: GraphQLConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GraphQLConfig {
+    pub depth_limit: usize,
+    pub complexity_limit: usize,
+    pub use_ssl: bool,
+    pub domain: String,
+    pub port: u16,
 }
 
 pub fn load_config(args: Args) -> Result<Config> {
@@ -98,6 +116,11 @@ pub fn load_config(args: Args) -> Result<Config> {
         .set_default("listen", "0.0.0.0:3100")?
         .set_default("job_inbox", "JOB_INBOX")?
         .set_default("inbox", "INBOX")?
+        .set_default("graphql.depth_limit", 10)?
+        .set_default("graphql.complexity_limit", 1000)?
+        .set_default("graphql.use_ssl", false)?
+        .set_default("graphql.domain", "localhost")?
+        .set_default("graphql.port", 3100)?
         .set_default(
             "connection_string",
             "postgres://forge:forge@localhost/forge",
@@ -109,10 +132,15 @@ pub fn load_config(args: Args) -> Result<Config> {
 
 #[derive(Debug)]
 struct AppState {
-    amqp: deadpool_lapin::Pool,
+    amqp: Pool,
     job_inbox: String,
     inbox: String,
     database: DatabaseConnection,
+    graphql: GraphQLConfig,
+}
+
+pub struct OrmDataloader {
+    pub db: DatabaseConnection,
 }
 
 type SharedState = Arc<Mutex<AppState>>;
@@ -126,12 +154,13 @@ pub async fn listen(cfg: Config) -> Result<()> {
         .max_connections(100);
     debug!("Opening RabbitMQ Connection");
     let state = Arc::new(Mutex::new(AppState {
+        graphql: cfg.graphql.clone(),
         amqp: cfg
             .amqp
             .create_pool(Some(deadpool_lapin::Runtime::Tokio1))?,
         job_inbox: cfg.job_inbox,
         inbox: cfg.inbox,
-        database: Database::connect(opts).await?,
+        database: Database::connect(opts.clone()).await?,
     }));
     let conn = state.lock().await.amqp.get().await?;
     let job_inbox = state.lock().await.job_inbox.clone();
@@ -172,11 +201,24 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     debug!("Migrating Database");
     Migrator::up(&state.lock().await.database, None).await?;
-
+    let orm_dataloader: DataLoader<OrmDataloader> = DataLoader::new(
+        OrmDataloader {
+            db: Database::connect(opts.clone()).await?,
+        },
+        tokio::spawn,
+    );
+    let schema = schema(
+        opts,
+        orm_dataloader,
+        Some(cfg.graphql.depth_limit),
+        Some(cfg.graphql.complexity_limit),
+    )
+    .await?;
     let amqp_consume_pool = state.lock().await.amqp.clone();
     let app = Router::new()
         .route("/healthz", get(health_check))
-        //.layer(tower_http::trace::TraceLayer::new_for_http())
+        .route("/", get(playground).post(graphql_handler))
+        .layer(Extension(schema))
         .with_state(state);
     info!("Listening on {0}", &cfg.listen);
     // run it with hyper on localhost:3100
@@ -204,8 +246,8 @@ async fn rabbitmq_listen(
         retry_interval.tick().await;
         info!("connecting amqp consumer...");
         match handle_rabbitmq(pool.clone(), &database, inbox_name, job_inbox_name).await {
-            Ok(_) => tracing::info!("rmq listen returned"),
-            Err(e) => tracing::error!(error = e.to_string(), "rmq listen had an error"),
+            Ok(_) => info!("rmq listen returned"),
+            Err(e) => error!(error = e.to_string(), "rmq listen had an error"),
         };
     }
 }
@@ -264,7 +306,7 @@ async fn handle_message(
         Event::Create(envelope) => {
             debug!("got create event: {:?}", envelope);
             match envelope.object {
-                Object::MergeRequest(mr) => {
+                ActivityObject::MergeRequest(mr) => {
                     use sea_orm::entity::prelude::*;
                     let repo = entity::prelude::SourceRepo::find()
                         .filter(entity::source_repo::Column::Url.eq(mr.repository.clone()))
@@ -304,34 +346,121 @@ async fn handle_message(
                         debug!("repo not found, ignoring event");
                     }
                 }
-                Object::PackageRepository(pr) => {}
-                Object::Package(p) => {}
-                Object::SoftwareComponent(sc) => {}
-                Object::Push(p) => {}
+                ActivityObject::PackageRepository(pr) => {
+                    use sea_orm::entity::prelude::*;
+                    let dbpr = entity::prelude::PackageRepository::find()
+                        .filter(
+                            entity::package_repository::Column::Url.eq(pr.url.clone().to_string()),
+                        )
+                        .one(database)
+                        .await?;
+                    if dbpr.is_none() {
+                        let new_repo_id = Uuid::new_v4();
+                        let dbpr = entity::package_repository::ActiveModel {
+                            id: ActiveValue::Set(new_repo_id.clone()),
+                            name: ActiveValue::Set(pr.name.clone()),
+                            url: ActiveValue::Set(pr.url.clone().to_string()),
+                            public_key: ActiveValue::Set(pr.public_key.clone()),
+                        };
+                        dbpr.save(database).await?;
+                        for publisher in pr.publishers {
+                            let dbp = entity::publisher::ActiveModel {
+                                id: ActiveValue::Set(Uuid::new_v4()),
+                                name: ActiveValue::Set(publisher),
+                                package_repository_id: ActiveValue::Set(new_repo_id.clone()),
+                            };
+                            dbp.save(database).await?;
+                        }
+                    } else {
+                        debug!("repo found, ignoring event");
+                    }
+                }
+                ActivityObject::Package(p) => {}
+                ActivityObject::SoftwareComponent(sc) => {}
+                ActivityObject::Push(p) => {}
             }
         }
         Event::Update(envelope) => {
             debug!("got update event: {:?}", envelope);
             match envelope.object {
-                Object::Push(_) => {}
-                Object::MergeRequest(_) => {}
-                Object::PackageRepository(_) => {}
-                Object::Package(_) => {}
-                Object::SoftwareComponent(_) => {}
+                ActivityObject::Push(_) => {}
+                ActivityObject::MergeRequest(_) => {}
+                ActivityObject::PackageRepository(_) => {}
+                ActivityObject::Package(_) => {}
+                ActivityObject::SoftwareComponent(_) => {}
             }
         }
         Event::Delete(envelope) => {
             debug!("got delete event: {:?}", envelope);
             match envelope.object {
-                Object::Push(_) => {}
-                Object::MergeRequest(_) => {}
-                Object::PackageRepository(_) => {}
-                Object::Package(_) => {}
-                Object::SoftwareComponent(_) => {}
+                ActivityObject::Push(_) => {}
+                ActivityObject::MergeRequest(_) => {}
+                ActivityObject::PackageRepository(_) => {}
+                ActivityObject::Package(_) => {}
+                ActivityObject::SoftwareComponent(_) => {}
             }
         }
     }
     Ok(())
+}
+
+async fn graphql_handler(schema: Extension<Schema>, req: GraphQLRequest) -> GraphQLResponse {
+    schema.execute(req.into_inner()).await.into()
+}
+
+async fn schema(
+    opts: sea_orm::ConnectOptions,
+    orm_dataloader: DataLoader<OrmDataloader>,
+    depth: Option<usize>,
+    complexity: Option<usize>,
+) -> Result<Schema> {
+    let database = Database::connect(opts.clone()).await?;
+    use entity::*;
+    let mut builder = Builder::new(&CONTEXT);
+    seaography::register_entities!(
+        builder,
+        [
+            blob,
+            component,
+            gate,
+            merge_request_to_component_record,
+            package,
+            package_repository,
+            publisher,
+            push_to_component_record,
+            source_merge_request,
+            source_repo,
+            source_repo_push,
+            source_to_gate_record,
+        ]
+    );
+    let schema = builder.schema_builder();
+    let schema = if let Some(depth) = depth {
+        schema.limit_depth(depth)
+    } else {
+        schema
+    };
+    let schema = if let Some(complexity) = complexity {
+        schema.limit_complexity(complexity)
+    } else {
+        schema
+    };
+    Ok(schema.data(database).data(orm_dataloader).finish()?)
+}
+
+async fn playground(State(state): State<SharedState>) -> impl IntoResponse {
+    use async_graphql::http::*;
+    let scheme = if state.lock().await.graphql.use_ssl {
+        "https"
+    } else {
+        "http"
+    };
+    let domain = state.lock().await.graphql.domain.clone();
+    let port = state.lock().await.graphql.port.clone();
+    let endpoint = format!("{}://{}:{}", scheme, domain, port);
+    Html(playground_source(GraphQLPlaygroundConfig::new(
+        endpoint.as_str(),
+    )))
 }
 
 #[derive(Serialize, Default)]

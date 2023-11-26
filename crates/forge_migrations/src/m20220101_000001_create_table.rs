@@ -18,6 +18,11 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Publisher::Name).string().not_null())
+                    .col(
+                        ColumnDef::new(Publisher::PackageRepositoryId)
+                            .uuid()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -131,6 +136,19 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_foreign_key(
+                ForeignKey::create()
+                    .name("publisher_package_repository_id")
+                    .from_tbl(Publisher::Table)
+                    .from_col(Publisher::PackageRepositoryId)
+                    .to_tbl(PackageRepository::Table)
+                    .to_col(PackageRepository::Id)
+                    .on_delete(ForeignKeyAction::Cascade)
                     .to_owned(),
             )
             .await?;
@@ -444,6 +462,7 @@ enum Publisher {
     Table,
     Id,
     Name,
+    PackageRepositoryId,
 }
 
 #[derive(DeriveIden)]

@@ -9,17 +9,32 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub name: String,
+    pub package_repository_id: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_many = "super::gate::Entity")]
     Gate,
+    #[sea_orm(
+        belongs_to = "super::package_repository::Entity",
+        from = "Column::PackageRepositoryId",
+        to = "super::package_repository::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    PackageRepository,
 }
 
 impl Related<super::gate::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Gate.def()
+    }
+}
+
+impl Related<super::package_repository::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::PackageRepository.def()
     }
 }
 
@@ -29,4 +44,6 @@ impl ActiveModelBehavior for ActiveModel {}
 pub enum RelatedEntity {
     #[sea_orm(entity = "super::gate::Entity")]
     Gate,
+    #[sea_orm(entity = "super::package_repository::Entity")]
+    PackageRepository,
 }

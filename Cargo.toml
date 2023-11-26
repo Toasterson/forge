@@ -9,7 +9,7 @@ edition = "2021"
 
 [dependencies]
 github.workspace = true
-miette = {workspace = true, features = ["fancy"] }
+miette = { workspace = true, features = ["fancy"] }
 thiserror.workspace = true
 serde.workspace = true
 url.workspace = true
@@ -22,11 +22,15 @@ clap.workspace = true
 hyper.workspace = true
 config.workspace = true
 serde_json.workspace = true
-sea-orm = { version = "0.12.4", features = ["sqlx-postgres", "runtime-tokio-rustls", "with-json", "mock", "macros", "with-chrono", "with-uuid"] }
+sea-orm = { version = "0.12.4", features = ["sqlx-postgres", "runtime-tokio-rustls", "with-json", "mock", "macros", "with-chrono", "with-uuid", "seaography"] }
 f3-rs = { git = "https://git.batsense.net/ForgeFlux/f3-rs.git", version = "0.1.0" }
 migration = { path = "crates/forge_migrations", version = "*" }
 futures.workspace = true
 uuid = { version = "1.5.0", features = ["v4", "serde"] }
+async-graphql = { version = "5.0.10", features = ["decimal", "chrono", "dataloader", "dynamic-schema"] }
+async-graphql-axum = "5.0.10"
+seaography = { version = "1.0.0-rc.2", features = ["with-decimal", "with-chrono", "with-uuid", "with-json"] }
+lazy_static = "1.4.0"
 
 [workspace]
 members = ["crates/*"]
@@ -46,7 +50,7 @@ axum = { version = "0.6.20", features = ["tracing"] }
 clap = { version = "4.4.7", features = ["derive"] }
 hyper = "0.14.27"
 github = { version = "*", path = "crates/github" }
-strum = { version = "0.25.0", features=["derive"] }
+strum = { version = "0.25.0", features = ["derive"] }
 forge = { version = "*", path = "." }
 url = { version = "2.4.1", features = ["serde"] }
 futures = "0.3.17"

@@ -40,11 +40,11 @@ pub struct ActivityEnvelope {
     pub actor: Url,
     pub to: Vec<Url>,
     pub cc: Vec<Url>,
-    pub object: Object,
+    pub object: ActivityObject,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum Object {
+pub enum ActivityObject {
     Push(Push),
     MergeRequest(MergeRequest),
     PackageRepository(PackageRepository),
@@ -83,6 +83,8 @@ pub struct SoftwareComponent {
 pub struct PackageRepository {
     pub name: String,
     pub publishers: Vec<String>,
+    pub url: Url,
+    pub public_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
