@@ -366,7 +366,60 @@ impl MigrationTrait for Migration {
                     .on_delete(ForeignKeyAction::Cascade)
                     .to_owned(),
             )
-            .await
+            .await?;
+
+        manager.create_table(
+            Table::create().table(Job::Table)
+                .if_not_exists()
+                .col(ColumnDef::new(Job::Id).uuid().not_null().primary_key(), )
+                .col(ColumnDef::new(Job::Patch).string().null(), )
+                .col(ColumnDef::new(Job::RefName).string().not_null(), )
+                .col(ColumnDef::new(Job::BaseRef).string().null(), )
+                .col(ColumnDef::new(Job::Repository).string().not_null())
+                .col(ColumnDef::new(Job::ConfRef).string().null())
+                .col(ColumnDef::new(Job::Tags).array(ColumnType::Text).null())
+                .col(ColumnDef::new(Job::JobType).string().null())
+                .col(ColumnDef::new(Job::PackageRepoId).uuid().null())
+                .col(ColumnDef::new(Job::SourceRepoId).uuid().not_null())
+                .foreign_key(ForeignKey::create().from(Job::Table, Job::PackageRepoId).to(PackageRepository::Table, PackageRepository::Id))
+                .foreign_key(ForeignKey::create().from(Job::Table, Job::SourceRepoId).to(SourceRepo::Table, SourceRepo::Id))
+                .to_owned()
+        ).await?;
+
+        manager.create_table(
+            Table::create().table(JobToComponentRecord::Table)
+                .if_not_exists()
+                .col(ColumnDef::new(JobToComponentRecord::JobId).uuid().not_null())
+                .col(ColumnDef::new(JobToComponentRecord::ComponentId).uuid().not_null()).primary_key(
+                Index::create()
+                    .name("job_to_component_pk")
+                    .col(JobToComponentRecord::JobId)
+                    .col(JobToComponentRecord::ComponentId),
+                )
+                .to_owned()
+        ).await?;
+
+        manager.create_foreign_key(
+            ForeignKey::create()
+               .name("job_to_component_job_id")
+               .from_tbl(JobToComponentRecord::Table)
+                .from_col(JobToComponentRecord::JobId)
+               .to_tbl(Job::Table)
+               .to_col(Job::Id)
+               .on_delete(ForeignKeyAction::Cascade)
+               .to_owned()
+        ).await?;
+
+        manager.create_foreign_key(
+            ForeignKey::create()
+                .name("job_to_component_to_component_id")
+                .from_tbl(JobToComponentRecord::Table)
+                .from_col(JobToComponentRecord::ComponentId)
+                .to_tbl(Component::Table)
+                .to_col(Component::Id)
+                .on_delete(ForeignKeyAction::Cascade)
+                .to_owned()
+        ).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -403,8 +456,32 @@ impl MigrationTrait for Migration {
             .await?;
         manager
             .drop_table(Table::drop().table(SourceRepo::Table).to_owned())
-            .await
+            .await?;
+        manager.drop_table(Table::drop().table(Job::Table).to_owned()).await?;
+        manager.drop_table(Table::drop().table(JobToComponentRecord::Table).to_owned()).await
     }
+}
+
+#[derive(DeriveIden)]
+enum JobToComponentRecord {
+    Table,
+    JobId,
+    ComponentId,
+}
+
+#[derive(DeriveIden)]
+enum Job {
+    Table,
+    Id,
+    SourceRepoId,
+    PackageRepoId,
+    Patch,
+    RefName,
+    BaseRef,
+    ConfRef,
+    Repository,
+    Tags,
+    JobType,
 }
 
 #[derive(DeriveIden)]

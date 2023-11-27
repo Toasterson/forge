@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use async_graphql::{dataloader::DataLoader, dynamic::*};
-use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
+use async_graphql::{Schema, EmptySubscription};
+use async_graphql_axum::{GraphQL};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
-use axum::{Extension, Json, Router};
+use axum::{Json, Router};
 use clap::Parser;
 use config::Environment;
 use deadpool_lapin::lapin::message::Delivery;
@@ -20,20 +20,20 @@ use deadpool_lapin::lapin::Channel;
 use deadpool_lapin::Pool;
 use futures::{join, StreamExt};
 use miette::Diagnostic;
-use sea_orm::{ActiveValue, Database, DatabaseConnection};
-use seaography::{Builder, BuilderContext};
+use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, log, trace};
+use tracing::{debug, error, info, log, trace, warn};
+use uuid::Uuid;
 
 pub use activities::*;
 use migration::{Migrator, MigratorTrait};
+use crate::graphql::{MutationRoot, QueryRoot};
 
 mod activities;
 mod entity;
-
-lazy_static::lazy_static! { static ref CONTEXT : BuilderContext = BuilderContext :: default () ; }
+mod graphql;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -68,9 +68,6 @@ pub enum Error {
 
     #[error(transparent)]
     SeaOrm(#[from] sea_orm::DbErr),
-
-    #[error(transparent)]
-    GraphQLDynamicSchema(#[from] async_graphql::dynamic::SchemaError),
 
     #[error("{0}")]
     String(String),
@@ -139,10 +136,6 @@ struct AppState {
     graphql: GraphQLConfig,
 }
 
-pub struct OrmDataloader {
-    pub db: DatabaseConnection,
-}
-
 type SharedState = Arc<Mutex<AppState>>;
 
 pub async fn listen(cfg: Config) -> Result<()> {
@@ -201,24 +194,15 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     debug!("Migrating Database");
     Migrator::up(&state.lock().await.database, None).await?;
-    let orm_dataloader: DataLoader<OrmDataloader> = DataLoader::new(
-        OrmDataloader {
-            db: Database::connect(opts.clone()).await?,
-        },
-        tokio::spawn,
-    );
-    let schema = schema(
-        opts,
-        orm_dataloader,
-        Some(cfg.graphql.depth_limit),
-        Some(cfg.graphql.complexity_limit),
-    )
-    .await?;
+
+    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+        .data(Database::connect(opts.clone()).await?)
+        .finish();
+
     let amqp_consume_pool = state.lock().await.amqp.clone();
     let app = Router::new()
         .route("/healthz", get(health_check))
-        .route("/", get(playground).post(graphql_handler))
-        .layer(Extension(schema))
+        .route("/", get(playground).post_service(GraphQL::new(schema)))
         .with_state(state);
     info!("Listening on {0}", &cfg.listen);
     // run it with hyper on localhost:3100
@@ -333,6 +317,20 @@ async fn handle_message(
                             tags: None,
                             job_type: Some(KnownJobs::CheckForChangedComponents),
                         };
+                        let db_job = entity::job::ActiveModel {
+                            id: ActiveValue::Set(Uuid::new_v4()),
+                            patch: ActiveValue::Set(job.patch.clone().map(|u| u.to_string())),
+                            ref_name: ActiveValue::Set(job.ref_name.clone()),
+                            base_ref: ActiveValue::Set(job.base_ref.clone()),
+                            repository: ActiveValue::Set(job.repository.clone()),
+                            conf_ref: ActiveValue::Set(job.conf_ref.clone()),
+                            tags: ActiveValue::Set(job.tags.clone()),
+                            job_type: ActiveValue::NotSet,
+                            package_repo_id: ActiveValue::NotSet,
+                            source_repo_id: ActiveValue::Set(repo.id.clone()),
+                        };
+                        db_job.insert(database).await?;
+
                         trace!("sending job: {:?}", job);
                         let payload = serde_json::to_vec(&job)?;
                         job_channel
@@ -405,51 +403,6 @@ async fn handle_message(
     }
     Ok(())
 }
-
-async fn graphql_handler(schema: Extension<Schema>, req: GraphQLRequest) -> GraphQLResponse {
-    schema.execute(req.into_inner()).await.into()
-}
-
-async fn schema(
-    opts: sea_orm::ConnectOptions,
-    orm_dataloader: DataLoader<OrmDataloader>,
-    depth: Option<usize>,
-    complexity: Option<usize>,
-) -> Result<Schema> {
-    let database = Database::connect(opts.clone()).await?;
-    use entity::*;
-    let mut builder = Builder::new(&CONTEXT);
-    seaography::register_entities!(
-        builder,
-        [
-            blob,
-            component,
-            gate,
-            merge_request_to_component_record,
-            package,
-            package_repository,
-            publisher,
-            push_to_component_record,
-            source_merge_request,
-            source_repo,
-            source_repo_push,
-            source_to_gate_record,
-        ]
-    );
-    let schema = builder.schema_builder();
-    let schema = if let Some(depth) = depth {
-        schema.limit_depth(depth)
-    } else {
-        schema
-    };
-    let schema = if let Some(complexity) = complexity {
-        schema.limit_complexity(complexity)
-    } else {
-        schema
-    };
-    Ok(schema.data(database).data(orm_dataloader).finish()?)
-}
-
 async fn playground(State(state): State<SharedState>) -> impl IntoResponse {
     use async_graphql::http::*;
     let scheme = if state.lock().await.graphql.use_ssl {
