@@ -1,0 +1,22 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run receiver" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+    <option name="command" value="run --package ghwhrecv --bin receiver" />
+    <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+    <option name="emulateTerminal" value="true" />
+    <option name="channel" value="DEFAULT" />
+    <option name="requiredFeatures" value="true" />
+    <option name="allFeatures" value="false" />
+    <option name="withSudo" value="false" />
+    <option name="buildTarget" value="REMOTE" />
+    <option name="backtrace" value="SHORT" />
+    <envs>
+      <env name="WEBHOOK__AMQP_URL" value="amqp://dev:dev@localhost:5672/master" />
+      <env name="WEBHOOK__DOMAIN" value="localhost" />
+    </envs>
+    <option name="isRedirectInput" value="false" />
+    <option name="redirectInputPath" value="" />
+    <method v="2">
+      <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+    </method>
+  </configuration>
+</component>

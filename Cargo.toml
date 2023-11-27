@@ -29,7 +29,7 @@ futures.workspace = true
 uuid = { version = "1.5.0", features = ["v4", "serde"] }
 async-graphql = { version = "5.0.10", features = ["decimal", "chrono", "dataloader", "dynamic-schema"] }
 async-graphql-axum = "5.0.10"
-seaography = { version = "1.0.0-rc.2", features = ["with-decimal", "with-chrono", "with-uuid", "with-json"] }
+seaography = { version = "*", features = ["with-decimal", "with-chrono", "with-uuid", "with-json"] }
 lazy_static = "1.4.0"
 
 [workspace]

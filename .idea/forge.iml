@@ -6,6 +6,11 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/github/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/forge_migrations/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/external_crates/seaography/cli/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/external_crates/seaography/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/external_crates/seaography/generator/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/external_crates/seaography/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/external_crates/seaography/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
