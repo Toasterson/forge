@@ -1,4 +1,5 @@
 use sea_orm_migration::prelude::*;
+use crate::extension::postgres::TypeCreateStatement;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -169,6 +170,12 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        manager.create_type(TypeCreateStatement::new().as_enum(SourceRepoKind::SourceRepoKind)
+            .values([SourceRepoKind::Recipes, SourceRepoKind::Upstream]).to_owned()).await?;
+
+        manager.create_type(TypeCreateStatement::new().as_enum(RecipeKind::RecipeKind)
+            .values([RecipeKind::Forge, RecipeKind::OpenIndianaUserland]).to_owned()).await?;
+
         manager
             .create_table(
                 Table::create()
@@ -182,6 +189,10 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(SourceRepo::Name).string().not_null())
                     .col(ColumnDef::new(SourceRepo::Url).string().not_null())
+                    .col(ColumnDef::new(SourceRepo::RepoKind).enumeration(SourceRepoKind::SourceRepoKind,
+                      [SourceRepoKind::Recipes, SourceRepoKind::Upstream]).not_null())
+                    .col(ColumnDef::new(SourceRepo::RecipeKind).enumeration(RecipeKind::RecipeKind,
+                            [RecipeKind::Forge, RecipeKind::OpenIndianaUserland]).not_null())
                     .to_owned(),
             )
             .await?;
@@ -490,6 +501,22 @@ enum SourceRepo {
     Id,
     Name,
     Url,
+    RepoKind,
+    RecipeKind,
+}
+
+#[derive(DeriveIden)]
+enum RecipeKind {
+    RecipeKind,
+    OpenIndianaUserland,
+    Forge,
+}
+
+#[derive(DeriveIden)]
+enum SourceRepoKind {
+    SourceRepoKind,
+    Recipes,
+    Upstream,
 }
 
 #[derive(DeriveIden)]

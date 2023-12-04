@@ -12,6 +12,7 @@ pub mod package;
 pub mod package_repository;
 pub mod publisher;
 pub mod push_to_component_record;
+pub mod sea_orm_active_enums;
 pub mod source_merge_request;
 pub mod source_repo;
 pub mod source_repo_push;

@@ -20,12 +20,11 @@ use deadpool_lapin::lapin::Channel;
 use deadpool_lapin::Pool;
 use futures::{join, StreamExt};
 use miette::Diagnostic;
-use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection};
+use sea_orm::{ActiveValue, Database, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, log, trace, warn};
-use uuid::Uuid;
+use tracing::{debug, error, info, log, trace};
 
 pub use activities::*;
 use migration::{Migrator, MigratorTrait};

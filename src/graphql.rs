@@ -1,9 +1,8 @@
-use async_graphql::{Context, EmptySubscription, InputObject, Object, Schema, Result};
+use async_graphql::{Context, InputObject, Object, Result, Enum};
 use sea_orm::*;
 use uuid::Uuid;
 use crate::entity::{*, prelude::*};
-
-pub type ForgeSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
+use crate::entity::sea_orm_active_enums::RecipeKind;
 
 pub struct QueryRoot;
 
@@ -23,6 +22,56 @@ pub struct MutationRoot;
 struct CreateRepoInput {
     name: String,
     url: String,
+    repo_kind: Option<SourceRepoKind>,
+    recipes_kind: RecipesKind,
+}
+
+#[derive(strum::Display, Enum, Copy, Clone, Eq, PartialEq)]
+enum RecipesKind {
+    OpenIndianaUserland,
+    Forge,
+}
+
+impl From<RecipeKind> for RecipesKind {
+    fn from(value: RecipeKind) -> Self {
+        match value {
+            RecipeKind::Forge => RecipesKind::Forge,
+            RecipeKind::OpenIndianaUserland => RecipesKind::OpenIndianaUserland,
+        }
+    }
+}
+
+impl Into<RecipeKind>  for RecipesKind{
+    fn into(self) -> RecipeKind {
+        match self {
+            RecipesKind::OpenIndianaUserland => RecipeKind::OpenIndianaUserland,
+            RecipesKind::Forge => RecipeKind::Forge,
+        }
+    }
+}
+
+#[derive(strum::Display, Enum, Copy, Clone, Eq, PartialEq)]
+enum SourceRepoKind {
+    Upstream,
+    Recipes,
+}
+
+impl From<sea_orm_active_enums::SourceRepoKind> for SourceRepoKind {
+    fn from(value: sea_orm_active_enums::SourceRepoKind) -> Self {
+        match value {
+            sea_orm_active_enums::SourceRepoKind::Recipes => SourceRepoKind::Recipes,
+            sea_orm_active_enums::SourceRepoKind::Upstream => SourceRepoKind::Upstream,
+        }
+    }
+}
+
+impl Into<sea_orm_active_enums::SourceRepoKind> for SourceRepoKind {
+    fn into(self) -> sea_orm_active_enums::SourceRepoKind {
+        match self {
+            SourceRepoKind::Upstream => sea_orm_active_enums::SourceRepoKind::Upstream,
+            SourceRepoKind::Recipes => sea_orm_active_enums::SourceRepoKind::Recipes,
+        }
+    }
 }
 
 struct SourceRepoObject(source_repo::Model);
@@ -40,6 +89,14 @@ impl SourceRepoObject {
     async fn url(&self) -> String {
         self.0.url.clone()
     }
+
+    async fn repo_kind(&self) -> SourceRepoKind {
+        SourceRepoKind::from(self.0.repo_kind.clone())
+    }
+
+    async fn recipe_kind(&self) -> RecipesKind {
+        RecipesKind::from(self.0.recipe_kind.clone())
+    }
 }
 #[Object]
 impl MutationRoot {
@@ -49,6 +106,8 @@ impl MutationRoot {
             id: ActiveValue::Set(Uuid::new_v4()),
             name: ActiveValue::Set(input.name),
             url: ActiveValue::Set(input.url),
+            repo_kind: ActiveValue::Set(input.repo_kind.unwrap_or(SourceRepoKind::Upstream).into()),
+            recipe_kind: ActiveValue::Set(input.recipes_kind.into()),
         };
         let repo = new_repo.insert(db).await?;
         Ok(SourceRepoObject(repo))
