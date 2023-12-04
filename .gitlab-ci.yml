@@ -1,5 +1,6 @@
 before_script:
-  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -- -y --profile complete
+  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -O rust-init.sh
+  - bash ./rust-init.sh -y --profile complete
   - cargo fetch
 
 build:
