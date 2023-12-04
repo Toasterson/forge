@@ -7,5 +7,5 @@ build:
     - dedicated
     - shell
   script:
-    - cargo build --release -p forged
+    - cargo build --release -p forge
     - cargo build --release -p ghwhrecv
