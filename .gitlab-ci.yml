@@ -1,0 +1,12 @@
+before_script:
+  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -- -y --profile complete
+  - cargo fetch
+
+build:
+  tags:
+    - illumos
+    - dedicated
+    - shell
+  script:
+    - cargo build --release -p forged
+    - cargo build --release -p ghwhrecv
