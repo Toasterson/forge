@@ -229,6 +229,16 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
+                    .col(
+                        ColumnDef::new(SourceMergeRequest::TargetRef)
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SourceMergeRequest::MergeRequestRef)
+                            .json_binary()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -384,10 +394,10 @@ impl MigrationTrait for Migration {
                 .if_not_exists()
                 .col(ColumnDef::new(Job::Id).uuid().not_null().primary_key(), )
                 .col(ColumnDef::new(Job::Patch).string().null(), )
-                .col(ColumnDef::new(Job::RefName).string().not_null(), )
-                .col(ColumnDef::new(Job::BaseRef).string().null(), )
+                .col(ColumnDef::new(Job::MergeRequestRef).json_binary().not_null(), )
+                .col(ColumnDef::new(Job::TargetRef).json_binary().not_null(), )
                 .col(ColumnDef::new(Job::Repository).string().not_null())
-                .col(ColumnDef::new(Job::ConfRef).string().null())
+                .col(ColumnDef::new(Job::ConfRef).json_binary().null())
                 .col(ColumnDef::new(Job::Tags).array(ColumnType::Text).null())
                 .col(ColumnDef::new(Job::JobType).string().null())
                 .col(ColumnDef::new(Job::PackageRepoId).uuid().null())
@@ -487,8 +497,8 @@ enum Job {
     SourceRepoId,
     PackageRepoId,
     Patch,
-    RefName,
-    BaseRef,
+    MergeRequestRef,
+    TargetRef,
     ConfRef,
     Repository,
     Tags,
@@ -528,6 +538,8 @@ enum SourceMergeRequest {
     Repository,
     State,
     APIKind,
+    TargetRef,
+    MergeRequestRef,
 }
 
 #[derive(DeriveIden)]

@@ -175,11 +175,11 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                     number: event.number as u64,
                     title: event.pull_request.title,
                     body: event.pull_request.body,
-                    head: CommitRef {
+                    merge_request_ref: CommitRef {
                         sha: event.pull_request.head.sha,
                         ref_name: event.pull_request.head.ref_name,
                     },
-                    base: CommitRef {
+                    target_ref: CommitRef {
                         sha: event.pull_request.base.sha,
                         ref_name: event.pull_request.base.ref_name,
                     },

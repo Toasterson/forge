@@ -13,6 +13,10 @@ pub struct Model {
     pub repository: Uuid,
     pub state: String,
     pub api_kind: String,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub target_ref: Json,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub merge_request_ref: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

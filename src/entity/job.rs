@@ -9,10 +9,13 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub patch: Option<String>,
-    pub ref_name: String,
-    pub base_ref: Option<String>,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub merge_request_ref: Json,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub target_ref: Json,
     pub repository: String,
-    pub conf_ref: Option<String>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub conf_ref: Option<Json>,
     pub tags: Option<Vec<String>>,
     pub job_type: Option<String>,
     pub package_repo_id: Option<Uuid>,

@@ -57,8 +57,8 @@ pub struct MergeRequest {
     pub number: u64,
     pub title: String,
     pub body: Option<String>,
-    pub head: CommitRef,
-    pub base: CommitRef,
+    pub merge_request_ref: CommitRef,
+    pub target_ref: CommitRef,
     pub repository: String,
     pub origin_url: Option<String>,
     pub action: String,
@@ -66,7 +66,7 @@ pub struct MergeRequest {
     pub patch: Option<Url>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitRef {
     pub sha: String,
     #[serde(rename = "ref")]
@@ -145,9 +145,9 @@ pub struct Job {
     /// Optional URL with a patch to apply to the repository before building.
     pub patch: Option<Url>,
     /// The reference to pass to git to pull the correct basis for the build.
-    pub ref_name: String,
+    pub merge_request_ref: CommitRef,
     /// Optional a ref that can be used to construct the list of changed files in the build.
-    pub base_ref: Option<String>,
+    pub target_ref: Option<CommitRef>,
     /// repository this job is related to. Must be the Forge Known repository and not a fork
     pub repository: String,
     /// the reference to pass to git with the build config if the source branch is not trusted (for example in pull requests)

@@ -304,13 +304,15 @@ async fn handle_message(
                             repository: ActiveValue::Set(repo.id),
                             state: ActiveValue::Set(mr.action),
                             api_kind: ActiveValue::Set("github".to_string()),
+                            target_ref: ActiveValue::Set(serde_json::to_value(&mr.target_ref)?),
+                            merge_request_ref: ActiveValue::Set(serde_json::to_value(&mr.merge_request_ref)?),
                         };
                         let res = dbmr.insert(database).await?;
                         trace!("saved merge request: {:?}", res);
                         let job = Job {
                             patch: mr.patch,
-                            ref_name: mr.head.ref_name,
-                            base_ref: Some(mr.base.ref_name),
+                            merge_request_ref: mr.merge_request_ref.clone(),
+                            target_ref: Some(mr.target_ref.clone()),
                             repository: mr.repository.clone(),
                             conf_ref: Some("default".to_string()),
                             tags: None,
@@ -319,10 +321,10 @@ async fn handle_message(
                         let db_job = entity::job::ActiveModel {
                             id: ActiveValue::Set(Uuid::new_v4()),
                             patch: ActiveValue::Set(job.patch.clone().map(|u| u.to_string())),
-                            ref_name: ActiveValue::Set(job.ref_name.clone()),
-                            base_ref: ActiveValue::Set(job.base_ref.clone()),
+                            merge_request_ref: ActiveValue::Set(serde_json::to_value(&job.merge_request_ref)?),
+                            target_ref: ActiveValue::Set(serde_json::to_value(&job.target_ref)?),
                             repository: ActiveValue::Set(job.repository.clone()),
-                            conf_ref: ActiveValue::Set(job.conf_ref.clone()),
+                            conf_ref: ActiveValue::Set(None),
                             tags: ActiveValue::Set(job.tags.clone()),
                             job_type: ActiveValue::NotSet,
                             package_repo_id: ActiveValue::NotSet,
