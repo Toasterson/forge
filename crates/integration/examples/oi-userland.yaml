@@ -1,0 +1,3 @@
+---
+component_list:
+  - "./tools/bass-o-matic --workspace=./ --components=paths | sed -e 's;./components/;;'"

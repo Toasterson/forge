@@ -1,0 +1,16 @@
+[package]
+name = "integration"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+kaydle = "0.2.0"
+miette.workspace = true
+schemars = { version = "0.8.16", features = ["semver", "chrono", "url", "uuid1"] }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml = "0.9.27"
+thiserror.workspace = true
+toml = "0.8.8"
+uuid = { version = "1.6.1", features = ["v4", "serde"] }
+

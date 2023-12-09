@@ -31,6 +31,7 @@ async-graphql = { version = "6.0.11", features = ["decimal", "chrono", "dataload
 async-graphql-axum = "6.0.11"
 lazy_static = "1.4.0"
 strum.workspace = true
+integration = { version = "0.1.0", path = "crates/integration" }
 
 [workspace]
 members = ["crates/*"]
