@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
+use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
 pub enum Scheme {
@@ -26,6 +27,12 @@ impl Display for Scheme {
             Scheme::HTTPS => write!(f, "https"),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum UrlOrEncodedBlob {
+    Url(Url),
+    Blob(String),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -76,7 +83,8 @@ pub struct CommitRef {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SoftwareComponent {
     pub name: String,
-    pub recipe_files: Vec<Url>,
+    pub recipe_file: Option<UrlOrEncodedBlob>,
+    pub merge_request: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -144,10 +152,12 @@ pub struct Actor {
 pub struct Job {
     /// Optional URL with a patch to apply to the repository before building.
     pub patch: Option<Url>,
+    /// Uuid Reference to the MergeRequest
+    pub merge_request_id: Option<Uuid>,
     /// The reference to pass to git to pull the correct basis for the build.
     pub merge_request_ref: CommitRef,
     /// Optional a ref that can be used to construct the list of changed files in the build.
-    pub target_ref: Option<CommitRef>,
+    pub target_ref: CommitRef,
     /// repository this job is related to. Must be the Forge Known repository and not a fork
     pub repository: String,
     /// the reference to pass to git with the build config if the source branch is not trusted (for example in pull requests)

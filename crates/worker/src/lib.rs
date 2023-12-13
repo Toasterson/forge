@@ -2,9 +2,12 @@ use axum::{response::IntoResponse, routing::get, Json, Router};
 use clap::Parser;
 use config::{Environment, File};
 use deadpool_lapin::lapin::message::Delivery;
-use deadpool_lapin::lapin::options::{BasicAckOptions, BasicConsumeOptions, BasicNackOptions};
+use deadpool_lapin::lapin::options::{
+    BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,
+};
+use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{options::QueueDeclareOptions, types::FieldTable, Channel};
-use forge::{CommitRef, Job, Scheme};
+use forge::{ActivityEnvelope, CommitRef, Event, Job, Scheme};
 use futures::{join, StreamExt};
 use github::GitHubError;
 use integration::{read_forge_manifest, ForgeIntegrationManifest};
@@ -16,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use thiserror::Error;
 use tracing::{debug, error, info};
+use url::Url;
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum Error {
@@ -221,7 +225,15 @@ async fn handle_rabbitmq(state: AppState) -> Result<()> {
         match delivery {
             Ok(delivery) => {
                 let tag = delivery.delivery_tag;
-                match handle_message(delivery, &channel, &state.inbox, &state.worker_dir).await {
+                match handle_message(
+                    delivery,
+                    &channel,
+                    &state.inbox,
+                    &state.base_url,
+                    &state.worker_dir,
+                )
+                .await
+                {
                     Ok(_) => {
                         debug!("handled message");
                         channel.basic_ack(tag, BasicAckOptions::default()).await?;
@@ -243,10 +255,13 @@ async fn handle_message(
     deliver: Delivery,
     channel: &Channel,
     inbox_name: &str,
+    base_url: &str,
     worker_dir: &str,
 ) -> Result<()> {
     let body = deliver.data;
     let job: Job = serde_json::from_slice(&body)?;
+    let worker_actor: Url = format!("{}/actors/worker", base_url).parse()?;
+    let forge_actor: Url = format!("{}/actors/forge", base_url).parse()?;
     if let Some(know_job) = job.job_type {
         match know_job {
             forge::KnownJobs::CheckForChangedComponents => {
@@ -260,6 +275,32 @@ async fn handle_message(
                     job.conf_ref.clone(),
                 )?;
                 let component_list = get_component_list_in_repo(&build_dir, &manifest)?;
+                let changed_files = get_changed_files(&build_dir, &job.target_ref)?;
+                let changed_components = get_changed_components(component_list, changed_files);
+                for component in changed_components {
+                    let event = Event::Create(ActivityEnvelope {
+                        actor: worker_actor.clone(),
+                        to: vec![forge_actor.clone()],
+                        cc: vec![],
+                        object: forge::ActivityObject::SoftwareComponent(
+                            forge::SoftwareComponent {
+                                name: component,
+                                recipe_file: None,
+                                merge_request: job.merge_request_id,
+                            },
+                        ),
+                    });
+                    let payload = serde_json::to_vec(&event)?;
+                    channel
+                        .basic_publish(
+                            "",
+                            inbox_name,
+                            BasicPublishOptions::default(),
+                            &payload,
+                            AMQPProperties::default(),
+                        )
+                        .await?;
+                }
             }
         }
     } else {
@@ -267,10 +308,32 @@ async fn handle_message(
     Ok(())
 }
 
-fn get_changed_files<P: AsRef<Path>>(
-    ws: P,
-    manifest: &ForgeIntegrationManifest,
-) -> Result<Vec<String>> {
+fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String>) -> Vec<String> {
+    let mut changed_components: Vec<String> = vec![];
+    'outer: for component in component_list {
+        for file in changed_files.iter() {
+            if file.contains(&component) {
+                changed_components.push(component.clone());
+                continue 'outer;
+            }
+        }
+    }
+    changed_components
+}
+
+fn get_changed_files<P: AsRef<Path>>(ws: P, target_branch_ref: &CommitRef) -> Result<Vec<String>> {
+    let mut diff_cmd = Command::new("git");
+    diff_cmd.arg("diff");
+    diff_cmd.arg("--name-only");
+    diff_cmd.arg(target_branch_ref.sha.as_str());
+    diff_cmd.current_dir(ws.as_ref());
+    let out = diff_cmd.output()?;
+    if !out.status.success() {
+        let out_string = String::from_utf8(out.stderr)?;
+        return Err(Error::GitError("diff".into(), out_string));
+    }
+    let result = String::from_utf8(out.stdout)?;
+    Ok(result.split("\n").map(|s| s.to_owned()).collect())
 }
 
 fn get_component_list_in_repo<P: AsRef<Path>>(

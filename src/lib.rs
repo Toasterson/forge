@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use async_graphql::{Schema, EmptySubscription};
-use async_graphql_axum::{GraphQL};
+use async_graphql::{EmptySubscription, Schema};
+use async_graphql_axum::GraphQL;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
@@ -26,9 +26,9 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, log, trace};
 
+use crate::graphql::{MutationRoot, QueryRoot};
 pub use activities::*;
 use migration::{Migrator, MigratorTrait};
-use crate::graphql::{MutationRoot, QueryRoot};
 
 mod activities;
 mod entity;
@@ -305,23 +305,28 @@ async fn handle_message(
                             state: ActiveValue::Set(mr.action),
                             api_kind: ActiveValue::Set("github".to_string()),
                             target_ref: ActiveValue::Set(serde_json::to_value(&mr.target_ref)?),
-                            merge_request_ref: ActiveValue::Set(serde_json::to_value(&mr.merge_request_ref)?),
+                            merge_request_ref: ActiveValue::Set(serde_json::to_value(
+                                &mr.merge_request_ref,
+                            )?),
                         };
                         let res = dbmr.insert(database).await?;
                         trace!("saved merge request: {:?}", res);
                         let job = Job {
                             patch: mr.patch,
                             merge_request_ref: mr.merge_request_ref.clone(),
-                            target_ref: Some(mr.target_ref.clone()),
+                            target_ref: mr.target_ref.clone(),
                             repository: mr.repository.clone(),
                             conf_ref: Some("default".to_string()),
                             tags: None,
                             job_type: Some(KnownJobs::CheckForChangedComponents),
+                            merge_request_id: Some(res.id.clone()),
                         };
                         let db_job = entity::job::ActiveModel {
                             id: ActiveValue::Set(Uuid::new_v4()),
                             patch: ActiveValue::Set(job.patch.clone().map(|u| u.to_string())),
-                            merge_request_ref: ActiveValue::Set(serde_json::to_value(&job.merge_request_ref)?),
+                            merge_request_ref: ActiveValue::Set(serde_json::to_value(
+                                &job.merge_request_ref,
+                            )?),
                             target_ref: ActiveValue::Set(serde_json::to_value(&job.target_ref)?),
                             repository: ActiveValue::Set(job.repository.clone()),
                             conf_ref: ActiveValue::Set(None),
@@ -343,6 +348,7 @@ async fn handle_message(
                                 AMQPProperties::default(),
                             )
                             .await?;
+                        //TODO Dispatch job to self to create package repository for the merge request
                     } else {
                         debug!("repo not found, ignoring event");
                     }
@@ -372,33 +378,61 @@ async fn handle_message(
                             };
                             dbp.save(database).await?;
                         }
+                        //TODO Dispatch worker to create the repository (merge as function with merge request creation.)
                     } else {
                         debug!("repo found, ignoring event");
                     }
                 }
-                ActivityObject::Package(p) => {}
-                ActivityObject::SoftwareComponent(sc) => {}
-                ActivityObject::Push(p) => {}
+                ActivityObject::Package(_) => {
+                    //TODO save built packages to db and dispatch jobs to add them to the repo.
+                    //TODO put messages where we do not have a repository into the wait queue.
+                }
+                ActivityObject::SoftwareComponent(sc) => {
+                    //TODO save software components to DB and dispatch builds
+                }
+                ActivityObject::Push(_) => {
+                    //TODO dispatch builds
+                }
             }
         }
         Event::Update(envelope) => {
             debug!("got update event: {:?}", envelope);
             match envelope.object {
-                ActivityObject::Push(_) => {}
-                ActivityObject::MergeRequest(_) => {}
-                ActivityObject::PackageRepository(_) => {}
-                ActivityObject::Package(_) => {}
-                ActivityObject::SoftwareComponent(_) => {}
+                ActivityObject::Push(_) => {
+                    //TODO make some grave message that we wont do this and bounce message
+                }
+                ActivityObject::MergeRequest(_) => {
+                    //TODO dispatch db update and check if we need to start some new builds
+                }
+                ActivityObject::PackageRepository(_) => {
+                    //TODO dispatch worker to make repo
+                }
+                ActivityObject::Package(_) => {
+                    //TODO make a grave error that this is not supported.
+                }
+                ActivityObject::SoftwareComponent(_) => {
+                    //TODO Bump Revision and trigger builds
+                }
             }
         }
         Event::Delete(envelope) => {
             debug!("got delete event: {:?}", envelope);
             match envelope.object {
-                ActivityObject::Push(_) => {}
-                ActivityObject::MergeRequest(_) => {}
-                ActivityObject::PackageRepository(_) => {}
-                ActivityObject::Package(_) => {}
-                ActivityObject::SoftwareComponent(_) => {}
+                ActivityObject::Push(_) => {
+                    //TODO not supported
+                }
+                ActivityObject::MergeRequest(_) => {
+                    //TODO Close MR
+                }
+                ActivityObject::PackageRepository(_) => {
+                    //TODO dispatch cleanup
+                }
+                ActivityObject::Package(_) => {
+                    //TODO dispatch cleanup
+                }
+                ActivityObject::SoftwareComponent(_) => {
+                    //TODO dispatch cleanup
+                }
             }
         }
     }
