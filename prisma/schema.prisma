@@ -1,0 +1,40 @@
+datasource db {
+  provider   = "postgres"
+  url        = "postgres://dev:dev@localhost:5432/dev"
+  extensions = [uuidOssp(map: "uuid-ossp")]
+}
+
+generator client {
+  provider = "cargo prisma"
+  output   = "../src/prisma.rs"
+
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+model Domain {
+  id      String  @id @default(uuid()) @db.Uuid
+  dnsName String  @unique
+  actors  Actor[] @relation("Members")
+}
+
+model Actor {
+  id          String @id @default(uuid()) @db.Uuid
+  displayName String
+  handle      String @unique
+  domain      Domain @relation("Members", fields: [domainId], references: [id])
+  domainId    String @db.Uuid
+}
+
+model Key {
+  id          String  @id @default(uuid()) @db.Uuid
+  actor       Actor   @relation(fields: [actorId], references: [id])
+  actorId     String  @db.Uuid
+  name        String
+  private_key String
+  public_key  String
+  key_type    KeyType @default(Ed25519)
+}
+
+enum KeyType {
+  Ed25519
+}

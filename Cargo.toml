@@ -22,9 +22,7 @@ clap.workspace = true
 hyper.workspace = true
 config.workspace = true
 serde_json.workspace = true
-sea-orm = { version = "0.12.7", features = ["sqlx-postgres", "runtime-tokio-rustls", "with-json", "mock", "macros", "with-chrono", "with-uuid"] }
 f3-rs = { git = "https://git.batsense.net/ForgeFlux/f3-rs.git", version = "0.1.0" }
-migration = { path = "crates/forge_migrations", version = "*" }
 futures.workspace = true
 uuid = { version = "1.6.1", features = ["v4", "serde"] }
 async-graphql = { version = "6.0.11", features = ["decimal", "chrono", "dataloader", "dynamic-schema"] }
@@ -32,6 +30,7 @@ async-graphql-axum = "6.0.11"
 lazy_static = "1.4.0"
 strum.workspace = true
 integration = { version = "0.1.0", path = "crates/integration" }
+prisma-client-rust.workspace = true
 
 [workspace]
 members = ["crates/*"]
@@ -55,3 +54,5 @@ strum = { version = "0.25.0", features = ["derive"] }
 forge = { version = "*", path = "." }
 url = { version = "2.4.1", features = ["serde"] }
 futures = "0.3.17"
+prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", tag = "0.6.11", default-features = false, features=[ "postgresql", "sqlite", "mysql", "mssql" ] }
+prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", tag = "0.6.11" }
