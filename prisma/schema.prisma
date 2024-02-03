@@ -23,6 +23,7 @@ model Actor {
   handle      String @unique
   domain      Domain @relation("Members", fields: [domainId], references: [id])
   domainId    String @db.Uuid
+  Key         Key[]
 }
 
 model Key {
@@ -37,4 +38,93 @@ model Key {
 
 enum KeyType {
   Ed25519
+}
+
+model Publisher {
+  id           String              @id @default(uuid()) @db.Uuid
+  name         String
+  repositories PackageRepository[]
+  Gate         Gate[]
+}
+
+model PackageRepository {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  publisher   Publisher @relation(fields: [publisherId], references: [id])
+  publisherId String    @db.Uuid
+}
+
+model Gate {
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String
+  version         String
+  ref             String
+  branch          String
+  publisher       Publisher         @relation(fields: [publisherId], references: [id])
+  transforms      Json              @db.JsonB
+  publisherId     String            @db.Uuid
+  Component       Component[]
+  ComponentChange ComponentChange[]
+}
+
+model Component {
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String
+  version         String
+  revision        String
+  anitya_id       String?
+  repology_id     String?
+  project_url     String
+  gate            Gate              @relation(fields: [gateId], references: [id])
+  recipe          Json              @db.JsonB
+  patches         String[]
+  scripts         String[]
+  archives        String[]
+  packages        Json?             @db.JsonB
+  gateId          String            @db.Uuid
+  ComponentChange ComponentChange[]
+  BuildJob        BuildJob[]
+}
+
+model ComponentChange {
+  id              String              @id @default(uuid()) @db.Uuid
+  kind            ComponentChangeKind
+  diff            Json?               @db.JsonB
+  component       Component?          @relation(fields: [componentId], references: [id])
+  recipe          Json                @db.JsonB
+  version         String
+  revision        String
+  gate            Gate                @relation(fields: [gateId], references: [id])
+  patches         String[]
+  scripts         String[]
+  archives        String[]
+  change_request  ChangeRequest       @relation(fields: [changeRequestId], references: [id])
+  componentId     String?             @db.Uuid
+  gateId          String              @db.Uuid
+  changeRequestId String              @db.Uuid
+}
+
+enum ComponentChangeKind {
+  Added
+  Updated
+  Removed
+}
+
+model ChangeRequest {
+  id                 String            @id @default(uuid()) @db.Uuid
+  component_changes  ComponentChange[]
+  waitForRequest     ChangeRequest?    @relation("waitForRequest", fields: [waitForRequestId], references: [id])
+  waitForRequestId   String?           @db.Uuid
+  dependantRequests  ChangeRequest[]   @relation("waitForRequest")
+  build_order        String[]
+  external_reference String?
+  Jobs               BuildJob[]
+}
+
+model BuildJob {
+  id              String        @id @default(uuid()) @db.Uuid
+  component       Component     @relation(fields: [componentId], references: [id])
+  change_request  ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  componentId     String        @db.Uuid
+  changeRequestId String        @db.Uuid
 }
