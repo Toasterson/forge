@@ -1,5 +1,5 @@
-use std::sync::Arc;
-
+use crate::graphql::{MutationRoot, QueryRoot};
+pub use activities::*;
 use async_graphql::{EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
 use axum::extract::State;
@@ -11,28 +11,24 @@ use clap::Parser;
 use config::Environment;
 use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::options::{
-    BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,
-    QueueDeclareOptions,
+    BasicAckOptions, BasicConsumeOptions, BasicNackOptions, QueueDeclareOptions,
 };
-use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::types::FieldTable;
 use deadpool_lapin::lapin::Channel;
 use deadpool_lapin::Pool;
-use futures::{join, StreamExt};
+use futures::{join, TryStreamExt};
 use miette::Diagnostic;
-use sea_orm::{ActiveValue, Database, DatabaseConnection};
+use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, log, trace};
-
-use crate::graphql::{MutationRoot, QueryRoot};
-pub use activities::*;
-use migration::{Migrator, MigratorTrait};
+use tracing::{debug, error, info};
 
 mod activities;
 mod entity;
 mod graphql;
+mod prisma;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -64,9 +60,6 @@ pub enum Error {
 
     #[error(transparent)]
     ParseError(#[from] url::ParseError),
-
-    #[error(transparent)]
-    SeaOrm(#[from] sea_orm::DbErr),
 
     #[error("{0}")]
     String(String),
@@ -131,7 +124,7 @@ struct AppState {
     amqp: Pool,
     job_inbox: String,
     inbox: String,
-    database: DatabaseConnection,
+    prisma: PrismaClient,
     graphql: GraphQLConfig,
 }
 
@@ -139,11 +132,10 @@ type SharedState = Arc<Mutex<AppState>>;
 
 pub async fn listen(cfg: Config) -> Result<()> {
     debug!("Opening Database Connection");
-    let mut opts = sea_orm::ConnectOptions::new(cfg.connection_string.clone());
-    opts.sqlx_logging_level(log::LevelFilter::Trace)
-        .sqlx_logging(true)
-        .min_connections(10)
-        .max_connections(100);
+    let db_conn = prisma::PrismaClient::_builder()
+        .with_url(cfg.connection_string)
+        .build()
+        .await?;
     debug!("Opening RabbitMQ Connection");
     let state = Arc::new(Mutex::new(AppState {
         graphql: cfg.graphql.clone(),
@@ -152,7 +144,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
             .create_pool(Some(deadpool_lapin::Runtime::Tokio1))?,
         job_inbox: cfg.job_inbox,
         inbox: cfg.inbox,
-        database: Database::connect(opts.clone()).await?,
+        prisma: db_conn,
     }));
     let conn = state.lock().await.amqp.get().await?;
     let job_inbox = state.lock().await.job_inbox.clone();
@@ -191,11 +183,8 @@ pub async fn listen(cfg: Config) -> Result<()> {
         )
         .await?;
 
-    debug!("Migrating Database");
-    Migrator::up(&state.lock().await.database, None).await?;
-
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-        .data(Database::connect(opts.clone()).await?)
+        .data(state)
         .finish();
 
     let amqp_consume_pool = state.lock().await.amqp.clone();
@@ -224,7 +213,10 @@ async fn rabbitmq_listen(
     job_inbox_name: &str,
 ) -> Result<()> {
     let mut retry_interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
-    let database = Database::connect(connection_string).await?;
+    let database = PrismaClient::_builder()
+        .with_url(connection_string)
+        .build()
+        .await?;
     loop {
         retry_interval.tick().await;
         info!("connecting amqp consumer...");
@@ -237,7 +229,7 @@ async fn rabbitmq_listen(
 
 async fn handle_rabbitmq(
     pool: Pool,
-    database: &DatabaseConnection,
+    database: &PrismaClient,
     inbox_name: &str,
     job_inbox_name: &str,
 ) -> Result<()> {
@@ -279,7 +271,7 @@ async fn handle_rabbitmq(
 
 async fn handle_message(
     deliver: Delivery,
-    database: &DatabaseConnection,
+    database: &PrismaClient,
     job_channel: &Channel,
     job_inbox_name: &str,
 ) -> Result<()> {
@@ -289,100 +281,8 @@ async fn handle_message(
         Event::Create(envelope) => {
             debug!("got create event: {:?}", envelope);
             match envelope.object {
-                ActivityObject::MergeRequest(mr) => {
-                    use sea_orm::entity::prelude::*;
-                    let repo = entity::prelude::SourceRepo::find()
-                        .filter(entity::source_repo::Column::Url.eq(mr.repository.clone()))
-                        .one(database)
-                        .await?;
-                    if let Some(repo) = repo {
-                        debug!("found repo: {:?}", repo);
-                        let dbmr = entity::source_merge_request::ActiveModel {
-                            id: ActiveValue::Set(Uuid::new_v4()),
-                            number: ActiveValue::Set(mr.number as i32),
-                            url: ActiveValue::Set(mr.origin_url.unwrap_or(mr.repository.clone())),
-                            repository: ActiveValue::Set(repo.id),
-                            state: ActiveValue::Set(mr.action),
-                            api_kind: ActiveValue::Set("github".to_string()),
-                            target_ref: ActiveValue::Set(serde_json::to_value(&mr.target_ref)?),
-                            merge_request_ref: ActiveValue::Set(serde_json::to_value(
-                                &mr.merge_request_ref,
-                            )?),
-                        };
-                        let res = dbmr.insert(database).await?;
-                        trace!("saved merge request: {:?}", res);
-                        let job = Job {
-                            patch: mr.patch,
-                            merge_request_ref: mr.merge_request_ref.clone(),
-                            target_ref: mr.target_ref.clone(),
-                            repository: mr.repository.clone(),
-                            conf_ref: Some("default".to_string()),
-                            tags: None,
-                            job_type: Some(KnownJobs::CheckForChangedComponents),
-                            merge_request_id: Some(res.id.clone()),
-                        };
-                        let db_job = entity::job::ActiveModel {
-                            id: ActiveValue::Set(Uuid::new_v4()),
-                            patch: ActiveValue::Set(job.patch.clone().map(|u| u.to_string())),
-                            merge_request_ref: ActiveValue::Set(serde_json::to_value(
-                                &job.merge_request_ref,
-                            )?),
-                            target_ref: ActiveValue::Set(serde_json::to_value(&job.target_ref)?),
-                            repository: ActiveValue::Set(job.repository.clone()),
-                            conf_ref: ActiveValue::Set(None),
-                            tags: ActiveValue::Set(job.tags.clone()),
-                            job_type: ActiveValue::NotSet,
-                            package_repo_id: ActiveValue::NotSet,
-                            source_repo_id: ActiveValue::Set(repo.id.clone()),
-                        };
-                        db_job.insert(database).await?;
-
-                        trace!("sending job: {:?}", job);
-                        let payload = serde_json::to_vec(&job)?;
-                        job_channel
-                            .basic_publish(
-                                "",
-                                job_inbox_name,
-                                BasicPublishOptions::default(),
-                                &payload,
-                                AMQPProperties::default(),
-                            )
-                            .await?;
-                        //TODO Dispatch job to self to create package repository for the merge request
-                    } else {
-                        debug!("repo not found, ignoring event");
-                    }
-                }
-                ActivityObject::PackageRepository(pr) => {
-                    use sea_orm::entity::prelude::*;
-                    let dbpr = entity::prelude::PackageRepository::find()
-                        .filter(
-                            entity::package_repository::Column::Url.eq(pr.url.clone().to_string()),
-                        )
-                        .one(database)
-                        .await?;
-                    if dbpr.is_none() {
-                        let new_repo_id = Uuid::new_v4();
-                        let dbpr = entity::package_repository::ActiveModel {
-                            id: ActiveValue::Set(new_repo_id.clone()),
-                            name: ActiveValue::Set(pr.name.clone()),
-                            url: ActiveValue::Set(pr.url.clone().to_string()),
-                            public_key: ActiveValue::Set(pr.public_key.clone()),
-                        };
-                        dbpr.save(database).await?;
-                        for publisher in pr.publishers {
-                            let dbp = entity::publisher::ActiveModel {
-                                id: ActiveValue::Set(Uuid::new_v4()),
-                                name: ActiveValue::Set(publisher),
-                                package_repository_id: ActiveValue::Set(new_repo_id.clone()),
-                            };
-                            dbp.save(database).await?;
-                        }
-                        //TODO Dispatch worker to create the repository (merge as function with merge request creation.)
-                    } else {
-                        debug!("repo found, ignoring event");
-                    }
-                }
+                ActivityObject::MergeRequest(_) => {}
+                ActivityObject::PackageRepository(_) => {}
                 ActivityObject::Package(_) => {
                     //TODO save built packages to db and dispatch jobs to add them to the repo.
                     //TODO put messages where we do not have a repository into the wait queue.
