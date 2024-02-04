@@ -1,4 +1,4 @@
-use crate::graphql::{MutationRoot, QueryRoot};
+use crate::graphql::{mutation::MutationRoot, query::QueryRoot};
 pub use activities::*;
 use async_graphql::{EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
@@ -9,14 +9,13 @@ use axum::routing::get;
 use axum::{Json, Router};
 use clap::Parser;
 use config::Environment;
-use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::options::{
     BasicAckOptions, BasicConsumeOptions, BasicNackOptions, QueueDeclareOptions,
 };
 use deadpool_lapin::lapin::types::FieldTable;
-use deadpool_lapin::lapin::Channel;
 use deadpool_lapin::Pool;
-use futures::{join, TryStreamExt};
+use futures::{join, StreamExt};
+use message_queue::handle_message;
 use miette::Diagnostic;
 use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
@@ -26,8 +25,9 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 mod activities;
-mod entity;
 mod graphql;
+mod message_queue;
+#[allow(warnings, unused)]
 mod prisma;
 
 #[derive(Parser, Debug)]
@@ -60,6 +60,9 @@ pub enum Error {
 
     #[error(transparent)]
     ParseError(#[from] url::ParseError),
+
+    #[error(transparent)]
+    NewClient(#[from] prisma_client_rust::NewClientError),
 
     #[error("{0}")]
     String(String),
@@ -119,6 +122,7 @@ pub fn load_config(args: Args) -> Result<Config> {
     Ok(cfg.try_deserialize()?)
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct AppState {
     amqp: Pool,
@@ -133,7 +137,7 @@ type SharedState = Arc<Mutex<AppState>>;
 pub async fn listen(cfg: Config) -> Result<()> {
     debug!("Opening Database Connection");
     let db_conn = prisma::PrismaClient::_builder()
-        .with_url(cfg.connection_string)
+        .with_url(cfg.connection_string.clone())
         .build()
         .await?;
     debug!("Opening RabbitMQ Connection");
@@ -183,9 +187,13 @@ pub async fn listen(cfg: Config) -> Result<()> {
         )
         .await?;
 
-    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-        .data(state)
-        .finish();
+    let schema = Schema::build(
+        QueryRoot::default(),
+        MutationRoot::default(),
+        EmptySubscription,
+    )
+    .data(state.clone())
+    .finish();
 
     let amqp_consume_pool = state.lock().await.amqp.clone();
     let app = Router::new()
@@ -269,75 +277,6 @@ async fn handle_rabbitmq(
     Ok(())
 }
 
-async fn handle_message(
-    deliver: Delivery,
-    database: &PrismaClient,
-    job_channel: &Channel,
-    job_inbox_name: &str,
-) -> Result<()> {
-    let body = deliver.data;
-    let envelope: Event = serde_json::from_slice(&body)?;
-    match envelope {
-        Event::Create(envelope) => {
-            debug!("got create event: {:?}", envelope);
-            match envelope.object {
-                ActivityObject::MergeRequest(_) => {}
-                ActivityObject::PackageRepository(_) => {}
-                ActivityObject::Package(_) => {
-                    //TODO save built packages to db and dispatch jobs to add them to the repo.
-                    //TODO put messages where we do not have a repository into the wait queue.
-                }
-                ActivityObject::SoftwareComponent(sc) => {
-                    //TODO save software components to DB and dispatch builds
-                }
-                ActivityObject::Push(_) => {
-                    //TODO dispatch builds
-                }
-            }
-        }
-        Event::Update(envelope) => {
-            debug!("got update event: {:?}", envelope);
-            match envelope.object {
-                ActivityObject::Push(_) => {
-                    //TODO make some grave message that we wont do this and bounce message
-                }
-                ActivityObject::MergeRequest(_) => {
-                    //TODO dispatch db update and check if we need to start some new builds
-                }
-                ActivityObject::PackageRepository(_) => {
-                    //TODO dispatch worker to make repo
-                }
-                ActivityObject::Package(_) => {
-                    //TODO make a grave error that this is not supported.
-                }
-                ActivityObject::SoftwareComponent(_) => {
-                    //TODO Bump Revision and trigger builds
-                }
-            }
-        }
-        Event::Delete(envelope) => {
-            debug!("got delete event: {:?}", envelope);
-            match envelope.object {
-                ActivityObject::Push(_) => {
-                    //TODO not supported
-                }
-                ActivityObject::MergeRequest(_) => {
-                    //TODO Close MR
-                }
-                ActivityObject::PackageRepository(_) => {
-                    //TODO dispatch cleanup
-                }
-                ActivityObject::Package(_) => {
-                    //TODO dispatch cleanup
-                }
-                ActivityObject::SoftwareComponent(_) => {
-                    //TODO dispatch cleanup
-                }
-            }
-        }
-    }
-    Ok(())
-}
 async fn playground(State(state): State<SharedState>) -> impl IntoResponse {
     use async_graphql::http::*;
     let scheme = if state.lock().await.graphql.use_ssl {
@@ -366,6 +305,5 @@ async fn health_check(State(state): State<SharedState>) -> Result<Json<HealthRes
             deadpool_lapin::lapin::Error::InvalidConnectionState(conn.status().state()),
         ));
     }
-    state.lock().await.database.ping().await?;
     Ok(Json(HealthResponse::default()))
 }

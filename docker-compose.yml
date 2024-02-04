@@ -3,8 +3,6 @@ version: '3.9'
 services:  
   rabbitmq:
     image: rabbitmq:3.12-management
-    networks:
-      - server
     environment:
       RABBITMQ_DEFAULT_VHOST: "master"
       RABBITMQ_DEFAULT_USER: "dev"
@@ -12,13 +10,11 @@ services:
     volumes:
       - rabbitmq:/var/lib/rabbitmq
     ports:
-      - 8090:15672
+      - 15672:15672
       - 5672:5672
 
   postgres:
-    image: postgres:16-bookworm
-    networks:
-      - server
+    image: postgres:16
     ports:
       - "5432:5432"
     environment:
@@ -28,10 +24,19 @@ services:
     volumes:
       - "postgres:/var/lib/postgresql/data"
 
-networks:
-  client: {}
-  server: {}
+  minio:
+    image: quay.io/minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: "minioadmin"
+      MINIO_ROOT_PASSWORD: "minioadmin"
+    command: server --console-address ":9001" /data
+    volumes:
+      - "minio:/data"
 
 volumes:
   rabbitmq: {}
   postgres: {}
+  minio: {}
