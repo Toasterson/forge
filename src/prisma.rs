@@ -2914,8 +2914,8 @@ pub mod publisher {
         pub fn order(direction: ::prisma_client_rust::Direction) -> OrderByParam {
             OrderByParam::Name(direction)
         }
-        pub fn equals(value: String) -> WhereParam {
-            WhereParam::Name(_prisma::read_filters::StringFilter::Equals(value))
+        pub fn equals<T: From<UniqueWhereParam>>(value: String) -> T {
+            UniqueWhereParam::NameEquals(value).into()
         }
         ::prisma_client_rust::scalar_where_param_fns!(_prisma::read_filters::StringFilter, Name, {
             fn in_vec(_: Vec<String>) -> InVec;
@@ -3628,11 +3628,15 @@ pub mod publisher {
     }
     #[derive(Clone)]
     pub enum UniqueWhereParam {
+        NameEquals(String),
         IdEquals(String),
     }
     impl From<UniqueWhereParam> for WhereParam {
         fn from(value: UniqueWhereParam) -> Self {
             match value {
+                UniqueWhereParam::NameEquals(value) => {
+                    Self::Name(_prisma::read_filters::StringFilter::Equals(value))
+                }
                 UniqueWhereParam::IdEquals(value) => {
                     Self::Id(_prisma::read_filters::StringFilter::Equals(value))
                 }

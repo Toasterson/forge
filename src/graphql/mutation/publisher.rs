@@ -1,5 +1,6 @@
-use crate::graphql::types::Publisher;
+use crate::{graphql::types::Publisher, SharedState};
 use async_graphql::{Context, InputObject, Object, Result};
+
 #[derive(Debug, InputObject)]
 pub struct CreatePublisherInput {
     pub name: String,
@@ -15,7 +16,15 @@ impl PublisherMutation {
         ctx: &Context<'_>,
         input: CreatePublisherInput,
     ) -> Result<Publisher> {
-        //let state: AppState = ctx.
-        todo!()
+        let database = &ctx.data_unchecked::<SharedState>().lock().await.prisma;
+        let publisher = database
+            .publisher()
+            .create(input.name, vec![])
+            .exec()
+            .await?;
+        Ok(Publisher {
+            id: publisher.id,
+            name: publisher.name,
+        })
     }
 }

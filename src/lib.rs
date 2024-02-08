@@ -66,6 +66,9 @@ pub enum Error {
 
     #[error("{0}")]
     String(String),
+
+    #[error("entity not found {0}")]
+    NotFound(String),
 }
 
 pub type Result<T> = miette::Result<T, Error>;

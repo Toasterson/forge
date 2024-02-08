@@ -1,3 +1,4 @@
+mod gate;
 mod publisher;
 
 pub use publisher::PublisherQuery;

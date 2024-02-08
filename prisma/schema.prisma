@@ -42,7 +42,7 @@ enum KeyType {
 
 model Publisher {
   id           String              @id @default(uuid()) @db.Uuid
-  name         String
+  name         String              @unique
   repositories PackageRepository[]
   Gate         Gate[]
 }
