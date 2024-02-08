@@ -120,6 +120,7 @@ pub fn load_config(args: Args) -> Result<Config> {
             "connection_string",
             "postgres://forge:forge@localhost/forge",
         )?
+        .set_default("amqp.url", "amqp://dev:dev@localhost:5672/master")?
         .set_override_option("amqp.url", args.rabbitmq_url)?
         .build()?;
     Ok(cfg.try_deserialize()?)
