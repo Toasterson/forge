@@ -17,18 +17,21 @@ pub async fn handle_message(
             debug!("got create event: {:?}", envelope);
             match envelope.object {
                 ActivityObject::ChangeRequest(_) => todo!(),
+                ActivityObject::JobReport(_) => todo!(),
             }
         }
         Event::Update(envelope) => {
             debug!("got update event: {:?}", envelope);
             match envelope.object {
                 ActivityObject::ChangeRequest(_) => todo!(),
+                ActivityObject::JobReport(_) => todo!(),
             }
         }
         Event::Delete(envelope) => {
             debug!("got delete event: {:?}", envelope);
             match envelope.object {
                 ActivityObject::ChangeRequest(_) => todo!(),
+                ActivityObject::JobReport(_) => todo!(),
             }
         }
     }

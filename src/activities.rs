@@ -51,12 +51,35 @@ pub struct ActivityEnvelope {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ActivityObject {
     ChangeRequest(ChangeRequest),
+    JobReport(JobReport),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JobReport {
+    pub result: JobReportResult,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum JobReportResult {
+    Sucess,
+    Failure,
+    Warning,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChangeRequest {
     pub changes: Vec<ComponentChange>,
     pub external_ref: ExternalReference,
+    pub state: ChangeRequestState,
+    pub contributor: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ChangeRequestState {
+    Open,
+    Closed,
+    Applied,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -75,6 +98,9 @@ impl Display for ExternalReference {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComponentChange {
     pub kind: ComponentChangeKind,
+    pub component_ref: String,
+    pub recipe: serde_json::Value,
+    pub recipe_diff: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,4 +108,14 @@ pub enum ComponentChangeKind {
     Added,
     Updated,
     Removed,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum JobObject {
+    DownloadSources(DownloadComponentSources),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DownloadComponentSources {
+    pub recipe: serde_json::Value,
 }

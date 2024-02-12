@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::{debug, error, info};
 
-use forge::{CommitRef, Scheme};
+use forge::{ChangeRequest, CommitRef, Scheme};
 use github::{GitHubError, GitHubEvent, GitHubWebhookRequest};
 
 #[derive(Error, Diagnostic, Debug)]
@@ -170,22 +170,11 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                 actor: format!("{}/actors/github", &state.base_url).parse()?,
                 to: vec![format!("{}/actors/forge", &state.base_url).parse()?],
                 cc: vec![],
-                object: forge::ActivityObject::MergeRequest(forge::MergeRequest {
-                    action: event.action,
-                    number: event.number as u64,
-                    title: event.pull_request.title,
-                    body: event.pull_request.body,
-                    merge_request_ref: CommitRef {
-                        sha: event.pull_request.head.sha,
-                        ref_name: event.pull_request.head.ref_name,
-                    },
-                    target_ref: CommitRef {
-                        sha: event.pull_request.base.sha,
-                        ref_name: event.pull_request.base.ref_name,
-                    },
-                    origin_url: Some(event.pull_request.url),
-                    repository: event.repository.git_url,
-                    patch: Some(event.pull_request.patch_url.parse()?),
+                object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                    changes: todo!(),
+                    external_ref: todo!(),
+                    state: todo!(),
+                    contributor: todo!(),
                 }),
             });
             debug!("forge event: {:?}", event_msg);
