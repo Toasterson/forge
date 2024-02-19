@@ -4,6 +4,8 @@ use component::Component;
 use component::Recipe;
 use config::{Environment, File};
 use deadpool_lapin::lapin::message::Delivery;
+use deadpool_lapin::lapin::options::QueueBindOptions;
+use deadpool_lapin::lapin::options::QueueDeclareOptions;
 use deadpool_lapin::lapin::options::{
     BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,
 };
@@ -178,6 +180,27 @@ pub async fn listen(cfg: Config) -> Result<()> {
                 durable: true,
                 ..Default::default()
             },
+            FieldTable::default(),
+        )
+        .await?;
+
+    channel
+        .queue_declare(
+            &state.job_inbox,
+            QueueDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await?;
+
+    channel
+        .queue_bind(
+            &state.job_inbox,
+            &state.job_inbox,
+            "",
+            QueueBindOptions::default(),
             FieldTable::default(),
         )
         .await?;
