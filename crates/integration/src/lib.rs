@@ -26,6 +26,15 @@ pub enum IntegrationError {
 pub struct ForgeIntegrationManifest {
     #[serde(rename = "component_list")]
     pub component_list_script: Vec<String>,
+    #[serde(rename = "metadata_generation_script")]
+    pub component_metadata_gen_script: Vec<String>,
+    #[serde(rename = "metadata_filename", default = "default_metadata_filename")]
+    pub component_metadata_filename: String,
+    pub change_to_component_dir: bool,
+}
+
+fn default_metadata_filename() -> String {
+    "package.kdl".to_string()
 }
 
 pub type Result<T> = miette::Result<T, IntegrationError>;

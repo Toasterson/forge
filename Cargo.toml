@@ -29,8 +29,9 @@ async-graphql = { version = "6.0.11", features = ["decimal", "chrono", "dataload
 async-graphql-axum = "6.0.11"
 lazy_static = "1.4.0"
 strum.workspace = true
-integration = { version = "0.1.0", path = "crates/integration" }
+integration.workspace = true
 prisma-client-rust.workspace = true
+component.workspace = true
 
 [workspace]
 members = ["crates/*"]
@@ -56,3 +57,5 @@ url = { version = "2.4.1", features = ["serde"] }
 futures = "0.3.17"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", tag = "0.6.11", default-features = false, features=[ "postgresql", "sqlite", "mysql", "mssql" ] }
 prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", tag = "0.6.11" }
+component = { version = "*", path = "crates/component" }
+integration = { version = "0.1.0", path = "crates/integration" }

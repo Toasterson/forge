@@ -1,13 +1,19 @@
 use axum::{response::IntoResponse, routing::get, Json, Router};
 use clap::Parser;
+use component::Component;
+use component::Recipe;
 use config::{Environment, File};
 use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::options::{
     BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
-use deadpool_lapin::lapin::{options::QueueDeclareOptions, types::FieldTable, Channel};
-use forge::{ActivityEnvelope, CommitRef, Event, Job, Scheme};
+use deadpool_lapin::lapin::{types::FieldTable, Channel};
+use forge::ComponentChange;
+use forge::JobReport;
+use forge::JobReportData;
+use forge::JobReportResult;
+use forge::{ActivityEnvelope, CommitRef, Scheme};
 use futures::{join, StreamExt};
 use github::GitHubError;
 use integration::{read_forge_manifest, ForgeIntegrationManifest};
@@ -18,7 +24,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use thiserror::Error;
-use tracing::{debug, error, info};
+use tracing::{debug, error, event, info, instrument, Level};
 use url::Url;
 
 #[derive(Error, Diagnostic, Debug)]
@@ -58,6 +64,9 @@ pub enum Error {
 
     #[error(transparent)]
     IntegrationError(#[from] integration::IntegrationError),
+
+    #[error("{0}")]
+    MietteReport(miette::Report),
 
     #[error("{0}")]
     String(String),
@@ -162,9 +171,13 @@ pub async fn listen(cfg: Config) -> Result<()> {
         channel.id()
     );
     channel
-        .queue_declare(
+        .exchange_declare(
             &state.inbox,
-            QueueDeclareOptions::default(),
+            deadpool_lapin::lapin::ExchangeKind::Direct,
+            deadpool_lapin::lapin::options::ExchangeDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
             FieldTable::default(),
         )
         .await?;
@@ -251,59 +264,104 @@ async fn handle_rabbitmq(state: AppState) -> Result<()> {
     Ok(())
 }
 
+#[instrument(skip_all)]
 async fn handle_message(
-    deliver: Delivery,
+    delivery: Delivery,
     channel: &Channel,
     inbox_name: &str,
     base_url: &str,
     worker_dir: &str,
 ) -> Result<()> {
-    let body = deliver.data;
-    let job: Job = serde_json::from_slice(&body)?;
+    let body = delivery.data;
+    let envelope: ActivityEnvelope = serde_json::from_slice(&body)?;
     let worker_actor: Url = format!("{}/actors/worker", base_url).parse()?;
     let forge_actor: Url = format!("{}/actors/forge", base_url).parse()?;
-    if let Some(know_job) = job.job_type {
-        match know_job {
-            forge::KnownJobs::CheckForChangedComponents => {
-                let build_dir =
-                    get_repo_path(worker_dir, &job.repository, &job.merge_request_ref.sha);
-                clean_ws(&build_dir)?;
-                let manifest = clone_repo(
-                    &build_dir,
-                    &job.repository,
-                    &job.merge_request_ref,
-                    job.conf_ref.clone(),
-                )?;
-                let component_list = get_component_list_in_repo(&build_dir, &manifest)?;
-                let changed_files = get_changed_files(&build_dir, &job.target_ref)?;
-                let changed_components = get_changed_components(component_list, changed_files);
-                for component in changed_components {
-                    let event = Event::Create(ActivityEnvelope {
-                        actor: worker_actor.clone(),
-                        to: vec![forge_actor.clone()],
+    match envelope.object {
+        forge::ActivityObject::ChangeRequest(_) => {
+            event!(
+                Level::ERROR,
+                "Cannot handle change request messages as worker"
+            );
+        }
+        forge::ActivityObject::JobReport(_) => {
+            event!(
+                Level::ERROR,
+                "Cannot handle a job report as worker. Something is wrong"
+            );
+        }
+        forge::ActivityObject::Job(job) => {
+            event!(Level::DEBUG, job = ?job, "handling job event");
+            match job {
+                forge::JobObject::DownloadSources(_) => todo!(),
+                forge::JobObject::DetectChanges(change_request) => {
+                    info!("Detecting changes for change_request {}", envelope.id);
+                    let build_dir = get_repo_path(
+                        worker_dir,
+                        &change_request.git_url,
+                        &change_request.head.sha,
+                    );
+                    clean_ws(&build_dir)?;
+                    let manifest = clone_repo(
+                        &build_dir,
+                        &change_request.git_url,
+                        &change_request.head,
+                        None,
+                    )?;
+                    let component_list = get_component_list_in_repo(&build_dir, &manifest)?;
+                    let changed_files = get_changed_files(&build_dir, &change_request.base)?;
+                    let changed_components = get_changed_components(component_list, changed_files);
+                    create_gen_meatdata_script(&build_dir, &manifest)?;
+                    let mut recipes: Vec<(String, Recipe)> = vec![];
+                    for component in changed_components {
+                        let recipe = get_component_metadata(
+                            &build_dir,
+                            &component,
+                            manifest.change_to_component_dir,
+                            &manifest.component_metadata_filename,
+                        )?;
+                        recipes.push((component, recipe));
+                    }
+                    //TODO pass in which files changed, added, deleted so we can categorize the change of the component
+                    let report_data = JobReportData::DetectedChanges {
+                        change_request_id: envelope.id.to_string(),
+                        changes: recipes
+                            .into_iter()
+                            .map(|(c, r)| ComponentChange {
+                                kind: forge::ComponentChangeKind::Added,
+                                component_ref: c,
+                                recipe: r,
+                                recipe_diff: None,
+                            })
+                            .collect(),
+                    };
+                    let envelope = ActivityEnvelope {
+                        id: envelope.id,
+                        actor: worker_actor,
+                        to: vec![forge_actor],
                         cc: vec![],
-                        object: forge::ActivityObject::SoftwareComponent(
-                            forge::SoftwareComponent {
-                                name: component,
-                                recipe_file: None,
-                                merge_request: job.merge_request_id,
-                            },
-                        ),
-                    });
-                    let payload = serde_json::to_vec(&event)?;
+                        object: forge::ActivityObject::JobReport(JobReport {
+                            result: JobReportResult::Sucess,
+                            data: report_data,
+                        }),
+                    };
+
+                    event!(Level::INFO, cr = ?envelope, "Sending detected recipies to forge");
+
+                    let msg = serde_json::to_vec(&envelope)?;
+
                     channel
                         .basic_publish(
-                            "",
                             inbox_name,
+                            "",
                             BasicPublishOptions::default(),
-                            &payload,
+                            &msg,
                             AMQPProperties::default(),
                         )
                         .await?;
+                    event!(Level::INFO, "Event Sent");
                 }
             }
         }
-    } else {
     }
     Ok(())
 }
@@ -311,8 +369,8 @@ async fn handle_message(
 fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String>) -> Vec<String> {
     let mut changed_components: Vec<String> = vec![];
     'outer: for component in component_list {
-        for file in changed_files.iter() {
-            if file.contains(&component) {
+        for file_path in changed_files.iter() {
+            if file_path.contains(&component) {
                 changed_components.push(component.clone());
                 continue 'outer;
             }
@@ -353,6 +411,46 @@ fn get_component_list_in_repo<P: AsRef<Path>>(
     }
     let result = String::from_utf8(out.stdout)?;
     Ok(result.split("\n").map(|s| s.to_owned()).collect())
+}
+
+fn create_gen_meatdata_script<P: AsRef<Path>>(
+    ws: P,
+    manifest: &ForgeIntegrationManifest,
+) -> Result<()> {
+    let list_script_path = ws.as_ref().join(".forge_script_components_gen_metadata.sh");
+    let mut list_script = std::fs::File::create(&list_script_path)?;
+    list_script.write_all(manifest.component_metadata_gen_script.join("\n").as_bytes())?;
+    Ok(())
+}
+
+fn get_component_metadata<P: AsRef<Path>>(
+    ws: P,
+    component: &str,
+    change_to_component_dir: bool,
+    metadata_file_name: &str,
+) -> Result<Recipe> {
+    let list_script_path = ws.as_ref().join(".forge_script_components_gen_metadata.sh");
+    let mut script_cmd = Command::new("bash");
+    script_cmd.arg("-ex");
+    script_cmd.arg(list_script_path.as_os_str());
+    if change_to_component_dir {
+        script_cmd.current_dir(ws.as_ref().join("components").join(component));
+    } else {
+        script_cmd.arg(component);
+    }
+    let out = script_cmd.output()?;
+    if !out.status.success() {
+        let out_string = String::from_utf8(out.stderr)?;
+        return Err(Error::ScriptError("gen_metadata.sh".into(), out_string));
+    }
+    let metadata_file_path = ws
+        .as_ref()
+        .join("components")
+        .join(component)
+        .join(metadata_file_name);
+    let c =
+        Component::open_local(metadata_file_path).map_err(|report| Error::MietteReport(report))?;
+    Ok(c.recipe)
 }
 
 fn get_repo_path(base_dir: &str, repo: &str, sha: &str) -> PathBuf {

@@ -18,6 +18,7 @@ pub async fn handle_message(
             match envelope.object {
                 ActivityObject::ChangeRequest(_) => todo!(),
                 ActivityObject::JobReport(_) => todo!(),
+                ActivityObject::Job(_) => todo!(),
             }
         }
         Event::Update(envelope) => {
@@ -25,6 +26,7 @@ pub async fn handle_message(
             match envelope.object {
                 ActivityObject::ChangeRequest(_) => todo!(),
                 ActivityObject::JobReport(_) => todo!(),
+                ActivityObject::Job(_) => todo!(),
             }
         }
         Event::Delete(envelope) => {
@@ -32,6 +34,7 @@ pub async fn handle_message(
             match envelope.object {
                 ActivityObject::ChangeRequest(_) => todo!(),
                 ActivityObject::JobReport(_) => todo!(),
+                ActivityObject::Job(_) => todo!(),
             }
         }
     }

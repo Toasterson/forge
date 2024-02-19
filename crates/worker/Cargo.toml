@@ -21,6 +21,6 @@ github.workspace = true
 strum.workspace = true
 forge.workspace = true
 url.workspace = true
-log = "0.4.20"
 futures.workspace = true
-integration = { version = "0.1.0", path = "../integration" }
+integration.workspace = true
+component.workspace = true

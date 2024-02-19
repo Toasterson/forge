@@ -1,4 +1,5 @@
 use derive_builder::Builder;
+use diff::Diff;
 use kdl::KdlValue;
 use miette::{Diagnostic, IntoDiagnostic, WrapErr};
 use serde::{Deserialize, Serialize};
@@ -34,7 +35,7 @@ type ComponentResult<T> = std::result::Result<T, ComponentError>;
 #[derive(Debug)]
 pub struct Component {
     path: PathBuf,
-    pub package_document: Recipe,
+    pub recipe: Recipe,
 }
 
 impl Component {
@@ -67,13 +68,13 @@ impl Component {
                     .parent()
                     .ok_or(ComponentError::NoPackageDocumentParentDir)?
                     .to_path_buf(),
-                package_document,
+                recipe: package_document,
             })
         } else {
             let package_document = knuffel::parse::<Recipe>(&name, &package_document_string)?;
             Ok(Self {
                 path,
-                package_document,
+                recipe: package_document,
             })
         }
     }
@@ -82,26 +83,26 @@ impl Component {
         let data_string = read_to_string(&self.path.join("package.kdl"))
             .into_diagnostic()
             .wrap_err("could not open package document")?;
-        self.package_document = knuffel::parse::<Recipe>("package.kdl", &data_string)?;
+        self.recipe = knuffel::parse::<Recipe>("package.kdl", &data_string)?;
         Ok(())
     }
 
     fn save_document(&self) -> ComponentResult<()> {
-        let doc_str = self.package_document.to_document().to_string();
+        let doc_str = self.recipe.to_document().to_string();
         let mut f = File::create(&self.path.join("package.kdl"))?;
         f.write_all(doc_str.as_bytes())?;
         Ok(())
     }
 
     pub fn add_source(&mut self, node: SourceNode) -> miette::Result<()> {
-        if let Some(src_section) = self.package_document.sources.first_mut() {
+        if let Some(src_section) = self.recipe.sources.first_mut() {
             src_section.sources.push(node);
         } else {
             let src_section = SourceSection {
                 name: None,
                 sources: vec![node],
             };
-            self.package_document.sources.push(src_section);
+            self.recipe.sources.push(src_section);
         };
         self.save_document()?;
         self.open_document()?;
@@ -113,7 +114,7 @@ impl Component {
     }
 
     pub fn get_name(&self) -> String {
-        self.package_document.name.clone()
+        self.recipe.name.clone()
     }
 
     pub fn get_mogrify_manifest(&self) -> Option<PathBuf> {
@@ -126,8 +127,11 @@ impl Component {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff)]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct Recipe {
     #[knuffel(child, unwrap(argument))]
     pub name: String,
@@ -409,7 +413,10 @@ impl Recipe {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct Dependency {
     #[knuffel(argument)]
     pub name: String,
@@ -436,7 +443,10 @@ impl Dependency {
     }
 }
 
-#[derive(Debug, knuffel::DecodeScalar, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::DecodeScalar, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub enum DependencyKind {
     Require,
     Incorporate,
@@ -453,7 +463,10 @@ impl From<&DependencyKind> for KdlValue {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct SourceSection {
     #[knuffel(argument)]
     pub name: Option<String>,
@@ -485,7 +498,10 @@ impl SourceSection {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub enum SourceNode {
     Archive(ArchiveSource),
     Git(GitSource),
@@ -495,7 +511,10 @@ pub enum SourceNode {
     Overlay(OverlaySource),
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct ArchiveSource {
     #[knuffel(argument)]
     pub src: String,
@@ -533,7 +552,10 @@ impl ArchiveSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct GitSource {
     #[knuffel(argument)]
     pub repository: String,
@@ -592,7 +614,10 @@ impl GitSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct FileSource {
     #[knuffel(argument)]
     bundle_path: PathBuf,
@@ -630,7 +655,10 @@ impl FileSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct DirectorySource {
     #[knuffel(argument)]
     bundle_path: PathBuf,
@@ -672,7 +700,10 @@ impl DirectorySource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct PatchSource {
     #[knuffel(argument)]
     bundle_path: PathBuf,
@@ -705,7 +736,10 @@ impl PatchSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct OverlaySource {
     #[knuffel(argument)]
     bundle_path: PathBuf,
@@ -729,7 +763,10 @@ impl OverlaySource {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub enum BuildSection {
     Configure(ConfigureBuildSection),
     CMake,
@@ -752,7 +789,10 @@ impl ToString for BuildSection {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct ConfigureBuildSection {
     #[knuffel(children(name = "option"))]
     pub options: Vec<BuildOptionNode>,
@@ -764,7 +804,10 @@ pub struct ConfigureBuildSection {
     pub linker: Option<String>,
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct ScriptBuildSection {
     #[knuffel(children(name = "script"))]
     pub scripts: Vec<ScriptNode>,
@@ -772,7 +815,10 @@ pub struct ScriptBuildSection {
     pub install_directives: Vec<InstallDirectiveNode>,
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct InstallDirectiveNode {
     #[knuffel(property)]
     pub src: String,
@@ -796,7 +842,10 @@ impl InstallDirectiveNode {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct ScriptNode {
     #[knuffel(argument)]
     pub name: String,
@@ -818,7 +867,10 @@ impl ScriptNode {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct BuildFlagNode {
     #[knuffel(argument)]
     pub flag: String,
@@ -834,7 +886,10 @@ impl BuildFlagNode {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct BuildOptionNode {
     #[knuffel(argument)]
     pub option: String,
@@ -896,7 +951,10 @@ impl BuildSection {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff)]
+#[diff(attr(
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct FileNode {
     #[knuffel(child, unwrap(argument))]
     pub include: String,
@@ -944,7 +1002,7 @@ mod tests {
             .map(|path| Component::open_local(&path))
             .collect::<miette::Result<Vec<Component>>>()?;
         for bundle in bundles {
-            assert_ne!(bundle.package_document.name, String::from(""))
+            assert_ne!(bundle.recipe.name, String::from(""))
         }
 
         Ok(())

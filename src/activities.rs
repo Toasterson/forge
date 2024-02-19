@@ -1,3 +1,4 @@
+use component::{Recipe, RecipeDiff};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use url::Url;
@@ -53,12 +54,13 @@ pub struct ActivityEnvelope {
 pub enum ActivityObject {
     ChangeRequest(ChangeRequest),
     JobReport(JobReport),
+    Job(JobObject),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JobReport {
     pub result: JobReportResult,
-    pub message: Option<String>,
+    pub data: JobReportData,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -66,6 +68,15 @@ pub enum JobReportResult {
     Sucess,
     Failure,
     Warning,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JobReportData {
+    ArchiveDownloaded {},
+    DetectedChanges {
+        change_request_id: String,
+        changes: Vec<ComponentChange>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -128,8 +139,8 @@ impl Display for ExternalReference {
 pub struct ComponentChange {
     pub kind: ComponentChangeKind,
     pub component_ref: String,
-    pub recipe: serde_json::Value,
-    pub recipe_diff: Option<serde_json::Value>,
+    pub recipe: Recipe,
+    pub recipe_diff: Option<RecipeDiff>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -147,5 +158,5 @@ pub enum JobObject {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DownloadComponentSources {
-    pub recipe: serde_json::Value,
+    pub recipe: Recipe,
 }
