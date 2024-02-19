@@ -10,7 +10,7 @@ use std::{
 use thiserror::Error;
 
 #[derive(Error, Debug, Diagnostic)]
-pub enum BundleError {
+pub enum ComponentError {
     #[error(transparent)]
     IOError(#[from] std::io::Error),
     #[error("no parent directory of package.kdl exists")]
@@ -29,15 +29,15 @@ pub enum BundleError {
     UninitializedFieldError(#[from] derive_builder::UninitializedFieldError),
 }
 
-type BundleResult<T> = std::result::Result<T, BundleError>;
+type ComponentResult<T> = std::result::Result<T, ComponentError>;
 
 #[derive(Debug)]
-pub struct Bundle {
+pub struct Component {
     path: PathBuf,
-    pub package_document: Package,
+    pub package_document: Recipe,
 }
 
-impl Bundle {
+impl Component {
     pub fn open_local<P: AsRef<Path>>(path: P) -> miette::Result<Self> {
         let path = path
             .as_ref()
@@ -49,7 +49,7 @@ impl Bundle {
             (
                 read_to_string(path.clone()).into_diagnostic()?,
                 path.parent()
-                    .ok_or(BundleError::NoPackageDocumentParentDir)?
+                    .ok_or(ComponentError::NoPackageDocumentParentDir)?
                     .to_string_lossy()
                     .to_string(),
             )
@@ -61,16 +61,16 @@ impl Bundle {
         };
 
         if path.is_file() {
-            let package_document = knuffel::parse::<Package>(&name, &package_document_string)?;
+            let package_document = knuffel::parse::<Recipe>(&name, &package_document_string)?;
             Ok(Self {
                 path: path
                     .parent()
-                    .ok_or(BundleError::NoPackageDocumentParentDir)?
+                    .ok_or(ComponentError::NoPackageDocumentParentDir)?
                     .to_path_buf(),
                 package_document,
             })
         } else {
-            let package_document = knuffel::parse::<Package>(&name, &package_document_string)?;
+            let package_document = knuffel::parse::<Recipe>(&name, &package_document_string)?;
             Ok(Self {
                 path,
                 package_document,
@@ -82,11 +82,11 @@ impl Bundle {
         let data_string = read_to_string(&self.path.join("package.kdl"))
             .into_diagnostic()
             .wrap_err("could not open package document")?;
-        self.package_document = knuffel::parse::<Package>("package.kdl", &data_string)?;
+        self.package_document = knuffel::parse::<Recipe>("package.kdl", &data_string)?;
         Ok(())
     }
 
-    fn save_document(&self) -> BundleResult<()> {
+    fn save_document(&self) -> ComponentResult<()> {
         let doc_str = self.package_document.to_document().to_string();
         let mut f = File::create(&self.path.join("package.kdl"))?;
         f.write_all(doc_str.as_bytes())?;
@@ -127,8 +127,8 @@ impl Bundle {
 }
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder)]
-#[builder(setter(into, strip_option), build_fn(error = "self::BundleError"))]
-pub struct Package {
+#[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
+pub struct Recipe {
     #[knuffel(child, unwrap(argument))]
     pub name: String,
 
@@ -192,7 +192,7 @@ pub struct Package {
     build_section: Vec<BuildSection>,
 }
 
-impl Package {
+impl Recipe {
     pub fn to_document(&self) -> kdl::KdlDocument {
         let pkg_node = self.to_node();
         pkg_node
@@ -297,7 +297,7 @@ impl Package {
         node
     }
 
-    pub fn merge_into_mut(&mut self, other: &Package) -> BundleResult<()> {
+    pub fn merge_into_mut(&mut self, other: &Recipe) -> ComponentResult<()> {
         self.name = other.name.clone();
 
         if let Some(classification) = &other.classification {
@@ -365,7 +365,7 @@ impl Package {
                         }))
                     }
                     BuildSection::NoBuild => Ok(BuildSection::Configure(other_configure.clone())),
-                    x => Err(BundleError::NonMergableBuildSections(
+                    x => Err(ComponentError::NonMergableBuildSections(
                         x.to_string(),
                         build_section.clone().to_string(),
                     )),
@@ -386,7 +386,7 @@ impl Package {
                             .collect(),
                     })),
                     BuildSection::NoBuild => Ok(BuildSection::Build(other_scripts.clone())),
-                    x => Err(BundleError::NonMergableBuildSections(
+                    x => Err(ComponentError::NonMergableBuildSections(
                         x.to_string(),
                         build_section.to_string(),
                     )),
@@ -601,7 +601,7 @@ pub struct FileSource {
 }
 
 impl FileSource {
-    pub fn new<P: AsRef<Path>>(bundle_path: P, target_path: Option<P>) -> BundleResult<Self> {
+    pub fn new<P: AsRef<Path>>(bundle_path: P, target_path: Option<P>) -> ComponentResult<Self> {
         Ok(Self {
             bundle_path: bundle_path.as_ref().to_path_buf(),
             target_path: target_path.as_ref().map(|p| p.as_ref().to_path_buf()),
@@ -639,7 +639,7 @@ pub struct DirectorySource {
 }
 
 impl DirectorySource {
-    pub fn new<P: AsRef<Path>>(bundle_path: P, target_path: Option<P>) -> BundleResult<Self> {
+    pub fn new<P: AsRef<Path>>(bundle_path: P, target_path: Option<P>) -> ComponentResult<Self> {
         Ok(Self {
             bundle_path: bundle_path.as_ref().to_path_buf(),
             target_path: target_path.as_ref().map(|p| p.as_ref().to_path_buf()),
@@ -684,7 +684,7 @@ impl PatchSource {
     pub fn new<P: AsRef<Path>>(
         bundle_path: P,
         drop_directories: Option<i64>,
-    ) -> BundleResult<Self> {
+    ) -> ComponentResult<Self> {
         Ok(Self {
             bundle_path: bundle_path.as_ref().to_path_buf(),
             drop_directories,
@@ -712,7 +712,7 @@ pub struct OverlaySource {
 }
 
 impl OverlaySource {
-    pub fn new<P: AsRef<Path>>(bundle_path: P) -> BundleResult<Self> {
+    pub fn new<P: AsRef<Path>>(bundle_path: P) -> ComponentResult<Self> {
         Ok(Self {
             bundle_path: bundle_path.as_ref().to_path_buf(),
         })
@@ -913,14 +913,14 @@ mod tests {
 
     /// Find all the bundle files at the given path. This will search the path
     /// recursively for any file named `package.kdl`.
-    pub fn find_bundle_files(path: &Path) -> BundleResult<Vec<PathBuf>> {
+    pub fn find_bundle_files(path: &Path) -> ComponentResult<Vec<PathBuf>> {
         let mut result = Vec::new();
         find_bundle_files_rec(path, &mut result)?;
         Ok(result)
     }
 
     /// Search the file system recursively for all build files.
-    fn find_bundle_files_rec(path: &Path, result: &mut Vec<PathBuf>) -> BundleResult<()> {
+    fn find_bundle_files_rec(path: &Path, result: &mut Vec<PathBuf>) -> ComponentResult<()> {
         for entry in std::fs::read_dir(path)? {
             let e = entry?;
             let ft = e.file_type()?;
@@ -941,8 +941,8 @@ mod tests {
         let paths = find_bundle_files(Path::new("../packages")).into_diagnostic()?;
         let bundles = paths
             .into_iter()
-            .map(|path| Bundle::open_local(&path))
-            .collect::<miette::Result<Vec<Bundle>>>()?;
+            .map(|path| Component::open_local(&path))
+            .collect::<miette::Result<Vec<Component>>>()?;
         for bundle in bundles {
             assert_ne!(bundle.package_document.name, String::from(""))
         }
@@ -953,7 +953,7 @@ mod tests {
     #[test]
     fn parse_openssl() -> miette::Result<()> {
         let bundle_path = Path::new("../packages/openssl");
-        let _b = Bundle::open_local(bundle_path)?;
+        let _b = Component::open_local(bundle_path)?;
 
         Ok(())
     }
@@ -961,7 +961,7 @@ mod tests {
     #[test]
     fn parse_binutils_gdb() -> miette::Result<()> {
         let bundle_path = Path::new("../packages/binutils-gdb");
-        let _b = Bundle::open_local(bundle_path)?;
+        let _b = Component::open_local(bundle_path)?;
 
         Ok(())
     }

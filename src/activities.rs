@@ -78,9 +78,9 @@ pub struct ChangeRequest {
     pub contributor: String,
     pub labels: Vec<Label>,
     pub milestone: Option<Milestone>,
-    pub dirty: bool,
     pub head: CommitRef,
     pub base: CommitRef,
+    pub git_url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -207,7 +207,7 @@ impl IntoResponse for GitHubError {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "action")]
+#[serde(tag = "action", rename_all = "snake_case")]
 pub enum PullRequestPayload {
     Assigned {
         assignee: Option<User>,
@@ -287,7 +287,7 @@ pub struct PullRequestPayloadSharedFields {
     /// The actual pull_request struct
     pub pull_request: PullRequestObject,
     /// The repository on GitHub where the event occurred. Webhook payloads contain the repository property when the event occurs from activity in a repository.
-    pub repository: Option<Repository>,
+    pub repository: Repository,
     /// A GitHub organization. Webhook payloads contain the organization property when the webhook is configured for an organization, or when the event occurs from activity in a repository owned by an organization.
     pub organization: Option<HashMap<String, Value>>,
     /// The GitHub App installation. Webhook payloads contain the installation property when the event is configured for and sent to a GitHub App. For more information, see "Using webhooks with GitHub Apps."
@@ -319,7 +319,7 @@ pub struct PullRequestObject {
     pub base: CommitRef,
     pub draft: bool,
     pub merged: bool,
-    pub mergable: bool,
+    pub mergable: Option<bool>,
     pub author_association: AuthorAssociation,
     pub labels: Vec<Label>,
     pub milestone: Option<Milestone>,
@@ -359,8 +359,8 @@ pub struct CommitRef {
 #[derive(Debug, Deserialize, Clone)]
 pub struct User {
     pub name: Option<String>,
-    pub email: String,
-    pub login: String,
+    pub email: Option<String>,
+    pub login: Option<String>,
     pub id: i32,
     pub url: String,
     #[serde(rename = "type")]
@@ -475,7 +475,7 @@ pub struct Repository {
 pub struct Ping {
     pub hook: HashMap<String, serde_json::Value>,
     pub hook_id: i32,
-    pub organization: HashMap<String, serde_json::Value>,
+    pub organization: Option<HashMap<String, serde_json::Value>>,
     pub repository: HashMap<String, serde_json::Value>,
     pub sender: HashMap<String, serde_json::Value>,
 }
