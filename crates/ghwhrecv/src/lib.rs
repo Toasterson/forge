@@ -274,13 +274,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::ConvertedToDraft { shared } => {
@@ -298,13 +298,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::ReadyForReview { shared } => {
@@ -322,13 +322,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::Demilestoned { shared, .. } => {
@@ -346,13 +346,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::Milestoned { shared, .. } => {
@@ -370,13 +370,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::Dequeued { .. } => {
@@ -398,13 +398,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::Opened { shared } => {
@@ -422,13 +422,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Create(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::Reopened { shared } => {
@@ -446,13 +446,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
                 github::PullRequestPayload::Synchronize { shared, .. } => {
@@ -470,13 +470,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Event::Update(forge::ActivityEnvelope {
+                        Some(forge::ActivityEnvelope {
                             id: change_request_id,
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
                             object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
-                        })),
+                        }),
                     )
                 }
             };
