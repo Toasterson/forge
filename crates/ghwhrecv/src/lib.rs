@@ -14,9 +14,9 @@ use deadpool_lapin::lapin::{
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{debug, error, info};
+use tracing::{debug, error, event, info, instrument, Level};
 
-use forge::{ChangeRequest, CommitRef, Scheme};
+use forge::{ChangeRequest, ChangeRequestState, CommitRef, Label, Milestone, Scheme};
 use github::{GitHubError, GitHubEvent, GitHubWebhookRequest};
 
 #[derive(Error, Diagnostic, Debug)]
@@ -157,72 +157,494 @@ async fn health_check() -> Json<HealthResponse> {
     Json(HealthResponse::default())
 }
 
+#[instrument]
 async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest) -> Result<()> {
     debug!("Received Webhook: {}", req.get_kind());
     match req.get_event()? {
         GitHubEvent::PullRequest(event) => {
-            // Implement a function that creates a PullRequest struct of type forge::PullRequest from
-            // the event and sends it to the forge.
-            info!("Received PullRequest event from Github");
-            debug!("event: {:?}", event);
-            let conn = state.amqp.get().await?;
-            let event_msg = forge::Event::Create(forge::ActivityEnvelope {
-                actor: format!("{}/actors/github", &state.base_url).parse()?,
-                to: vec![format!("{}/actors/forge", &state.base_url).parse()?],
-                cc: vec![],
-                object: forge::ActivityObject::ChangeRequest(ChangeRequest {
-                    changes: todo!(),
-                    external_ref: todo!(),
-                    state: todo!(),
-                    contributor: todo!(),
-                }),
-            });
-            debug!("forge event: {:?}", event_msg);
-            let msg = serde_json::to_vec(&event_msg)?;
-            let channel = conn.create_channel().await?;
-            channel
-                .basic_publish(
-                    "",
-                    &state.inbox,
-                    BasicPublishOptions::default(),
-                    &msg,
-                    AMQPProperties::default(),
-                )
-                .await?;
+            event!(Level::INFO, pr = ?event.clone(), "Received pull request event");
+            let from_actor = format!("{}/actors/github", &state.base_url).parse()?;
+            let to_actor = format!("{}/actors/forge", &state.base_url).parse()?;
+
+            let payload = match event {
+                github::PullRequestPayload::Assigned { .. } => {
+                    info!("No need to check asignees at the moment. Ignoring");
+                    None
+                }
+                github::PullRequestPayload::AutoMergeDisabled { .. } => {
+                    info!("Not tracking automerge events");
+                    None
+                }
+                github::PullRequestPayload::AutoMergeEnabled { .. } => {
+                    info!("Not tracking automerge events");
+                    None
+                }
+                github::PullRequestPayload::Closed { shared } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: false,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: ChangeRequestState::Closed,
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::ConvertedToDraft { shared } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: ChangeRequestState::Draft,
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::ReadyForReview { shared } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: ChangeRequestState::Open,
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::Demilestoned { shared, .. } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: match shared.pull_request.state {
+                                github::PullRequestState::Open => ChangeRequestState::Open,
+                                github::PullRequestState::Closed => ChangeRequestState::Closed,
+                            },
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::Milestoned { shared, .. } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: match shared.pull_request.state {
+                                github::PullRequestState::Open => ChangeRequestState::Open,
+                                github::PullRequestState::Closed => ChangeRequestState::Closed,
+                            },
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::Dequeued { .. } => {
+                    info!("Not tracking queue events");
+                    None
+                }
+                github::PullRequestPayload::Edited { shared } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: match shared.pull_request.state {
+                                github::PullRequestState::Open => ChangeRequestState::Open,
+                                github::PullRequestState::Closed => ChangeRequestState::Closed,
+                            },
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::Opened { shared } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Create(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: ChangeRequestState::Open,
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::Reopened { shared } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: ChangeRequestState::Open,
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+                github::PullRequestPayload::Synchronize { shared, .. } => {
+                    let change_request_id = format!(
+                        "{}/objects/changeRequests/{}",
+                        &state.base_url, shared.number
+                    )
+                    .parse()?;
+                    Some(forge::Event::Update(forge::ActivityEnvelope {
+                        id: change_request_id,
+                        actor: from_actor,
+                        to: vec![to_actor],
+                        cc: vec![],
+                        object: forge::ActivityObject::ChangeRequest(ChangeRequest {
+                            title: shared.pull_request.title,
+                            body: shared.pull_request.body.unwrap_or(String::new()),
+                            changes: vec![],
+                            dirty: true,
+                            external_ref: forge::ExternalReference::GitHub {
+                                pull_request: shared.pull_request.url,
+                            },
+                            state: match shared.pull_request.state {
+                                github::PullRequestState::Open => ChangeRequestState::Open,
+                                github::PullRequestState::Closed => ChangeRequestState::Closed,
+                            },
+                            contributor: format!("{}@github.com", shared.sender.login),
+                            labels: shared
+                                .pull_request
+                                .labels
+                                .into_iter()
+                                .map(|l| Label {
+                                    name: l.name,
+                                    description: l.description,
+                                    color: l.color,
+                                })
+                                .collect(),
+                            milestone: shared.pull_request.milestone.map(|m| Milestone {
+                                number: m.number,
+                                title: m.title,
+                                description: m.description,
+                            }),
+                            head: CommitRef {
+                                sha: shared.pull_request.head.sha,
+                                ref_name: shared.pull_request.head.ref_name,
+                            },
+                            base: CommitRef {
+                                sha: shared.pull_request.base.sha,
+                                ref_name: shared.pull_request.base.ref_name,
+                            },
+                        }),
+                    }))
+                }
+            };
+
+            if let Some(payload) = payload {
+                event!(Level::INFO, cr = ?payload.clone(), "Built change request event");
+                let conn = state.amqp.get().await?;
+                let msg = serde_json::to_vec(&payload)?;
+                let channel = conn.create_channel().await?;
+                channel
+                    .basic_publish(
+                        "",
+                        &state.inbox,
+                        BasicPublishOptions::default(),
+                        &msg,
+                        AMQPProperties::default(),
+                    )
+                    .await?;
+            }
             Ok(())
         }
-        GitHubEvent::Issue(_) => todo!(),
-        GitHubEvent::IssueComment(_) => todo!(),
-        GitHubEvent::Status(_) => todo!(),
-        GitHubEvent::Push(event) => {
-            info!("Received Push event from Github");
-            debug!("event: {:?}", event);
-            let conn = state.amqp.get().await?;
-            let event_msg = forge::Event::Create(forge::ActivityEnvelope {
-                actor: format!("{}/actors/github", &state.base_url).parse()?,
-                to: vec![format!("{}/actors/forge", &state.base_url).parse()?],
-                cc: vec![],
-                object: forge::ActivityObject::Push(forge::Push {
-                    before: event.before,
-                    after: event.after,
-                    ref_name: event.ref_name,
-                    repository: event.repository.git_url,
-                }),
-            });
-            let msg = serde_json::to_vec(&event_msg)?;
-            let channel = conn.create_channel().await?;
-            channel
-                .basic_publish(
-                    "",
-                    &state.inbox,
-                    BasicPublishOptions::default(),
-                    &msg,
-                    AMQPProperties::default(),
-                )
-                .await?;
+        GitHubEvent::Issue(_) => Ok(()),
+        GitHubEvent::IssueComment(_) => Ok(()),
+        GitHubEvent::Status(_) => Ok(()),
+        GitHubEvent::Push(_) => Ok(()),
+        GitHubEvent::Ping(ping) => {
+            event!(Level::INFO, ping = ?ping, "ping received");
             Ok(())
         }
-        GitHubEvent::Ping(_) => todo!(),
     }
 }
 

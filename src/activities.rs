@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use url::Url;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub enum Scheme {
     HTTP,
     HTTPS,
@@ -27,62 +27,91 @@ impl Display for Scheme {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum UrlOrEncodedBlob {
     Url(Url),
     Blob(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Event {
     Create(ActivityEnvelope),
     Update(ActivityEnvelope),
     Delete(ActivityEnvelope),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ActivityEnvelope {
+    pub id: Url,
     pub actor: Url,
     pub to: Vec<Url>,
     pub cc: Vec<Url>,
     pub object: ActivityObject,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ActivityObject {
     ChangeRequest(ChangeRequest),
     JobReport(JobReport),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JobReport {
     pub result: JobReportResult,
     pub message: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobReportResult {
     Sucess,
     Failure,
     Warning,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChangeRequest {
+    pub title: String,
+    pub body: String,
     pub changes: Vec<ComponentChange>,
     pub external_ref: ExternalReference,
     pub state: ChangeRequestState,
     pub contributor: String,
+    pub labels: Vec<Label>,
+    pub milestone: Option<Milestone>,
+    pub dirty: bool,
+    pub head: CommitRef,
+    pub base: CommitRef,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CommitRef {
+    pub sha: String,
+    pub ref_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Label {
+    pub name: String,
+    pub description: Option<String>,
+    pub color: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Milestone {
+    pub number: i32,
+    pub title: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ChangeRequestState {
     Open,
+    Draft,
     Closed,
     Applied,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ExternalReference {
     GitHub { pull_request: String },
 }
@@ -95,7 +124,7 @@ impl Display for ExternalReference {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ComponentChange {
     pub kind: ComponentChangeKind,
     pub component_ref: String,
@@ -103,19 +132,20 @@ pub struct ComponentChange {
     pub recipe_diff: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ComponentChangeKind {
     Added,
     Updated,
     Removed,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobObject {
     DownloadSources(DownloadComponentSources),
+    DetectChanges(ChangeRequest),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DownloadComponentSources {
     pub recipe: serde_json::Value,
 }

@@ -10,6 +10,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::Deserialize;
+use serde_json::Value;
 use thiserror::Error;
 use tracing::trace;
 
@@ -23,6 +24,7 @@ pub mod headers {
 
     pub static SIGNATURE: HeaderName = HeaderName::from_static("x-hub-signature-256");
 
+    #[derive(Debug)]
     pub struct Signature(String);
 
     impl Header for Signature {
@@ -53,7 +55,7 @@ pub mod headers {
 
     pub static EVENT: HeaderName = HeaderName::from_static("x-github-event");
 
-    #[derive(Clone, Display, EnumString)]
+    #[derive(Debug, Clone, Display, EnumString)]
     pub enum Event {
         Ping,
         Push,
@@ -96,7 +98,7 @@ pub mod headers {
         HeaderName::from_static("x-github-hook-installation-target-id");
 }
 
-#[derive(FromRequest)]
+#[derive(FromRequest, Debug)]
 #[from_request(rejection(GitHubError))]
 pub struct GitHubWebhookRequest {
     #[allow(dead_code)]
@@ -105,6 +107,12 @@ pub struct GitHubWebhookRequest {
     #[from_request(via(TypedHeader))]
     event_kind: headers::Event,
     body: Bytes,
+}
+
+impl std::fmt::Display for GitHubWebhookRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Event Request: {}", self.event_kind)
+    }
 }
 
 impl GitHubWebhookRequest {
@@ -125,7 +133,7 @@ impl GitHubWebhookRequest {
 }
 
 pub enum GitHubEvent {
-    PullRequest(PullRequest),
+    PullRequest(PullRequestPayload),
     Issue(Issue),
     IssueComment(IssueComment),
     Status(Status),
@@ -198,19 +206,99 @@ impl IntoResponse for GitHubError {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct PullRequest {
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "action")]
+pub enum PullRequestPayload {
+    Assigned {
+        assignee: Option<User>,
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    AutoMergeDisabled {
+        reason: String,
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    AutoMergeEnabled {
+        reason: String,
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Closed {
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    ConvertedToDraft {
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    ReadyForReview {
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Demilestoned {
+        milestone: Option<Milestone>,
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Milestoned {
+        milestone: Option<Milestone>,
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Dequeued {
+        reason: String,
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Edited {
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Opened {
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Reopened {
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+    Synchronize {
+        after: String,
+        before: String,
+        #[serde(flatten)]
+        shared: PullRequestPayloadSharedFields,
+    },
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Milestone {
+    pub id: i32,
+    pub url: String,
+    pub number: i32,
+    pub title: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct PullRequestPayloadSharedFields {
     /// The pull request number.
     pub number: i32,
     /// The actual pull_request struct
     pub pull_request: PullRequestObject,
     /// The repository on GitHub where the event occurred. Webhook payloads contain the repository property when the event occurs from activity in a repository.
-    pub repository: Repository,
-    /// action that this event represents
-    pub action: String,
+    pub repository: Option<Repository>,
+    /// A GitHub organization. Webhook payloads contain the organization property when the webhook is configured for an organization, or when the event occurs from activity in a repository owned by an organization.
+    pub organization: Option<HashMap<String, Value>>,
+    /// The GitHub App installation. Webhook payloads contain the installation property when the event is configured for and sent to a GitHub App. For more information, see "Using webhooks with GitHub Apps."
+    pub installation: Option<HashMap<String, Value>>,
+    /// An enterprise on GitHub. Webhook payloads contain the enterprise property when the webhook is configured on an enterprise account or an organization that's part of an enterprise account. For more information, see "About enterprise accounts."
+    pub enterprise: Option<HashMap<String, Value>>,
+    /// The GitHub user that triggered the event. This property is included in every webhook payload.
+    pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PullRequestObject {
     pub url: String,
     pub id: i32,
@@ -229,16 +317,46 @@ pub struct PullRequestObject {
     pub body: Option<String>,
     pub head: CommitRef,
     pub base: CommitRef,
+    pub draft: bool,
+    pub merged: bool,
+    pub mergable: bool,
+    pub author_association: AuthorAssociation,
+    pub labels: Vec<Label>,
+    pub milestone: Option<Milestone>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
+pub struct Label {
+    pub id: i32,
+    pub node_id: String,
+    pub url: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub color: String,
+    pub default: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AuthorAssociation {
+    Collaborator,
+    Contributor,
+    FirstTimer,
+    FirstTimeContributor,
+    Mannequin,
+    Member,
+    None,
+    Owner,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct CommitRef {
     pub sha: String,
     #[serde(rename = "ref")]
     pub ref_name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct User {
     pub name: Option<String>,
     pub email: String,
@@ -246,26 +364,33 @@ pub struct User {
     pub id: i32,
     pub url: String,
     #[serde(rename = "type")]
-    pub kind: String,
+    pub kind: UserKind,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
+pub enum UserKind {
+    Bot,
+    User,
+    Organisation,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum PullRequestState {
     Open,
     Closed,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Issue {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct IssueComment {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Status {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Push {
     /// The SHA of the most recent commit on ref after the push.
     pub after: String,
@@ -302,7 +427,7 @@ pub struct Push {
     pub sender: serde_json::Value,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Commit {
     /// An array of files added in the commit.
     pub added: Vec<String>,
@@ -326,7 +451,7 @@ pub struct Commit {
     pub url: url::Url,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Author {
     pub date: Option<String>,
     pub email: Option<String>,
@@ -335,7 +460,7 @@ pub struct Author {
     pub username: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Repository {
     pub id: i32,
     pub node_id: String,
@@ -346,7 +471,7 @@ pub struct Repository {
     pub private: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Ping {
     pub hook: HashMap<String, serde_json::Value>,
     pub hook_id: i32,
