@@ -11,7 +11,6 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{types::FieldTable, Channel};
-use forge::ComponentChange;
 use forge::JobReport;
 use forge::JobReportData;
 use forge::JobReportResult;
@@ -345,17 +344,9 @@ async fn handle_message(
                         recipes.push((component, recipe));
                     }
                     //TODO pass in which files changed, added, deleted so we can categorize the change of the component
-                    let report_data = JobReportData::DetectedChanges {
+                    let report_data = JobReportData::GetRecipies {
                         change_request_id: envelope.id.to_string(),
-                        changes: recipes
-                            .into_iter()
-                            .map(|(c, r)| ComponentChange {
-                                kind: forge::ComponentChangeKind::Added,
-                                component_ref: c,
-                                recipe: r,
-                                recipe_diff: None,
-                            })
-                            .collect(),
+                        recipies: recipes,
                     };
                     let envelope = ActivityEnvelope {
                         id: envelope.id,
@@ -389,6 +380,7 @@ async fn handle_message(
     Ok(())
 }
 
+#[instrument]
 fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String>) -> Vec<String> {
     let mut changed_components: Vec<String> = vec![];
     'outer: for component in component_list {
@@ -402,7 +394,11 @@ fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String
     changed_components
 }
 
-fn get_changed_files<P: AsRef<Path>>(ws: P, target_branch_ref: &CommitRef) -> Result<Vec<String>> {
+#[instrument]
+fn get_changed_files<P: AsRef<Path> + std::fmt::Debug>(
+    ws: P,
+    target_branch_ref: &CommitRef,
+) -> Result<Vec<String>> {
     let mut diff_cmd = Command::new("git");
     diff_cmd.arg("diff");
     diff_cmd.arg("--name-only");
@@ -417,7 +413,8 @@ fn get_changed_files<P: AsRef<Path>>(ws: P, target_branch_ref: &CommitRef) -> Re
     Ok(result.split("\n").map(|s| s.to_owned()).collect())
 }
 
-fn get_component_list_in_repo<P: AsRef<Path>>(
+#[instrument]
+fn get_component_list_in_repo<P: AsRef<Path> + std::fmt::Debug>(
     ws: P,
     manifest: &ForgeIntegrationManifest,
 ) -> Result<Vec<String>> {
@@ -436,7 +433,8 @@ fn get_component_list_in_repo<P: AsRef<Path>>(
     Ok(result.split("\n").map(|s| s.to_owned()).collect())
 }
 
-fn create_gen_meatdata_script<P: AsRef<Path>>(
+#[instrument]
+fn create_gen_meatdata_script<P: AsRef<Path> + std::fmt::Debug>(
     ws: P,
     manifest: &ForgeIntegrationManifest,
 ) -> Result<()> {
@@ -446,7 +444,8 @@ fn create_gen_meatdata_script<P: AsRef<Path>>(
     Ok(())
 }
 
-fn get_component_metadata<P: AsRef<Path>>(
+#[instrument]
+fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
     ws: P,
     component: &str,
     change_to_component_dir: bool,
@@ -476,6 +475,7 @@ fn get_component_metadata<P: AsRef<Path>>(
     Ok(c.recipe)
 }
 
+#[instrument]
 fn get_repo_path(base_dir: &str, repo: &str, sha: &str) -> PathBuf {
     let repo = repo
         .replace(":", "")
@@ -485,7 +485,8 @@ fn get_repo_path(base_dir: &str, repo: &str, sha: &str) -> PathBuf {
     Path::new(base_dir).join(repo).join(sha).to_path_buf()
 }
 
-fn clean_ws<P: AsRef<Path>>(dir: P) -> Result<()> {
+#[instrument]
+fn clean_ws<P: AsRef<Path> + std::fmt::Debug>(dir: P) -> Result<()> {
     let path = dir.as_ref();
     if path.exists() {
         remove_dir_all(path)?;
@@ -494,7 +495,8 @@ fn clean_ws<P: AsRef<Path>>(dir: P) -> Result<()> {
     Ok(())
 }
 
-fn clone_repo<P: AsRef<Path>>(
+#[instrument]
+fn clone_repo<P: AsRef<Path> + std::fmt::Debug>(
     ws: P,
     repository: &str,
     checkout_ref: &CommitRef,
@@ -556,7 +558,8 @@ fn clone_repo<P: AsRef<Path>>(
     Ok(info.1)
 }
 
-fn read_manifest<P: AsRef<Path>>(ws: P) -> Result<ForgeIntegrationManifest> {
+#[instrument]
+fn read_manifest<P: AsRef<Path> + std::fmt::Debug>(ws: P) -> Result<ForgeIntegrationManifest> {
     let conf_dir = ws.as_ref().join(".forge");
     if !conf_dir.exists() {
         return Err(Error::NoForgeConfigFolder);

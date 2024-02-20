@@ -73,9 +73,9 @@ pub enum JobReportResult {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobReportData {
     ArchiveDownloaded {},
-    DetectedChanges {
+    GetRecipies {
         change_request_id: String,
-        changes: Vec<ComponentChange>,
+        recipies: Vec<(String, Recipe)>,
     },
 }
 
