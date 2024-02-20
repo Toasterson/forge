@@ -316,13 +316,15 @@ async fn handle_message(
             match job {
                 forge::JobObject::DownloadSources(_) => todo!(),
                 forge::JobObject::GetRecipies(change_request) => {
-                    info!("Detecting changes for change_request {}", envelope.id);
+                    info!("getting recipies for change_request {}", envelope.id);
                     let build_dir = get_repo_path(
                         worker_dir,
                         &change_request.git_url,
                         &change_request.head.sha,
                     );
+                    debug!("cleaning workspace {}", &build_dir.display());
                     clean_ws(&build_dir)?;
+                    debug!("cloning repo {}", &change_request.git_url);
                     let manifest = clone_repo(
                         &build_dir,
                         &change_request.git_url,
@@ -391,6 +393,10 @@ fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String
             }
         }
     }
+    debug!(
+        "the following components changed: {:?}",
+        &changed_components
+    );
     changed_components
 }
 
@@ -399,6 +405,7 @@ fn get_changed_files<P: AsRef<Path> + std::fmt::Debug>(
     ws: P,
     target_branch_ref: &CommitRef,
 ) -> Result<Vec<String>> {
+    debug!("Detecting changed files");
     let mut diff_cmd = Command::new("git");
     diff_cmd.arg("diff");
     diff_cmd.arg("--name-only");
@@ -418,9 +425,11 @@ fn get_component_list_in_repo<P: AsRef<Path> + std::fmt::Debug>(
     ws: P,
     manifest: &ForgeIntegrationManifest,
 ) -> Result<Vec<String>> {
+    debug!("creating list_component script");
     let list_script_path = ws.as_ref().join(".forge_script_list_components.sh");
     let mut list_script = std::fs::File::create(&list_script_path)?;
     list_script.write_all(manifest.component_list_script.join("\n").as_bytes())?;
+    debug!("running list_component script");
     let mut script_cmd = Command::new("bash");
     script_cmd.arg("-ex");
     script_cmd.arg(list_script_path.as_os_str());
@@ -438,6 +447,7 @@ fn create_gen_meatdata_script<P: AsRef<Path> + std::fmt::Debug>(
     ws: P,
     manifest: &ForgeIntegrationManifest,
 ) -> Result<()> {
+    debug!("creating gen metadata hepler script");
     let list_script_path = ws.as_ref().join(".forge_script_components_gen_metadata.sh");
     let mut list_script = std::fs::File::create(&list_script_path)?;
     list_script.write_all(manifest.component_metadata_gen_script.join("\n").as_bytes())?;
@@ -451,6 +461,7 @@ fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
     change_to_component_dir: bool,
     metadata_file_name: &str,
 ) -> Result<Recipe> {
+    debug!("running create_metadata script");
     let list_script_path = ws.as_ref().join(".forge_script_components_gen_metadata.sh");
     let mut script_cmd = Command::new("bash");
     script_cmd.arg("-ex");
@@ -502,6 +513,11 @@ fn clone_repo<P: AsRef<Path> + std::fmt::Debug>(
     checkout_ref: &CommitRef,
     conf_ref: Option<String>,
 ) -> Result<ForgeIntegrationManifest> {
+    debug!(
+        "running git clone {} {}",
+        &repository,
+        ws.as_ref().display()
+    );
     let mut git_cmd = Command::new("git");
     git_cmd.arg("clone");
     git_cmd.arg(&repository);
@@ -513,6 +529,7 @@ fn clone_repo<P: AsRef<Path> + std::fmt::Debug>(
     }
     struct ProcessInfo(bool, ForgeIntegrationManifest);
     let info: ProcessInfo = if let Some(conf_ref) = conf_ref {
+        debug!("resetting repo to {}, to get config", &conf_ref);
         let mut git_cmd = Command::new("git");
         git_cmd.arg("reset");
         git_cmd.arg("--hard");
@@ -527,6 +544,7 @@ fn clone_repo<P: AsRef<Path> + std::fmt::Debug>(
         let manifest = read_manifest(ws.as_ref())?;
         ProcessInfo(false, manifest)
     } else {
+        debug!("resetting git repo to {}", &checkout_ref.sha);
         let mut git_cmd = Command::new("git");
         git_cmd.arg("reset");
         git_cmd.arg("--hard");
@@ -542,6 +560,7 @@ fn clone_repo<P: AsRef<Path> + std::fmt::Debug>(
         ProcessInfo(true, manifest)
     };
     if !info.0 {
+        debug!("resetting git repo to {}", &checkout_ref.sha);
         let mut git_cmd = Command::new("git");
         git_cmd.arg("reset");
         git_cmd.arg("--hard");
@@ -574,6 +593,7 @@ fn read_manifest<P: AsRef<Path> + std::fmt::Debug>(ws: P) -> Result<ForgeIntegra
             .to_str()
             == Some("manifest")
         {
+            debug!("found manifest file {}", &file.path().display());
             return Ok(read_forge_manifest(&file.path())?);
         }
     }
