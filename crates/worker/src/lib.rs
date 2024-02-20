@@ -596,7 +596,8 @@ fn read_manifest<P: AsRef<Path> + std::fmt::Debug>(ws: P) -> Result<ForgeIntegra
             .file_name()
             .ok_or(Error::ForgeFilesNoBasename)?
             .to_str()
-            == Some("manifest")
+            .ok_or(Error::ForgeFilesNoBasename)?
+            .starts_with("manifest")
         {
             debug!("found manifest file {}", &file.path().display());
             return Ok(read_forge_manifest(&file.path())?);
