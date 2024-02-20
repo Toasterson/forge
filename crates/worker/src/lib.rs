@@ -384,7 +384,7 @@ async fn handle_message(
     Ok(())
 }
 
-#[instrument]
+#[instrument(skip_all)]
 fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String>) -> Vec<String> {
     let mut changed_components: Vec<String> = vec![];
     'outer: for file_path in changed_files.iter() {
@@ -470,7 +470,11 @@ fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
     debug!("running create_metadata script");
     let mut script_cmd = Command::new("bash");
     script_cmd.arg("-ex");
-    script_cmd.arg(".forge_script_components_gen_metadata.sh");
+    script_cmd.arg(
+        ws.as_ref()
+            .join(".forge_script_components_gen_metadata.sh")
+            .as_os_str(),
+    );
     if change_to_component_dir {
         script_cmd.current_dir(ws.as_ref().join("components").join(component));
     } else {
