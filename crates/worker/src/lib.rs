@@ -437,7 +437,8 @@ fn get_component_list_in_repo<P: AsRef<Path> + std::fmt::Debug>(
     debug!("running list_component script");
     let mut script_cmd = Command::new("bash");
     script_cmd.arg("-ex");
-    script_cmd.arg(list_script_path.as_os_str());
+    script_cmd.current_dir(ws.as_ref());
+    script_cmd.arg("./.forge_script_list_components.sh");
     let out = script_cmd.output()?;
     if !out.status.success() {
         let out_string = String::from_utf8(out.stderr)?;
@@ -467,13 +468,13 @@ fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
     metadata_file_name: &str,
 ) -> Result<Recipe> {
     debug!("running create_metadata script");
-    let list_script_path = ws.as_ref().join(".forge_script_components_gen_metadata.sh");
     let mut script_cmd = Command::new("bash");
     script_cmd.arg("-ex");
-    script_cmd.arg(list_script_path.as_os_str());
+    script_cmd.arg(".forge_script_components_gen_metadata.sh");
     if change_to_component_dir {
         script_cmd.current_dir(ws.as_ref().join("components").join(component));
     } else {
+        script_cmd.current_dir(ws.as_ref());
         script_cmd.arg(component);
     }
     let out = script_cmd.output()?;
