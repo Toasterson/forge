@@ -397,7 +397,11 @@ fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String
             }
         }
     }
-    let changed_components = changed_components.into_iter().unique().collect();
+    let changed_components = changed_components
+        .into_iter()
+        .unique()
+        .filter(|c| c != "")
+        .collect();
     debug!(
         "the following components changed: {:?}",
         &changed_components
