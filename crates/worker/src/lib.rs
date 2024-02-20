@@ -495,8 +495,8 @@ fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
         .join("components")
         .join(component)
         .join(metadata_file_name);
-    let c =
-        Component::open_local(metadata_file_path).map_err(|report| Error::MietteReport(report))?;
+    let c = Component::open_local(metadata_file_path)
+        .map_err(|report| Error::String(report.to_string()))?;
     Ok(c.recipe)
 }
 
