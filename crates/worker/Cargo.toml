@@ -24,3 +24,4 @@ url.workspace = true
 futures.workspace = true
 integration.workspace = true
 component.workspace = true
+itertools = "0.12.1"

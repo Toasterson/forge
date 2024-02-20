@@ -32,6 +32,7 @@ strum.workspace = true
 integration.workspace = true
 prisma-client-rust.workspace = true
 component.workspace = true
+itertools = "0.12.1"
 
 [workspace]
 members = ["crates/*"]

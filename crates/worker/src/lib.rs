@@ -18,6 +18,7 @@ use forge::{ActivityEnvelope, CommitRef, Scheme};
 use futures::{join, StreamExt};
 use github::GitHubError;
 use integration::{read_forge_manifest, ForgeIntegrationManifest};
+use itertools::Itertools;
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, remove_dir_all};
@@ -386,14 +387,17 @@ async fn handle_message(
 #[instrument]
 fn get_changed_components(component_list: Vec<String>, changed_files: Vec<String>) -> Vec<String> {
     let mut changed_components: Vec<String> = vec![];
-    'outer: for component in component_list {
-        for file_path in changed_files.iter() {
-            if file_path.contains(&component) {
+    'outer: for file_path in changed_files.iter() {
+        trace!("checking if file: {} is a changed component", &file_path);
+        for component in component_list.iter() {
+            if file_path.contains(component) {
+                trace!("detected changed component {}", component);
                 changed_components.push(component.clone());
                 continue 'outer;
             }
         }
     }
+    let changed_components = changed_components.into_iter().unique().collect();
     debug!(
         "the following components changed: {:?}",
         &changed_components
