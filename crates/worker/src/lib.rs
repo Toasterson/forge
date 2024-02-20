@@ -315,7 +315,7 @@ async fn handle_message(
             event!(Level::DEBUG, job = ?job, "handling job event");
             match job {
                 forge::JobObject::DownloadSources(_) => todo!(),
-                forge::JobObject::DetectChanges(change_request) => {
+                forge::JobObject::GetRecipies(change_request) => {
                     info!("Detecting changes for change_request {}", envelope.id);
                     let build_dir = get_repo_path(
                         worker_dir,

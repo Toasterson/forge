@@ -279,7 +279,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -303,7 +303,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -327,7 +327,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -351,7 +351,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -375,7 +375,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -403,7 +403,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -427,7 +427,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -451,7 +451,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }
@@ -475,7 +475,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             actor: from_actor,
                             to: vec![to_actor],
                             cc: vec![],
-                            object: forge::ActivityObject::Job(JobObject::DetectChanges(cr)),
+                            object: forge::ActivityObject::Job(JobObject::GetRecipies(cr)),
                         }),
                     )
                 }

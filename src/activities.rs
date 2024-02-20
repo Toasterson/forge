@@ -153,7 +153,7 @@ pub enum ComponentChangeKind {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobObject {
     DownloadSources(DownloadComponentSources),
-    DetectChanges(ChangeRequest),
+    GetRecipies(ChangeRequest),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
