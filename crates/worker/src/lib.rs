@@ -68,8 +68,9 @@ pub enum Error {
     #[error(transparent)]
     IntegrationError(#[from] integration::IntegrationError),
 
-    #[error("{0}")]
-    MietteReport(miette::Report),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    ComponentError(#[from] component::ComponentError),
 
     #[error("{0}")]
     String(String),
@@ -276,7 +277,7 @@ async fn handle_rabbitmq(state: AppState) -> Result<()> {
                         channel.basic_ack(tag, BasicAckOptions::default()).await?;
                     }
                     Err(e) => {
-                        error!(error = e.to_string(), "failed to handle message");
+                        error!(error = ?e, "failed to handle message");
                         channel.basic_nack(tag, BasicNackOptions::default()).await?;
                     }
                 }
@@ -495,8 +496,7 @@ fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
         .join("components")
         .join(component)
         .join(metadata_file_name);
-    let c = Component::open_local(metadata_file_path)
-        .map_err(|report| Error::String(report.to_string()))?;
+    let c = Component::open_local(metadata_file_path)?;
     Ok(c.recipe)
 }
 

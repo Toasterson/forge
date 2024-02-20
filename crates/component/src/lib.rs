@@ -13,21 +13,32 @@ use thiserror::Error;
 #[derive(Error, Debug, Diagnostic)]
 pub enum ComponentError {
     #[error(transparent)]
+    #[diagnostic(code(component::io_error))]
     IOError(#[from] std::io::Error),
+
     #[error("no parent directory of package.kdl exists")]
     NoPackageDocumentParentDir,
+
     #[error(transparent)]
-    #[diagnostic(code(bundle::kdl_error))]
+    #[diagnostic(transparent)]
     Kdl(#[from] kdl::KdlError),
+
     #[error(transparent)]
     #[diagnostic(code(bundle::url_parse_error))]
     UrlParseError(#[from] url::ParseError),
+
     #[error("unknown build type {0}")]
     UnknownBuildType(String),
+
     #[error("build types {0} and {1} are not mergeable")]
     NonMergableBuildSections(String, String),
+
     #[error(transparent)]
     UninitializedFieldError(#[from] derive_builder::UninitializedFieldError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Knuffel(#[from] knuffel::Error),
 }
 
 type ComponentResult<T> = std::result::Result<T, ComponentError>;
@@ -39,16 +50,12 @@ pub struct Component {
 }
 
 impl Component {
-    pub fn open_local<P: AsRef<Path>>(path: P) -> miette::Result<Self> {
-        let path = path
-            .as_ref()
-            .canonicalize()
-            .into_diagnostic()
-            .wrap_err(miette::miette!("could not open bundle"))?;
+    pub fn open_local<P: AsRef<Path>>(path: P) -> ComponentResult<Self> {
+        let path = path.as_ref().canonicalize()?;
 
         let (package_document_string, name) = if path.is_file() {
             (
-                read_to_string(path.clone()).into_diagnostic()?,
+                read_to_string(path.clone())?,
                 path.parent()
                     .ok_or(ComponentError::NoPackageDocumentParentDir)?
                     .to_string_lossy()
@@ -56,7 +63,7 @@ impl Component {
             )
         } else {
             (
-                read_to_string(&path.join("package.kdl")).into_diagnostic()?,
+                read_to_string(&path.join("package.kdl"))?,
                 path.to_string_lossy().to_string(),
             )
         };
