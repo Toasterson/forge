@@ -25,6 +25,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use thiserror::Error;
+use tracing::trace;
 use tracing::{debug, error, event, info, instrument, Level};
 use url::Url;
 
@@ -586,6 +587,10 @@ fn read_manifest<P: AsRef<Path> + std::fmt::Debug>(ws: P) -> Result<ForgeIntegra
 
     for file in conf_dir.read_dir()? {
         let file = file?;
+        trace!(
+            "checking file {:?} if it is a manifest",
+            file.path().file_name()
+        );
         if file
             .path()
             .file_name()
