@@ -1,6 +1,6 @@
 datasource db {
   provider   = "postgres"
-  url        = "postgres://dev:dev@localhost:5432/dev"
+  url        = "postgres://forge:forge@localhost:5432/forge"
   extensions = [uuidOssp(map: "uuid-ossp")]
 }
 

@@ -11,6 +11,10 @@
       <sourceFolder url="file://$MODULE_DIR$/external_crates/seaography/generator/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/external_crates/seaography/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/worker/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/component/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/integration/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/integration/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/prisma/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/external_crates/seaography/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
