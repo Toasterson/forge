@@ -1,4 +1,4 @@
 /target
 /Cargo.lock
 /testcredentials
-sample_data/downloads
+/sample_data/downloads/*
