@@ -116,7 +116,6 @@ impl Component {
             src_section.sources.push(node);
         } else {
             let src_section = SourceSection {
-                name: None,
                 sources: vec![node],
             };
             self.recipe.sources.push(src_section);
@@ -417,8 +416,6 @@ impl From<&DependencyKind> for KdlValue {
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct SourceSection {
-    #[knuffel(argument)]
-    pub name: Option<String>,
     #[knuffel(children)]
     pub sources: Vec<SourceNode>,
 }
@@ -426,9 +423,6 @@ pub struct SourceSection {
 impl SourceSection {
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut source_node = kdl::KdlNode::new("source");
-        if let Some(name) = &self.name {
-            source_node.insert(0, name.as_str());
-        }
 
         for src in &self.sources {
             let src_node = match src {

@@ -1,17 +1,10 @@
-use std::path::PathBuf;
-
-use clap::Parser;
 use miette::IntoDiagnostic;
+
+use crate::args::ComponentArgs;
 
 mod repology;
 
-#[derive(Debug, Parser)]
-pub(crate) struct Args {
-    #[clap(short, long, default_value = ".")]
-    component: PathBuf,
-}
-
-pub(crate) fn print_component(args: Args) -> miette::Result<()> {
+pub(crate) fn print_component(args: ComponentArgs) -> miette::Result<()> {
     let component = component::Component::open_local(&args.component)?;
     println!(
         "{}",

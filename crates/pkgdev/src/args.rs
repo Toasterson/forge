@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand, ValueEnum};
 use miette::IntoDiagnostic;
 use strum::Display;
 
 use crate::metadata;
+use crate::sources::download_sources;
 
 #[derive(Debug, Parser)]
 pub(crate) struct Args {
@@ -12,13 +15,26 @@ pub(crate) struct Args {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
+    #[clap(name = "download")]
+    Download {
+        #[clap(short, long, default_value = ".")]
+        component: PathBuf,
+        #[clap(default_value = ".")]
+        target_dir: PathBuf,
+    },
     #[clap(name = "metadata")]
-    Metadata(metadata::Args),
+    Metadata(ComponentArgs),
     #[clap(name = "generate")]
     Generate {
         #[clap(default_value_t = GenerateSchemaKind::default())]
         kind: GenerateSchemaKind,
     },
+}
+
+#[derive(Debug, Parser, Clone)]
+pub(crate) struct ComponentArgs {
+    #[clap(short, long, default_value = ".")]
+    pub component: PathBuf,
 }
 
 #[derive(Debug, Default, Display, Clone, ValueEnum)]
@@ -50,5 +66,9 @@ pub(crate) fn run(args: Args) -> miette::Result<()> {
                 Ok(())
             }
         },
+        Commands::Download {
+            component,
+            target_dir,
+        } => download_sources(component, target_dir),
     }
 }

@@ -8,6 +8,7 @@ version "11.0.22"
 project-url "https://openjdk.java.net/"
 source {
     archive "https://github.com/openjdk/jdk11u/archive/refs/tags/jdk-11.0.22-ga.tar.gz" sha256="5ed47173679cdfefa0cb9fc92d443413e05ab2e157a29bb86e829d7f6a80913a"
+    archive "https://github.com/openjdk/jdk11u/archive/refs/tags/jdk-11.0.22-ga.tar.gz" sha256="5ed47173679cdfefa0cb9fc92d443413e05ab2e157a29bb86e829"
     patch "tribblix-demangle2.patch"
     patch "make_autoconf_flags-cflags.m4.patch"
     patch "src_hotspot_share_gc_g1_g1Analytics.cpp.patch"
