@@ -1,12 +1,13 @@
+use std::{fs::read_to_string, path::Path};
+
 use miette::Diagnostic;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
-use std::{fs::read_to_string, path::Path};
 use thiserror::Error;
 
 #[derive(Error, Debug, Diagnostic)]
 pub enum IntegrationError {
-    #[error("{0} is not a supported manifest format extention. Use toml,yaml,json or kdl")]
+    #[error("{0} is not a supported manifest format extension. Use toml,yaml,json or kdl")]
     NotSupportedFormat(String),
 
     #[error(transparent)]

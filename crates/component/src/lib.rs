@@ -1,13 +1,14 @@
-use derive_builder::Builder;
-use diff::Diff;
-use kdl::KdlValue;
-use miette::{Diagnostic, IntoDiagnostic, WrapErr};
-use serde::{Deserialize, Serialize};
 use std::{
     fs::{read_to_string, File},
     io::Write,
     path::{Path, PathBuf},
 };
+
+use derive_builder::Builder;
+use diff::Diff;
+use kdl::KdlValue;
+use miette::{Diagnostic, IntoDiagnostic, WrapErr};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug, Diagnostic)]
@@ -41,9 +42,12 @@ pub enum ComponentError {
     Knuffel(#[from] knuffel::Error),
 }
 
-type ComponentResult<T> = std::result::Result<T, ComponentError>;
+type ComponentResult<T> = Result<T, ComponentError>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, Diff, PartialEq)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
 pub struct Component {
     path: PathBuf,
     pub recipe: Recipe,
@@ -134,10 +138,10 @@ impl Component {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq)]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct Recipe {
     #[knuffel(child, unwrap(argument))]
@@ -186,10 +190,6 @@ pub struct Recipe {
     #[builder(default)]
     pub seperate_build_dir: bool,
 
-    #[knuffel(child, unwrap(argument))]
-    #[builder(default)]
-    pub maintainer: Option<String>,
-
     #[knuffel(children(name = "source"))]
     #[builder(default)]
     pub sources: Vec<SourceSection>,
@@ -210,17 +210,6 @@ impl Recipe {
             .children()
             .unwrap_or(&kdl::KdlDocument::new())
             .clone()
-    }
-
-    pub fn get_build_section(&self) -> Option<BuildSection> {
-        self.build_section.first().map(|b| b.clone())
-    }
-
-    pub fn ensure_build_section(&self) -> BuildSection {
-        self.build_section
-            .first()
-            .map(|b| b.clone())
-            .unwrap_or(BuildSection::default())
     }
 
     pub fn to_node(&self) -> kdl::KdlNode {
@@ -282,7 +271,7 @@ impl Recipe {
             doc.nodes_mut().push(project_url_node);
         }
 
-        if let Some(maintainer) = &self.maintainer {
+        for maintainer in self.maintainers.iter() {
             let mut maintainer_node = kdl::KdlNode::new("maintainer");
             maintainer_node.insert(0, maintainer.as_str());
             doc.nodes_mut().push(maintainer_node);
@@ -295,7 +284,7 @@ impl Recipe {
             }
         }
 
-        if let Some(build) = &self.get_build_section() {
+        for build in &self.build_section {
             let build_node = build.to_node();
             doc.nodes_mut().push(build_node);
         }
@@ -343,69 +332,12 @@ impl Recipe {
             self.project_url = Some(project_url.clone());
         }
 
-        if let Some(maintainer) = &other.maintainer {
-            self.maintainer = Some(maintainer.clone());
+        for maintainer in &other.maintainers {
+            self.maintainers.push(maintainer.clone());
         }
 
-        if let Some(build_section) = &other.get_build_section() {
-            let self_build = self.ensure_build_section();
-            let final_build = match build_section {
-                BuildSection::Configure(other_configure) => match self_build {
-                    BuildSection::Configure(c) => {
-                        Ok(BuildSection::Configure(ConfigureBuildSection {
-                            options: c
-                                .options
-                                .into_iter()
-                                .chain(other_configure.options.clone())
-                                .collect(),
-                            flags: c
-                                .flags
-                                .into_iter()
-                                .chain(other_configure.flags.clone())
-                                .collect(),
-                            compiler: if let Some(compiler) = &other_configure.compiler {
-                                Some(compiler.clone())
-                            } else {
-                                c.compiler
-                            },
-                            linker: if let Some(linker) = &other_configure.linker {
-                                Some(linker.clone())
-                            } else {
-                                c.linker
-                            },
-                        }))
-                    }
-                    BuildSection::NoBuild => Ok(BuildSection::Configure(other_configure.clone())),
-                    x => Err(ComponentError::NonMergableBuildSections(
-                        x.to_string(),
-                        build_section.clone().to_string(),
-                    )),
-                },
-                BuildSection::CMake => todo!(),
-                BuildSection::Meson => todo!(),
-                BuildSection::Build(other_scripts) => match self_build {
-                    BuildSection::Build(s) => Ok(BuildSection::Build(ScriptBuildSection {
-                        scripts: s
-                            .scripts
-                            .into_iter()
-                            .chain(other_scripts.scripts.clone())
-                            .collect(),
-                        install_directives: s
-                            .install_directives
-                            .into_iter()
-                            .chain(other_scripts.install_directives.clone())
-                            .collect(),
-                    })),
-                    BuildSection::NoBuild => Ok(BuildSection::Build(other_scripts.clone())),
-                    x => Err(ComponentError::NonMergableBuildSections(
-                        x.to_string(),
-                        build_section.to_string(),
-                    )),
-                },
-                BuildSection::NoBuild => Ok(BuildSection::NoBuild),
-            }?;
-
-            self.build_section = vec![final_build];
+        for bld in &other.build_section {
+            self.build_section.push(bld.clone());
         }
 
         for src in &other.sources {
@@ -422,7 +354,7 @@ impl Recipe {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct Dependency {
     #[knuffel(argument)]
@@ -452,7 +384,7 @@ impl Dependency {
 
 #[derive(Debug, knuffel::DecodeScalar, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub enum DependencyKind {
     Require,
@@ -472,7 +404,7 @@ impl From<&DependencyKind> for KdlValue {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct SourceSection {
     #[knuffel(argument)]
@@ -507,7 +439,7 @@ impl SourceSection {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub enum SourceNode {
     Archive(ArchiveSource),
@@ -520,7 +452,7 @@ pub enum SourceNode {
 
 #[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct ArchiveSource {
     #[knuffel(argument)]
@@ -561,7 +493,7 @@ impl ArchiveSource {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct GitSource {
     #[knuffel(argument)]
@@ -623,7 +555,7 @@ impl GitSource {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct FileSource {
     #[knuffel(argument)]
@@ -664,7 +596,7 @@ impl FileSource {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct DirectorySource {
     #[knuffel(argument)]
@@ -709,7 +641,7 @@ impl DirectorySource {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct PatchSource {
     #[knuffel(argument)]
@@ -745,7 +677,7 @@ impl PatchSource {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct OverlaySource {
     #[knuffel(argument)]
@@ -772,33 +704,42 @@ impl OverlaySource {
 
 #[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
-pub enum BuildSection {
-    Configure(ConfigureBuildSection),
-    CMake,
-    Meson,
-    Build(ScriptBuildSection),
-    #[default]
-    NoBuild,
+pub struct BuildSection {
+    #[knuffel(child, unwrap(argument))]
+    source: Option<String>,
+    #[knuffel(child)]
+    configure: Option<ConfigureBuildSection>,
+    #[knuffel(child, unwrap(argument))]
+    cmake: Option<String>,
+    #[knuffel(child, unwrap(argument))]
+    meson: Option<String>,
+    #[knuffel(child)]
+    script: Option<ScriptBuildSection>,
 }
 
-impl ToString for BuildSection {
-    fn to_string(&self) -> String {
-        match &self {
-            BuildSection::Configure(_) => "configure",
-            BuildSection::CMake => "cmake",
-            BuildSection::Meson => "meson",
-            BuildSection::Build(_) => "build",
-            BuildSection::NoBuild => "no-build",
+impl BuildSection {
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("build");
+        if let Some(source) = &self.source {
+            node.insert(0, source.as_str());
         }
-        .to_string()
+        let doc = node.ensure_children();
+        if let Some(configure) = &self.configure {
+            doc.nodes_mut().push(configure.to_node());
+        } else if let Some(script) = &self.script {
+            doc.nodes_mut().push(script.to_node());
+        } else {
+            doc.nodes_mut().push(kdl::KdlNode::new("no-build"));
+        }
+        node
     }
 }
 
 #[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct ConfigureBuildSection {
     #[knuffel(children(name = "option"))]
@@ -811,9 +752,37 @@ pub struct ConfigureBuildSection {
     pub linker: Option<String>,
 }
 
+impl ConfigureBuildSection {
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("configure");
+        let doc = node.ensure_children();
+        for option in &self.options {
+            doc.nodes_mut().push(option.to_node());
+        }
+
+        for flag in &self.flags {
+            doc.nodes_mut().push(flag.to_node());
+        }
+
+        if let Some(compiler) = &self.compiler {
+            let mut n = kdl::KdlNode::new("compiler");
+            n.insert(0, compiler.clone());
+            doc.nodes_mut().push(n);
+        }
+
+        if let Some(linker) = &self.linker {
+            let mut n = kdl::KdlNode::new("linker");
+            n.insert(0, linker.clone());
+            doc.nodes_mut().push(n);
+        }
+
+        node
+    }
+}
+
 #[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct ScriptBuildSection {
     #[knuffel(children(name = "script"))]
@@ -822,9 +791,25 @@ pub struct ScriptBuildSection {
     pub install_directives: Vec<InstallDirectiveNode>,
 }
 
+impl ScriptBuildSection {
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("script");
+        let doc = node.ensure_children();
+        for script in &self.scripts {
+            doc.nodes_mut().push(script.to_node());
+        }
+
+        for install in &self.install_directives {
+            doc.nodes_mut().push(install.to_node());
+        }
+
+        node
+    }
+}
+
 #[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct InstallDirectiveNode {
     #[knuffel(property)]
@@ -851,7 +836,7 @@ impl InstallDirectiveNode {
 
 #[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct ScriptNode {
     #[knuffel(argument)]
@@ -876,7 +861,7 @@ impl ScriptNode {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct BuildFlagNode {
     #[knuffel(argument)]
@@ -895,7 +880,7 @@ impl BuildFlagNode {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct BuildOptionNode {
     #[knuffel(argument)]
@@ -910,57 +895,9 @@ impl BuildOptionNode {
     }
 }
 
-impl BuildSection {
-    pub fn to_node(&self) -> kdl::KdlNode {
-        match &self {
-            BuildSection::Configure(c) => {
-                let mut node = kdl::KdlNode::new("configure");
-                let doc = node.ensure_children();
-                for option in &c.options {
-                    doc.nodes_mut().push(option.to_node());
-                }
-
-                for flag in &c.flags {
-                    doc.nodes_mut().push(flag.to_node());
-                }
-
-                if let Some(compiler) = &c.compiler {
-                    let mut n = kdl::KdlNode::new("compiler");
-                    n.insert(0, compiler.clone());
-                    doc.nodes_mut().push(n);
-                }
-
-                if let Some(linker) = &c.linker {
-                    let mut n = kdl::KdlNode::new("linker");
-                    n.insert(0, linker.clone());
-                    doc.nodes_mut().push(n);
-                }
-
-                node
-            }
-            BuildSection::CMake => todo!(),
-            BuildSection::Meson => todo!(),
-            BuildSection::Build(s) => {
-                let mut node = kdl::KdlNode::new("build");
-                let doc = node.ensure_children();
-                for script in &s.scripts {
-                    doc.nodes_mut().push(script.to_node());
-                }
-
-                for package_directory in &s.install_directives {
-                    doc.nodes_mut().push(package_directory.to_node());
-                }
-
-                node
-            }
-            BuildSection::NoBuild => kdl::KdlNode::new("no-build"),
-        }
-    }
-}
-
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff)]
 #[diff(attr(
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+# [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct FileNode {
     #[knuffel(child, unwrap(argument))]
@@ -969,12 +906,11 @@ pub struct FileNode {
 
 #[cfg(test)]
 mod tests {
+    use std::path::{Path, PathBuf};
 
     use miette::IntoDiagnostic;
 
     use crate::*;
-
-    use std::path::{Path, PathBuf};
 
     /// Find all the bundle files at the given path. This will search the path
     /// recursively for any file named `package.kdl`.
@@ -1007,7 +943,7 @@ mod tests {
         let bundles = paths
             .into_iter()
             .map(|path| Component::open_local(&path))
-            .collect::<miette::Result<Vec<Component>>>()?;
+            .collect::<ComponentResult<Vec<Component>>>()?;
         for bundle in bundles {
             assert_ne!(bundle.recipe.name, String::from(""))
         }

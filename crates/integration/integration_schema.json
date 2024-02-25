@@ -3,10 +3,25 @@
   "title": "ForgeIntegrationManifest",
   "type": "object",
   "required": [
-    "component_list"
+    "change_to_component_dir",
+    "component_list",
+    "metadata_generation_script"
   ],
   "properties": {
+    "change_to_component_dir": {
+      "type": "boolean"
+    },
     "component_list": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metadata_filename": {
+      "default": "package.kdl",
+      "type": "string"
+    },
+    "metadata_generation_script": {
       "type": "array",
       "items": {
         "type": "string"

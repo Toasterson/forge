@@ -1,2 +1,7 @@
+[target.aarch64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+]
+
 [alias]
 prisma = "run -p prisma --"
