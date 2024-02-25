@@ -8,6 +8,8 @@ use derive_builder::Builder;
 use diff::Diff;
 use kdl::KdlValue;
 use miette::{Diagnostic, IntoDiagnostic, WrapErr};
+use schemars::schema::RootSchema;
+use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -44,7 +46,11 @@ pub enum ComponentError {
 
 type ComponentResult<T> = Result<T, ComponentError>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Diff, PartialEq)]
+pub fn get_schema() -> RootSchema {
+    schema_for!(Component)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Diff, PartialEq, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -138,7 +144,9 @@ impl Component {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+)]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -352,7 +360,7 @@ impl Recipe {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -382,7 +390,9 @@ impl Dependency {
     }
 }
 
-#[derive(Debug, knuffel::DecodeScalar, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(
+    Debug, knuffel::DecodeScalar, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -402,7 +412,7 @@ impl From<&DependencyKind> for KdlValue {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -437,7 +447,7 @@ impl SourceSection {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -450,7 +460,9 @@ pub enum SourceNode {
     Overlay(OverlaySource),
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -491,7 +503,7 @@ impl ArchiveSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -553,7 +565,7 @@ impl GitSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -594,7 +606,7 @@ impl FileSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -639,7 +651,7 @@ impl DirectorySource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -675,7 +687,7 @@ impl PatchSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -702,7 +714,9 @@ impl OverlaySource {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -737,7 +751,9 @@ impl BuildSection {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -780,7 +796,9 @@ impl ConfigureBuildSection {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -807,7 +825,9 @@ impl ScriptBuildSection {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -834,7 +854,9 @@ impl InstallDirectiveNode {
     }
 }
 
-#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -859,7 +881,7 @@ impl ScriptNode {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -878,7 +900,7 @@ impl BuildFlagNode {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]

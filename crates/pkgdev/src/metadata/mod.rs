@@ -17,6 +17,5 @@ pub(crate) fn print_component(args: Args) -> miette::Result<()> {
         "{}",
         serde_json::to_string_pretty(&component).into_diagnostic()?
     );
-    println!("{}", component.recipe.to_document());
     Ok(())
 }

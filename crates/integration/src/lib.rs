@@ -1,6 +1,7 @@
 use std::{fs::read_to_string, path::Path};
 
 use miette::Diagnostic;
+use schemars::schema::RootSchema;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -70,6 +71,10 @@ pub fn read_forge_manifest<P: AsRef<Path>>(path: P) -> Result<ForgeIntegrationMa
 pub fn emit_schema() -> Result<String> {
     let schema = schema_for!(ForgeIntegrationManifest);
     Ok(serde_json::to_string_pretty(&schema)?)
+}
+
+pub fn get_schema() -> RootSchema {
+    schema_for!(ForgeIntegrationManifest)
 }
 
 #[cfg(test)]
