@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 
+use crate::create::create_component;
 use clap::{Parser, Subcommand, ValueEnum};
 use miette::IntoDiagnostic;
 use strum::Display;
 
 use crate::metadata;
+use crate::modify::{edit_component, EditArgs};
 use crate::sources::download_sources;
 
 #[derive(Debug, Parser)]
@@ -28,6 +30,19 @@ pub(crate) enum Commands {
     Generate {
         #[clap(default_value_t = GenerateSchemaKind::default())]
         kind: GenerateSchemaKind,
+    },
+    #[clap(name = "create")]
+    Create {
+        fmri: String,
+        #[clap(flatten)]
+        args: ComponentArgs,
+    },
+    #[clap(name = "edit")]
+    Edit {
+        #[clap(short, long, default_value = ".")]
+        component: PathBuf,
+        #[clap(subcommand)]
+        args: EditArgs,
     },
 }
 
@@ -70,5 +85,7 @@ pub(crate) fn run(args: Args) -> miette::Result<()> {
             component,
             target_dir,
         } => download_sources(component, target_dir),
+        Commands::Create { fmri, args } => create_component(args, fmri),
+        Commands::Edit { component, args } => edit_component(component, args),
     }
 }

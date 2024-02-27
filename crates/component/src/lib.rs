@@ -60,6 +60,19 @@ pub struct Component {
 }
 
 impl Component {
+    pub fn new<P: AsRef<Path>>(fmri: String, p: Option<P>) -> ComponentResult<Self> {
+        let path = if let Some(p) = p {
+            p.as_ref().to_path_buf()
+        } else {
+            PathBuf::from(".")
+        };
+
+        Ok(Self {
+            path,
+            recipe: RecipeBuilder::default().name(fmri).build()?,
+        })
+    }
+
     pub fn open_local<P: AsRef<Path>>(path: P) -> ComponentResult<Self> {
         let path = path.as_ref().canonicalize()?;
 
@@ -104,7 +117,7 @@ impl Component {
         Ok(())
     }
 
-    fn save_document(&self) -> ComponentResult<()> {
+    pub fn save_document(&self) -> ComponentResult<()> {
         let doc_str = self.recipe.to_document().to_string();
         let mut f = File::create(&self.path.join("package.kdl"))?;
         f.write_all(doc_str.as_bytes())?;
@@ -155,7 +168,8 @@ pub struct Recipe {
     pub name: String,
 
     #[knuffel(child, unwrap(argument))]
-    pub project_name: String,
+    #[builder(default)]
+    pub project_name: Option<String>,
 
     #[knuffel(child, unwrap(argument))]
     #[builder(default)]
@@ -207,7 +221,7 @@ pub struct Recipe {
 
     #[knuffel(children(name = "build"))]
     #[builder(default)]
-    build_section: Vec<BuildSection>,
+    pub build_sections: Vec<BuildSection>,
 }
 
 impl Recipe {
@@ -226,9 +240,11 @@ impl Recipe {
         name_node.insert(0, self.name.as_str());
         doc.nodes_mut().push(name_node);
 
-        let mut project_name_node = kdl::KdlNode::new("project-name");
-        project_name_node.insert(0, self.name.as_str());
-        doc.nodes_mut().push(project_name_node);
+        if let Some(project_name) = &self.project_name {
+            let mut project_name_node = kdl::KdlNode::new("project-name");
+            project_name_node.insert(0, project_name.as_str());
+            doc.nodes_mut().push(project_name_node);
+        }
 
         if let Some(classification) = &self.classification {
             let mut classification_node = kdl::KdlNode::new("classification");
@@ -291,7 +307,7 @@ impl Recipe {
             }
         }
 
-        for build in &self.build_section {
+        for build in &self.build_sections {
             let build_node = build.to_node();
             doc.nodes_mut().push(build_node);
         }
@@ -343,8 +359,8 @@ impl Recipe {
             self.maintainers.push(maintainer.clone());
         }
 
-        for bld in &other.build_section {
-            self.build_section.push(bld.clone());
+        for bld in &other.build_sections {
+            self.build_sections.push(bld.clone());
         }
 
         for src in &other.sources {
@@ -359,7 +375,10 @@ impl Recipe {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema, Builder,
+)]
+#[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -369,7 +388,8 @@ pub struct Dependency {
     #[knuffel(property, default = false)]
     pub dev: bool,
     #[knuffel(property)]
-    pub kind: Option<DependencyKind>,
+    #[builder(default)]
+    pub kind: DependencyKind,
 }
 
 impl Dependency {
@@ -381,21 +401,28 @@ impl Dependency {
             node.insert("dev", true);
         }
 
-        if let Some(kind) = &self.kind {
-            node.insert("kind", kind);
-        }
+        node.insert("kind", &self.kind);
 
         node
     }
 }
 
 #[derive(
-    Debug, knuffel::DecodeScalar, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+    Debug,
+    knuffel::DecodeScalar,
+    Default,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub enum DependencyKind {
+    #[default]
     Require,
     Incorporate,
     Optional,
@@ -407,6 +434,17 @@ impl From<&DependencyKind> for KdlValue {
             DependencyKind::Require => "require".into(),
             DependencyKind::Incorporate => "incorporate".into(),
             DependencyKind::Optional => "optional".into(),
+        }
+    }
+}
+
+impl From<&str> for DependencyKind {
+    fn from(value: &str) -> Self {
+        match value {
+            "require" => Self::Require,
+            "incorporate" => Self::Incorporate,
+            "optional" => Self::Optional,
+            _ => Self::Require,
         }
     }
 }
@@ -455,8 +493,18 @@ pub enum SourceNode {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    JsonSchema,
+    Builder,
 )]
+#[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -465,15 +513,19 @@ pub struct ArchiveSource {
     pub src: String,
 
     #[knuffel(property)]
+    #[builder(default)]
     pub sha512: Option<String>,
 
     #[knuffel(property)]
+    #[builder(default)]
     pub sha256: Option<String>,
 
     #[knuffel(property)]
+    #[builder(default)]
     pub signature_url_extension: Option<String>,
 
     #[knuffel(property)]
+    #[builder(default)]
     pub signature_url: Option<String>,
 }
 
@@ -709,22 +761,32 @@ impl OverlaySource {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    JsonSchema,
+    Builder,
 )]
+#[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct BuildSection {
     #[knuffel(child, unwrap(argument))]
-    source: Option<String>,
+    pub source: Option<String>,
     #[knuffel(child)]
-    configure: Option<ConfigureBuildSection>,
+    pub configure: Option<ConfigureBuildSection>,
     #[knuffel(child, unwrap(argument))]
-    cmake: Option<String>,
+    pub cmake: Option<String>,
     #[knuffel(child, unwrap(argument))]
-    meson: Option<String>,
+    pub meson: Option<String>,
     #[knuffel(child)]
-    script: Option<ScriptBuildSection>,
+    pub script: Option<ScriptBuildSection>,
 }
 
 impl BuildSection {
