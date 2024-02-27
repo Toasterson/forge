@@ -17,6 +17,9 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/prisma/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/pkgdev/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/workspace/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/activities/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/forged/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/job/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/external_crates/seaography/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>

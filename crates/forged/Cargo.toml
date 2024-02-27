@@ -1,0 +1,33 @@
+[package]
+name = "forged"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+github.workspace = true
+miette = { workspace = true, features = ["fancy"] }
+thiserror.workspace = true
+serde.workspace = true
+url.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+deadpool-lapin.workspace = true
+axum.workspace = true
+clap.workspace = true
+hyper.workspace = true
+config.workspace = true
+serde_json.workspace = true
+f3-rs = { git = "https://git.batsense.net/ForgeFlux/f3-rs.git", version = "0.1.0" }
+futures.workspace = true
+uuid = { version = "1.6.1", features = ["v4", "serde"] }
+async-graphql = { version = "6.0.11", features = ["decimal", "chrono", "dataloader", "dynamic-schema"] }
+async-graphql-axum = "6.0.11"
+lazy_static = "1.4.0"
+strum.workspace = true
+integration.workspace = true
+prisma-client-rust.workspace = true
+component.workspace = true
+itertools = "0.12.1"
