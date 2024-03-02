@@ -25,7 +25,11 @@ pub(crate) enum Commands {
         target_dir: PathBuf,
     },
     #[clap(name = "metadata")]
-    Metadata(ComponentArgs),
+    Metadata{
+        args: ComponentArgs,
+        #[clap(default_value_t = metadata::MetadataFormat::default())]
+        format: metadata::MetadataFormat,
+    },
     #[clap(name = "generate")]
     Generate {
         #[clap(default_value_t = GenerateSchemaKind::default())]
@@ -62,7 +66,7 @@ pub(crate) enum GenerateSchemaKind {
 
 pub(crate) fn run(args: Args) -> miette::Result<()> {
     match args.command {
-        Commands::Metadata(args) => metadata::print_component(args),
+        Commands::Metadata{args, format } => metadata::print_component(args, format),
         Commands::Generate { kind } => match kind {
             GenerateSchemaKind::ComponentRecipe => {
                 let schema = component::get_schema();
