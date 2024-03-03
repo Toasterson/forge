@@ -4,6 +4,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use miette::IntoDiagnostic;
 use strum::Display;
 
+use gate::Gate;
+
 use crate::create::create_component;
 use crate::metadata;
 use crate::modify::{edit_component, EditArgs};
@@ -11,6 +13,9 @@ use crate::sources::download_sources;
 
 #[derive(Debug, Parser)]
 pub(crate) struct Args {
+    #[arg(long, global = true)]
+    /// Path to the gate kdl file adding gate wide settings to this all components
+    gate: Option<PathBuf>,
     #[clap(subcommand)]
     command: Commands,
 }
@@ -66,6 +71,13 @@ pub(crate) enum GenerateSchemaKind {
 }
 
 pub(crate) fn run(args: Args) -> miette::Result<()> {
+    let gate = if let Some(gate_path) = args.gate {
+        let gate = Gate::new(gate_path)?;
+        Some(gate)
+    } else {
+        None
+    };
+
     match args.command {
         Commands::Metadata { args, format } => metadata::print_component(args, format),
         Commands::Generate { kind } => match kind {
@@ -89,8 +101,8 @@ pub(crate) fn run(args: Args) -> miette::Result<()> {
         Commands::Download {
             component,
             target_dir,
-        } => download_sources(component, target_dir),
-        Commands::Create { fmri, args } => create_component(args, fmri),
-        Commands::Edit { component, args } => edit_component(component, args),
+        } => download_sources(component, gate, target_dir),
+        Commands::Create { fmri, args } => create_component(args, gate, fmri),
+        Commands::Edit { component, args } => edit_component(component, gate, args),
     }
 }

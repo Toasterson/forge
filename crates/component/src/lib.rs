@@ -778,14 +778,19 @@ impl OverlaySource {
 ))]
 pub struct BuildSection {
     #[knuffel(child, unwrap(argument))]
+    #[builder(default)]
     pub source: Option<String>,
     #[knuffel(child)]
+    #[builder(default)]
     pub configure: Option<ConfigureBuildSection>,
     #[knuffel(child, unwrap(argument))]
+    #[builder(default)]
     pub cmake: Option<String>,
     #[knuffel(child, unwrap(argument))]
+    #[builder(default)]
     pub meson: Option<String>,
     #[knuffel(child)]
+    #[builder(default)]
     pub script: Option<ScriptBuildSection>,
 }
 

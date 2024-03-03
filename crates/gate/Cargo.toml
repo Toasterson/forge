@@ -1,0 +1,15 @@
+[package]
+name = "gate"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+component.workspace = true
+kdl = "4.6.0"
+knuffel = "3.2.0"
+miette.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+url.workspace = true

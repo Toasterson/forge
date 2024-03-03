@@ -6,6 +6,7 @@ use miette::{Diagnostic, IntoDiagnostic};
 use thiserror::Error;
 
 use component::{ArchiveSource, GitSource, SourceNode};
+use gate::Gate;
 use workspace::{HasherKind, Workspace};
 
 use crate::sources::path::add_extension;
@@ -19,7 +20,11 @@ pub struct HashMismatchError {
     actual: String,
 }
 
-pub(crate) fn download_sources<P: AsRef<Path>>(component: P, target_dir: P) -> miette::Result<()> {
+pub(crate) fn download_sources<P: AsRef<Path>>(
+    component: P,
+    gate: Option<Gate>,
+    target_dir: P,
+) -> miette::Result<()> {
     let wks = Workspace::new(target_dir)?;
     let component = component::Component::open_local(component)?;
     println!("Loaded component recipe: {}", &component.recipe.name);
@@ -171,7 +176,7 @@ fn make_git_archive(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
     let prefix_arg = format!("--prefix={}/", &repo_prefix);
     let output_arg = format!(
         "--output={}",
-        add_extension(&repo_prefix, "tar.gz",)
+        add_extension(&repo_prefix, "tar.gz")
             .to_string_lossy()
             .to_string()
     );
@@ -198,7 +203,7 @@ fn git_archive_get(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
     let prefix_arg = format!("--prefix={}", &repo_prefix);
     let output_arg = format!(
         "--output={}",
-        add_extension(&repo_prefix, "tar.gz",)
+        add_extension(&repo_prefix, "tar.gz")
             .to_string_lossy()
             .to_string()
     );

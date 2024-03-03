@@ -41,3 +41,4 @@ prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-
 component = { version = "*", path = "crates/component" }
 integration = { version = "0.1.0", path = "crates/integration" }
 repology = { version = "*", path = "crates/repology" }
+gate = { version = "*", path = "crates/gate" }

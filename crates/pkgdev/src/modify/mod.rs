@@ -1,11 +1,14 @@
+use std::fs;
 use std::path::PathBuf;
 
 use clap::{arg, Subcommand, ValueEnum};
+use miette::IntoDiagnostic;
 
 use component::{
     ArchiveSourceBuilder, BuildOptionNode, BuildSectionBuilder, Component, ConfigureBuildSection,
     DependencyBuilder, DependencyKind, ScriptBuildSection, ScriptNode, SourceNode, SourceSection,
 };
+use gate::Gate;
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum EditArgs {
@@ -32,6 +35,8 @@ pub(crate) enum SetArgs {
     },
     License {
         arg: String,
+        #[clap(short, long)]
+        file: String,
     },
     Version {
         arg: String,
@@ -40,8 +45,9 @@ pub(crate) enum SetArgs {
         arg: String,
     },
     Build {
+        #[arg(short, long, value_parser)]
         index: usize,
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, raw = true)]
         args: Vec<String>,
     },
 }
@@ -97,7 +103,11 @@ pub(crate) enum BuildKind {
     None,
 }
 
-pub(crate) fn edit_component(component_path: PathBuf, args: EditArgs) -> miette::Result<()> {
+pub(crate) fn edit_component(
+    component_path: PathBuf,
+    gate: Option<Gate>,
+    args: EditArgs,
+) -> miette::Result<()> {
     let mut c = Component::open_local(component_path)?;
     match args {
         EditArgs::Add { args } => match args {
@@ -136,37 +146,61 @@ pub(crate) fn edit_component(component_path: PathBuf, args: EditArgs) -> miette:
                 }
                 c.recipe.build_sections.push(bsb.build()?);
             }
-            AddArgs::Source { args } => match args {
-                SourceKind::Archive {
-                    source_url,
-                    source_hash,
-                } => {
-                    let mut archive = ArchiveSourceBuilder::default();
-                    archive.src(source_url);
-                    if let Some((kind, hash)) = source_hash.split_once(':') {
-                        match kind {
-                            "sha256" => {
-                                archive.sha256(hash);
+            AddArgs::Source { args } => {
+                if c.recipe.sources.is_empty() {
+                    c.recipe.sources.push(SourceSection { sources: vec![] });
+                }
+                let src_section = c.recipe.sources.first_mut().unwrap();
+                match args {
+                    SourceKind::Archive {
+                        source_url,
+                        source_hash,
+                    } => {
+                        let mut archive = ArchiveSourceBuilder::default();
+                        archive.src(source_url);
+                        if let Some((kind, hash)) = source_hash.split_once(':') {
+                            match kind {
+                                "sha256" => {
+                                    archive.sha256(hash);
+                                }
+                                "sha512" => {
+                                    archive.sha512(hash);
+                                }
+                                _ => {}
                             }
-                            "sha512" => {
-                                archive.sha512(hash);
+                        }
+                        let archive = archive.build()?;
+                        src_section.sources.push(SourceNode::Archive(archive));
+                    }
+                    SourceKind::Patch { path_dir } => {
+                        let mut patch_vec = vec![];
+                        let read_dir_res = fs::read_dir(&path_dir).into_diagnostic()?;
+                        for entry in read_dir_res {
+                            let entry = entry.into_diagnostic()?;
+                            if entry.path().is_file()
+                                && entry.path().extension().is_some_and(|t| t == "patch")
+                            {
+                                let file_name = entry
+                                    .path()
+                                    .file_name()
+                                    .ok_or(miette::miette!(
+                                        "no filename for {}",
+                                        &path_dir.display()
+                                    ))?
+                                    .to_owned()
+                                    .to_string_lossy()
+                                    .to_string();
+                                patch_vec.push(SourceNode::Patch(component::PatchSource::new(
+                                    file_name, None,
+                                )?));
                             }
-                            _ => {}
+                            src_section.sources.append(&mut patch_vec);
                         }
                     }
-                    let archive = archive.build()?;
-                    if let Some(src) = c.recipe.sources.first_mut() {
-                        src.sources.push(SourceNode::Archive(archive));
-                    } else {
-                        c.recipe.sources.push(SourceSection {
-                            sources: vec![SourceNode::Archive(archive)],
-                        });
-                    };
+                    SourceKind::File => {}
+                    SourceKind::Git => {}
                 }
-                SourceKind::Patch { .. } => {}
-                SourceKind::File => {}
-                SourceKind::Git => {}
-            },
+            }
             AddArgs::Maintainer { arg } => {
                 c.recipe.maintainers.push(arg);
             }
@@ -181,8 +215,9 @@ pub(crate) fn edit_component(component_path: PathBuf, args: EditArgs) -> miette:
             SetArgs::Classification { arg } => {
                 c.recipe.classification = Some(arg);
             }
-            SetArgs::License { arg } => {
+            SetArgs::License { arg, file } => {
                 c.recipe.license = Some(arg);
+                c.recipe.license_file = Some(file);
             }
             SetArgs::Version { arg } => {
                 c.recipe.version = Some(arg);
@@ -193,7 +228,25 @@ pub(crate) fn edit_component(component_path: PathBuf, args: EditArgs) -> miette:
             SetArgs::Build { index, args } => {
                 if let Some(section) = c.recipe.build_sections.get_mut(index) {
                     if let Some(configure) = &mut section.configure {
-                        for arg in args {
+                        'outer: for arg in args {
+                            if let Some(gate) = &gate {
+                                for transform in &gate.metadata_transforms {
+                                    if arg.contains(&transform.matcher) {
+                                        if !transform.drop {
+                                            println!(
+                                                "replacing {} with {}",
+                                                &arg, &transform.replacement
+                                            );
+                                            configure.options.push(BuildOptionNode {
+                                                option: transform.replacement.clone(),
+                                            });
+                                        } else {
+                                            println!("dropping {}", &arg);
+                                        }
+                                        continue 'outer;
+                                    }
+                                }
+                            }
                             configure.options.push(BuildOptionNode { option: arg });
                         }
                     } else if let Some(script) = &mut section.script {
