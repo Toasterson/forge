@@ -1,9 +1,11 @@
+use std::path::PathBuf;
+
 use clap::{arg, Subcommand, ValueEnum};
+
 use component::{
     ArchiveSourceBuilder, BuildOptionNode, BuildSectionBuilder, Component, ConfigureBuildSection,
     DependencyBuilder, DependencyKind, ScriptBuildSection, ScriptNode, SourceNode, SourceSection,
 };
-use std::path::PathBuf;
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum EditArgs {
@@ -161,7 +163,7 @@ pub(crate) fn edit_component(component_path: PathBuf, args: EditArgs) -> miette:
                         });
                     };
                 }
-                SourceKind::Patch { path_dir } => {}
+                SourceKind::Patch { .. } => {}
                 SourceKind::File => {}
                 SourceKind::Git => {}
             },

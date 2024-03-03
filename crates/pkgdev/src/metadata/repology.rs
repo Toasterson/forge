@@ -1,6 +1,7 @@
-use miette::Diagnostic;
+use miette::{Diagnostic, IntoDiagnostic};
 use semver::Version;
 use thiserror::Error;
+
 use component::{Component, SourceNode};
 use repology::MetadataBuilder;
 
@@ -25,19 +26,49 @@ pub(crate) fn build_metadata(c: &Component) -> miette::Result<repology::Metadata
     let m = MetadataBuilder::default()
         .summary(recipe.summary.clone().ok_or(RepologyError::NoSummary)?)
         .fmri(recipe.name.clone())
-        .project_name(recipe.project_name.clone().ok_or(RepologyError::NoProjectName)?)
-        .add_homepage(recipe.project_url.clone().ok_or(RepologyError::NoProjectUrl)?)
+        .project_name(
+            recipe
+                .project_name
+                .clone()
+                .ok_or(RepologyError::NoProjectName)?,
+        )
+        .add_homepage(
+            recipe
+                .project_url
+                .clone()
+                .ok_or(RepologyError::NoProjectUrl)?,
+        )
         .add_license(recipe.license.clone().ok_or(RepologyError::NoLicense)?)
-        .version(Version::parse(&recipe.version.clone().ok_or(RepologyError::NoVersion)?)?)
-        .source_links(recipe.sources.iter().map(|s| {s.sources.iter().filter_map(|so|{match so {
-            SourceNode::Archive(a) => Some(a.src.clone()),
-            SourceNode::Git(g) => Some(g.repository.clone()),
-            SourceNode::File(_) => None,
-            SourceNode::Directory(_) => None,
-            SourceNode::Patch(_) => None,
-            SourceNode::Overlay(_) => None,
-        }}).collect()}).flatten().collect())
-        .add_category(recipe.classification.clone().ok_or(RepologyError::NoCategory)?)
+        .version(
+            Version::parse(&recipe.version.clone().ok_or(RepologyError::NoVersion)?)
+                .into_diagnostic()?,
+        )
+        .source_links(
+            recipe
+                .sources
+                .iter()
+                .map(|s| {
+                    s.sources
+                        .iter()
+                        .filter_map(|so| match so {
+                            SourceNode::Archive(a) => Some(a.src.clone()),
+                            SourceNode::Git(g) => Some(g.repository.clone()),
+                            SourceNode::File(_) => None,
+                            SourceNode::Directory(_) => None,
+                            SourceNode::Patch(_) => None,
+                            SourceNode::Overlay(_) => None,
+                        })
+                        .collect::<Vec<String>>()
+                })
+                .flatten()
+                .collect::<Vec<String>>(),
+        )
+        .add_category(
+            recipe
+                .classification
+                .clone()
+                .ok_or(RepologyError::NoCategory)?,
+        )
         .build()?;
     Ok(m)
 }

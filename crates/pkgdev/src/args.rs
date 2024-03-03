@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use crate::create::create_component;
 use clap::{Parser, Subcommand, ValueEnum};
 use miette::IntoDiagnostic;
 use strum::Display;
 
+use crate::create::create_component;
 use crate::metadata;
 use crate::modify::{edit_component, EditArgs};
 use crate::sources::download_sources;
@@ -25,7 +25,8 @@ pub(crate) enum Commands {
         target_dir: PathBuf,
     },
     #[clap(name = "metadata")]
-    Metadata{
+    Metadata {
+        #[clap(flatten)]
         args: ComponentArgs,
         #[clap(default_value_t = metadata::MetadataFormat::default())]
         format: metadata::MetadataFormat,
@@ -66,7 +67,7 @@ pub(crate) enum GenerateSchemaKind {
 
 pub(crate) fn run(args: Args) -> miette::Result<()> {
     match args.command {
-        Commands::Metadata{args, format } => metadata::print_component(args, format),
+        Commands::Metadata { args, format } => metadata::print_component(args, format),
         Commands::Generate { kind } => match kind {
             GenerateSchemaKind::ComponentRecipe => {
                 let schema = component::get_schema();

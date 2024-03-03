@@ -1,11 +1,12 @@
 use clap::ValueEnum;
 use miette::IntoDiagnostic;
+use strum::Display;
 
 use crate::args::ComponentArgs;
 
 mod repology;
 
-#[derive(Debug, ValueEnum, Clone, Default)]
+#[derive(Debug, ValueEnum, Clone, Default, Display)]
 pub(crate) enum MetadataFormat {
     #[default]
     Forge,
@@ -23,10 +24,7 @@ pub(crate) fn print_component(args: ComponentArgs, format: MetadataFormat) -> mi
         }
         MetadataFormat::Repology => {
             let r = repology::build_metadata(&component)?;
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&r).into_diagnostic()?
-            )
+            println!("{}", serde_json::to_string_pretty(&r).into_diagnostic()?)
         }
     }
     Ok(())
