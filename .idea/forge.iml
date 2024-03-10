@@ -20,9 +20,9 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/activities/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/forged/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/job/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/gate/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/repology/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/repology/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/gate/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/external_crates/seaography/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>

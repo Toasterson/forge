@@ -53,12 +53,11 @@ pub struct ActivityEnvelope {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ActivityObject {
     ChangeRequest(ChangeRequest),
-    JobReport(JobReport),
-    Job(JobObject),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JobReport {
+    pub related_object: Url,
     pub result: JobReportResult,
     pub data: JobReportData,
 }
@@ -72,7 +71,6 @@ pub enum JobReportResult {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobReportData {
-    ArchiveDownloaded {},
     GetRecipies {
         change_request_id: String,
         recipies: Vec<(String, Recipe)>,
@@ -81,6 +79,8 @@ pub enum JobReportData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChangeRequest {
+    pub id: String,
+    pub activitypub_url: Option<Url>,
     pub title: String,
     pub body: String,
     pub changes: Vec<ComponentChange>,
@@ -148,15 +148,10 @@ pub enum ComponentChangeKind {
     Added,
     Updated,
     Removed,
+    Processing,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum JobObject {
-    DownloadSources(DownloadComponentSources),
+pub enum Job {
     GetRecipies(ChangeRequest),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DownloadComponentSources {
-    pub recipe: Recipe,
 }

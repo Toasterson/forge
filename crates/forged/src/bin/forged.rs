@@ -1,5 +1,5 @@
 use clap::Parser;
-use forge::*;
+use forged::*;
 use tracing_subscriber::prelude::*;
 
 #[tokio::main]

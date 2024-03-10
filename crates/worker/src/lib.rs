@@ -11,7 +11,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{types::FieldTable, Channel};
-use forge::JobReport;
+use forge::{ComponentChange, ComponentChangeKind, Event, Job, JobReport};
 use forge::JobReportData;
 use forge::JobReportResult;
 use forge::{ActivityEnvelope, CommitRef, Scheme};
@@ -298,88 +298,74 @@ async fn handle_message(
     worker_dir: &str,
 ) -> Result<()> {
     let body = delivery.data;
-    let envelope: ActivityEnvelope = serde_json::from_slice(&body)?;
+    let envelope: Job = serde_json::from_slice(&body)?;
     let worker_actor: Url = format!("{}/actors/worker", base_url).parse()?;
     let forge_actor: Url = format!("{}/actors/forge", base_url).parse()?;
-    match envelope.object {
-        forge::ActivityObject::ChangeRequest(_) => {
-            event!(
-                Level::ERROR,
-                "Cannot handle change request messages as worker"
+    match envelope {
+        Job::GetRecipies(cr) => {
+            info!("getting recipies for change_request {}", );
+            let build_dir = get_repo_path(
+                worker_dir,
+                &cr.git_url,
+                &cr.head.sha,
             );
-        }
-        forge::ActivityObject::JobReport(_) => {
-            event!(
-                Level::ERROR,
-                "Cannot handle a job report as worker. Something is wrong"
-            );
-        }
-        forge::ActivityObject::Job(job) => {
-            event!(Level::DEBUG, job = ?job, "handling job event");
-            match job {
-                forge::JobObject::DownloadSources(_) => todo!(),
-                forge::JobObject::GetRecipies(change_request) => {
-                    info!("getting recipies for change_request {}", envelope.id);
-                    let build_dir = get_repo_path(
-                        worker_dir,
-                        &change_request.git_url,
-                        &change_request.head.sha,
-                    );
-                    debug!("cleaning workspace {}", &build_dir.display());
-                    clean_ws(&build_dir)?;
-                    debug!("cloning repo {}", &change_request.git_url);
-                    let manifest = clone_repo(
-                        &build_dir,
-                        &change_request.git_url,
-                        &change_request.head,
-                        None,
-                    )?;
-                    let component_list = get_component_list_in_repo(&build_dir, &manifest)?;
-                    let changed_files = get_changed_files(&build_dir, &change_request.base)?;
-                    let changed_components = get_changed_components(component_list, changed_files);
-                    create_gen_meatdata_script(&build_dir, &manifest)?;
-                    let mut recipes: Vec<(String, Recipe)> = vec![];
-                    for component in changed_components {
-                        let recipe = get_component_metadata(
-                            &build_dir,
-                            &component,
-                            manifest.change_to_component_dir,
-                            &manifest.component_metadata_filename,
-                        )?;
-                        recipes.push((component, recipe));
-                    }
-                    //TODO pass in which files changed, added, deleted so we can categorize the change of the component
-                    let report_data = JobReportData::GetRecipies {
-                        change_request_id: envelope.id.to_string(),
-                        recipies: recipes,
-                    };
-                    let envelope = ActivityEnvelope {
-                        id: envelope.id,
-                        actor: worker_actor,
-                        to: vec![forge_actor],
-                        cc: vec![],
-                        object: forge::ActivityObject::JobReport(JobReport {
-                            result: JobReportResult::Sucess,
-                            data: report_data,
-                        }),
-                    };
-
-                    event!(Level::INFO, cr = ?envelope, "Sending detected recipies to forge");
-
-                    let msg = serde_json::to_vec(&envelope)?;
-
-                    channel
-                        .basic_publish(
-                            inbox_name,
-                            "",
-                            BasicPublishOptions::default(),
-                            &msg,
-                            AMQPProperties::default(),
-                        )
-                        .await?;
-                    event!(Level::INFO, "Event Sent");
-                }
+            debug!("cleaning workspace {}", &build_dir.display());
+            clean_ws(&build_dir)?;
+            debug!("cloning repo {}", &cr.git_url);
+            let manifest = clone_repo(
+                &build_dir,
+                &cr.git_url,
+                &cr.head,
+                None,
+            )?;
+            let component_list = get_component_list_in_repo(&build_dir, &manifest)?;
+            let changed_files = get_changed_files(&build_dir, &cr.base)?;
+            let changed_components = get_changed_components(component_list, changed_files);
+            create_gen_meatdata_script(&build_dir, &manifest)?;
+            let mut recipes: Vec<(String, Recipe)> = vec![];
+            for component in changed_components {
+                let recipe = get_component_metadata(
+                    &build_dir,
+                    &component,
+                    manifest.change_to_component_dir,
+                    &manifest.component_metadata_filename,
+                )?;
+                recipes.push((component, recipe));
             }
+            
+            let mut updated_cr = cr.clone();
+            for (component_ref, recipe) in recipes {
+                let change_definition = ComponentChange{
+                    kind: ComponentChangeKind::Processing,
+                    component_ref,
+                    recipe,
+                    recipe_diff: None,
+                };
+                updated_cr.changes.push(change_definition);
+            }
+            
+            let envelope = Event::Update(ActivityEnvelope {
+                id: envelope.id,
+                actor: worker_actor,
+                to: vec![forge_actor],
+                cc: vec![],
+                object: forge::ActivityObject::ChangeRequest(updated_cr),
+            });
+
+            event!(Level::INFO, cr = ?envelope, "Sending detected recipies to forge");
+
+            let msg = serde_json::to_vec(&envelope)?;
+
+            channel
+                .basic_publish(
+                    inbox_name,
+                    "",
+                    BasicPublishOptions::default(),
+                    &msg,
+                    AMQPProperties::default(),
+                )
+                .await?;
+            event!(Level::INFO, "Event Sent");
         }
     }
     Ok(())
