@@ -1,7 +1,19 @@
-use component::{Recipe, RecipeDiff};
+use component::{Component, Recipe, RecipeDiff};
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
-use url::Url;
+use std::fmt::{Display, format};
+use url::{ParseError, Url};
+use gate::Gate;
+
+pub enum IdKind {
+    Actor,
+    ChangeRequest,
+}
+pub fn build_public_id(kind: IdKind, base_url: &Url, parent: &str, id: &str) -> Result<Url, ParseError> {
+    match kind {
+        IdKind::Actor => format!("{}/actors/{}", base_url, id),
+        IdKind::ChangeRequest => format!("{}/objects/changeRequests/{}/{}", base_url, parent, id),
+    }.parse()
+}
 
 #[derive(Deserialize, Serialize, Clone)]
 pub enum Scheme {
@@ -53,6 +65,11 @@ pub struct ActivityEnvelope {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ActivityObject {
     ChangeRequest(ChangeRequest),
+    Component{
+        component: Component,
+        gate: String,
+    },
+    Gate(Gate)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -80,7 +97,6 @@ pub enum JobReportData {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChangeRequest {
     pub id: String,
-    pub activitypub_url: Option<Url>,
     pub title: String,
     pub body: String,
     pub changes: Vec<ComponentChange>,
@@ -153,5 +169,8 @@ pub enum ComponentChangeKind {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Job {
-    GetRecipies(ChangeRequest),
+    GetRecipies{
+        cr_id: Url,
+        cr: ChangeRequest
+    },
 }

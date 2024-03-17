@@ -11,7 +11,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{types::FieldTable, Channel};
-use forge::{ComponentChange, ComponentChangeKind, Event, Job, JobReport};
+use forge::{build_public_id, ComponentChange, ComponentChangeKind, Event, IdKind, Job, JobReport};
 use forge::JobReportData;
 use forge::JobReportResult;
 use forge::{ActivityEnvelope, CommitRef, Scheme};
@@ -145,7 +145,7 @@ struct AppState {
     amqp: deadpool_lapin::Pool,
     inbox: String,
     job_inbox: String,
-    base_url: String,
+    base_url: Url,
     worker_dir: String,
 }
 
@@ -157,7 +157,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
             .create_pool(Some(deadpool_lapin::Runtime::Tokio1))?,
         inbox: cfg.inbox,
         job_inbox: cfg.job_inbox,
-        base_url: format!("{}://{}", Scheme::from(cfg.scheme), cfg.domain),
+        base_url: format!("{}://{}", Scheme::from(cfg.scheme), cfg.domain).parse()?,
         worker_dir: cfg.directory,
     };
     let conn = state.amqp.get().await?;
@@ -294,16 +294,16 @@ async fn handle_message(
     delivery: Delivery,
     channel: &Channel,
     inbox_name: &str,
-    base_url: &str,
+    base_url: &Url,
     worker_dir: &str,
 ) -> Result<()> {
     let body = delivery.data;
     let envelope: Job = serde_json::from_slice(&body)?;
-    let worker_actor: Url = format!("{}/actors/worker", base_url).parse()?;
-    let forge_actor: Url = format!("{}/actors/forge", base_url).parse()?;
+    let worker_actor: Url = build_public_id(IdKind::Actor, base_url, "", "github")?;
+    let forge_actor: Url = build_public_id(IdKind::Actor, base_url, "", "forge")?;
     match envelope {
-        Job::GetRecipies(cr) => {
-            info!("getting recipies for change_request {}", );
+        Job::GetRecipies{cr_id, cr} => {
+            info!("getting recipes for change_request {}", cr.id);
             let build_dir = get_repo_path(
                 worker_dir,
                 &cr.git_url,
@@ -345,14 +345,14 @@ async fn handle_message(
             }
             
             let envelope = Event::Update(ActivityEnvelope {
-                id: envelope.id,
+                id: cr_id,
                 actor: worker_actor,
                 to: vec![forge_actor],
                 cc: vec![],
                 object: forge::ActivityObject::ChangeRequest(updated_cr),
             });
 
-            event!(Level::INFO, cr = ?envelope, "Sending detected recipies to forge");
+            event!(Level::INFO, cr = ?envelope, "Sending detected recipes to forge");
 
             let msg = serde_json::to_vec(&envelope)?;
 

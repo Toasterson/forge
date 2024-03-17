@@ -57,10 +57,11 @@ pub fn get_schema() -> RootSchema {
 pub struct Component {
     path: PathBuf,
     pub recipe: Recipe,
+    pub package_meta: Option<PackageMeta>,
 }
 
 impl Component {
-    pub fn new<P: AsRef<Path>>(fmri: String, p: Option<P>) -> ComponentResult<Self> {
+    pub fn new<P: AsRef<Path>>(name: String, p: Option<P>) -> ComponentResult<Self> {
         let path = if let Some(p) = p {
             p.as_ref().to_path_buf()
         } else {
@@ -69,42 +70,55 @@ impl Component {
 
         Ok(Self {
             path,
-            recipe: RecipeBuilder::default().name(fmri).build()?,
+            recipe: RecipeBuilder::default().name(name).build()?,
+            package_meta: None,
         })
     }
 
     pub fn open_local<P: AsRef<Path>>(path: P) -> ComponentResult<Self> {
         let path = path.as_ref().canonicalize()?;
 
-        let (package_document_string, name) = if path.is_file() {
+        let (package_document_string, name, dir) = if path.is_file() {
             (
                 read_to_string(path.clone())?,
                 path.parent()
                     .ok_or(ComponentError::NoPackageDocumentParentDir)?
                     .to_string_lossy()
                     .to_string(),
+                path
+                    .parent()
+                    .ok_or(ComponentError::NoPackageDocumentParentDir)?
             )
         } else {
             (
                 read_to_string(&path.join("package.kdl"))?,
                 path.to_string_lossy().to_string(),
+                path.as_path(),
             )
+        };
+
+        let package_meta_path = dir.join("pkg5");
+        let package_meta = if package_meta_path.exists() {
+            let file = File::open(&package_meta_path)?;
+            serde_json::from_reader(file).ok()
+        } else {
+            None
         };
 
         if path.is_file() {
             let package_document = knuffel::parse::<Recipe>(&name, &package_document_string)?;
             Ok(Self {
-                path: path
-                    .parent()
-                    .ok_or(ComponentError::NoPackageDocumentParentDir)?
+                path: dir
                     .to_path_buf(),
                 recipe: package_document,
+                package_meta,
             })
         } else {
             let package_document = knuffel::parse::<Recipe>(&name, &package_document_string)?;
             Ok(Self {
                 path,
                 recipe: package_document,
+                package_meta,
             })
         }
     }
@@ -157,6 +171,42 @@ impl Component {
 }
 
 #[derive(
+Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+)]
+#[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct PackageMeta {
+    name: String,
+    fmris: Vec<String>,
+    dependencies: Vec<String>
+}
+
+
+#[derive(
+Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+)]
+#[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct ComponentMetadataItem {
+    #[knuffel(node_name)]
+    pub name: String,
+    #[knuffel(argument)]
+    pub value: String,
+}
+
+#[derive(
+Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff, PartialEq, JsonSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct ComponentMetadata (#[knuffel(children)] pub Vec<ComponentMetadataItem>);
+
+#[derive(
     Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
@@ -166,6 +216,10 @@ impl Component {
 pub struct Recipe {
     #[knuffel(child, unwrap(argument))]
     pub name: String,
+
+    #[knuffel(child)]
+    #[builder(default)]
+    pub metadata: Option<ComponentMetadata>,
 
     #[knuffel(child, unwrap(argument))]
     #[builder(default)]
@@ -244,6 +298,15 @@ impl Recipe {
             let mut project_name_node = kdl::KdlNode::new("project-name");
             project_name_node.insert(0, project_name.as_str());
             doc.nodes_mut().push(project_name_node);
+        }
+        
+        if let Some(metadata) = &self.metadata {
+            let mut metadata_node = kdl::KdlNode::new("metadata");
+            for item in &metadata.0 {
+                let mut item_node = kdl::KdlNode::new(item.name.clone());
+                item_node.insert(0, item.value.clone());
+                metadata_node.ensure_children().nodes_mut().push(item_node);
+            }
         }
 
         if let Some(classification) = &self.classification {

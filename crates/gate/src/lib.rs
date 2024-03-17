@@ -36,6 +36,8 @@ type GateResult<T> = std::result::Result<T, GateError>;
 pub struct Gate {
     path: PathBuf,
     #[knuffel(child, unwrap(argument))]
+    pub id: String,
+    #[knuffel(child, unwrap(argument))]
     pub name: String,
     #[knuffel(child, unwrap(argument))]
     pub version: String,

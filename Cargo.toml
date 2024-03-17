@@ -13,6 +13,7 @@ thiserror.workspace = true
 serde.workspace = true
 url.workspace = true
 component.workspace = true
+gate.workspace = true
 
 [workspace]
 members = ["crates/*"]

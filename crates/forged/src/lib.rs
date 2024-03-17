@@ -62,6 +62,18 @@ pub enum Error {
 
     #[error(transparent)]
     NewClient(#[from] prisma_client_rust::NewClientError),
+    
+    #[error(transparent)]
+    QueryError(#[from] prisma_client_rust::QueryError),
+    
+    #[error("no version found in component with name: {0}")]
+    NoVersionFoundInRecipe(String),
+
+    #[error("no revision found in component with name: {0}")]
+    NoRevisionFoundInRecipe(String),
+
+    #[error("no project URL found in component with name: {0}")]
+    NoProjectUrlFoundInRecipe(String),
 
     #[error("{0}")]
     String(String),
@@ -246,12 +258,11 @@ async fn handle_rabbitmq(
 ) -> Result<()> {
     let rmq_con = pool.get().await.map_err(|e| Error::String(e.to_string()))?;
     let channel = rmq_con.create_channel().await?;
-    let job_channel = rmq_con.create_channel().await?;
 
     let mut consumer = channel
         .basic_consume(
             inbox_name,
-            "inbox.consumer",
+            "forged.consumer",
             BasicConsumeOptions::default(),
             FieldTable::default(),
         )
@@ -262,7 +273,7 @@ async fn handle_rabbitmq(
         match delivery {
             Ok(delivery) => {
                 let tag = delivery.delivery_tag;
-                match handle_message(delivery, database, &job_channel, job_inbox_name).await {
+                match handle_message(delivery, database, &channel).await {
                     Ok(_) => {
                         debug!("handled message");
                         channel.basic_ack(tag, BasicAckOptions::default()).await?;

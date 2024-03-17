@@ -1,5 +1,9 @@
 name "runtime/java/openjdk11"
 project-name "runtime/java/openjdk11"
+metadata {
+    anitya-id "123456"
+    repology-id "123456"
+}
 classification "Development/Java"
 summary "Open-source implementation of the Java Platform, Standard Edition"
 license-file "openjdk.license"

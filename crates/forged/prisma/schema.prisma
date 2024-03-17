@@ -58,7 +58,6 @@ model Gate {
   id              String            @id @default(uuid()) @db.Uuid
   name            String
   version         String
-  ref             String
   branch          String
   publisher       Publisher         @relation(fields: [publisherId], references: [id])
   transforms      Json              @db.JsonB
@@ -68,7 +67,6 @@ model Gate {
 }
 
 model Component {
-  id              String            @id @default(uuid()) @db.Uuid
   name            String
   version         String
   revision        String
@@ -84,24 +82,28 @@ model Component {
   gateId          String            @db.Uuid
   ComponentChange ComponentChange[]
   BuildJob        BuildJob[]
+
+  @@id([name, gateId, version, revision])
 }
 
 model ComponentChange {
-  id              String              @id @default(uuid()) @db.Uuid
-  kind            ComponentChangeKind
-  diff            Json                @db.JsonB
-  component       Component?          @relation(fields: [componentId], references: [id])
-  recipe          Json                @db.JsonB
-  version         String
-  revision        String
-  gate            Gate                @relation(fields: [gateId], references: [id])
-  patches         String[]
-  scripts         String[]
-  archives        String[]
-  change_request  ChangeRequest       @relation(fields: [changeRequestId], references: [id])
-  componentId     String?             @db.Uuid
-  gateId          String              @db.Uuid
-  changeRequestId String              @db.Uuid
+  id                String              @id @default(uuid()) @db.Uuid
+  kind              ComponentChangeKind
+  diff              Json                @db.JsonB
+  component         Component?          @relation(fields: [componentName, gateId, componentVersion, componentRevision], references: [name, gateId, version, revision])
+  recipe            Json                @db.JsonB
+  version           String
+  revision          String
+  gate              Gate?               @relation(fields: [gateId], references: [id])
+  patches           String[]
+  scripts           String[]
+  archives          String[]
+  change_request    ChangeRequest       @relation(fields: [changeRequestId], references: [id])
+  componentName     String?
+  componentVersion  String?
+  componentRevision String?
+  gateId            String?             @db.Uuid
+  changeRequestId   String              @db.Uuid
 }
 
 enum ComponentChangeKind {
@@ -112,6 +114,7 @@ enum ComponentChangeKind {
 
 model ChangeRequest {
   id                 String            @id @default(uuid()) @db.Uuid
+  processing         Boolean           @default(false)
   component_changes  ComponentChange[]
   waitForRequest     ChangeRequest?    @relation("waitForRequest", fields: [waitForRequestId], references: [id])
   waitForRequestId   String?           @db.Uuid
@@ -122,9 +125,12 @@ model ChangeRequest {
 }
 
 model BuildJob {
-  id              String        @id @default(uuid()) @db.Uuid
-  component       Component     @relation(fields: [componentId], references: [id])
-  change_request  ChangeRequest @relation(fields: [changeRequestId], references: [id])
-  componentId     String        @db.Uuid
-  changeRequestId String        @db.Uuid
+  id                String        @id @default(uuid()) @db.Uuid
+  component         Component?    @relation(fields: [componentName, gateId, componentVersion, componentRevision], references: [name, gateId, version, revision])
+  change_request    ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  componentName     String?
+  componentVersion  String?
+  componentRevision String?
+  gateId            String?       @db.Uuid
+  changeRequestId   String        @db.Uuid
 }
