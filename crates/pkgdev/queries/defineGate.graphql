@@ -1,0 +1,18 @@
+mutation DefineGateMutation($name: String!, $publisher: String!, $version: String!, $branch: String!, $transforms: [String!]!) {
+    createGate(
+        input: {
+            name: $name,
+            publisher: $publisher,
+            version: $version,
+            branch: $branch,
+            transforms: $transforms
+        }
+    ) {
+        id
+        name
+        version
+        branch
+        transforms
+        publisher
+    }
+}

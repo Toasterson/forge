@@ -22,7 +22,7 @@ pub struct HashMismatchError {
 
 pub(crate) fn download_sources<P: AsRef<Path>>(
     component: P,
-    gate: Option<Gate>,
+    _gate: Option<Gate>,
     target_dir: P,
 ) -> miette::Result<()> {
     let wks = Workspace::new(target_dir)?;
