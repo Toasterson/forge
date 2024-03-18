@@ -4,14 +4,13 @@ use crate::{Error, Result};
 use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::Channel;
 use tracing::{debug, error, instrument};
-use tracing::field::debug;
 use component::Recipe;
 
 #[instrument(skip_all)]
 pub async fn handle_message(
     deliver: Delivery,
     db: &PrismaClient,
-    channel: &Channel,
+    _channel: &Channel,
 ) -> Result<()> {
     let body = deliver.data;
     let envelope: Event = serde_json::from_slice(&body)?;
@@ -33,11 +32,12 @@ pub async fn handle_message(
                     Ok(())
                 }
                 ActivityObject::Component{component, gate} => {
+                    let recipe = &component.recipe;
                     db.component().create(
                         component.recipe.name.clone(),
-                        component.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component.recipe.name.clone()))?,
-                        component.recipe.revision.unwrap_or(String::from("0")),
-                        component.recipe.project_url.ok_or(Error::NoProjectUrlFoundInRecipe(component.recipe.name.clone()))?,
+                        recipe.version.clone().ok_or(Error::NoVersionFoundInRecipe(recipe.name.clone()))?,
+                        recipe.revision.clone().unwrap_or(String::from("0")),
+                        recipe.project_url.clone().ok_or(Error::NoProjectUrlFoundInRecipe(recipe.name.clone()))?,
                         prisma::gate::UniqueWhereParam::IdEquals(gate),
                         serde_json::to_value(&component.recipe)?,
                         serde_json::to_value(&component.package_meta)?,
@@ -164,15 +164,16 @@ pub async fn handle_message(
                     Ok(())
                 },
                 ActivityObject::Component{component, gate} => {
+                    let recipe = &component.recipe;
                     db.component().update(
                         prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
-                            component.recipe.name.clone(),
+                            recipe.name.clone(),
                             gate,
-                            component.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component.recipe.name.clone()))?.clone(),
-                            component.recipe.revision.ok_or(Error::NoRevisionFoundInRecipe(component.recipe.name.clone()))?.clone(),
+                            recipe.version.clone().ok_or(Error::NoVersionFoundInRecipe(recipe.name.clone()))?.clone(),
+                            recipe.revision.clone().ok_or(Error::NoRevisionFoundInRecipe(recipe.name.clone()))?.clone(),
                         ),
                         vec![
-                            prisma::component::SetParam::SetProjectUrl(component.recipe.project_url.ok_or(Error::NoProjectUrlFoundInRecipe(component.recipe.name.clone()))?),
+                            prisma::component::SetParam::SetProjectUrl(recipe.project_url.clone().ok_or(Error::NoProjectUrlFoundInRecipe(recipe.name.clone()))?),
                             prisma::component::SetParam::SetRecipe(serde_json::to_value(&component.recipe)?),
                             prisma::component::SetParam::SetPackages(serde_json::to_value(&component.package_meta)?)
                         ]
@@ -203,9 +204,11 @@ pub async fn handle_message(
                 },
                 ActivityObject::Component { .. } => {
                     error!("We do not support deleting components, please delete manually in the database");
+                    Ok(())
                 }
                 ActivityObject::Gate(_) => {
                     error!("We do not support deleting gates, please delete manually in the database");
+                    Ok(())
                 }
             }
         }

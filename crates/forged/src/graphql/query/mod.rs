@@ -1,5 +1,6 @@
 mod gate;
 mod publisher;
+mod component;
 
 pub use publisher::PublisherQuery;
 

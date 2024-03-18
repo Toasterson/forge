@@ -7,26 +7,18 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="232d6af2-8c87-4c11-9457-1b026e2808bf" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/crates/component/examples/parse.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/forge.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/forge.iml" afterDir="false" />
+    <list default="true" id="232d6af2-8c87-4c11-9457-1b026e2808bf" name="Changes" comment="Implement Forged message queue">
+      <change afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/component.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/component.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/gate.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/gate.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/types.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/prisma.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/prisma.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/gate/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/gate/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/worker/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/worker/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/prisma/schema.prisma" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/oi-userland" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/oi-userland" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/oi-userland/make-rules/repology.mk" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/oi-userland/make-rules/repology.mk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/oi-userland/make-rules/shared-macros.mk" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/oi-userland/make-rules/shared-macros.mk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/oi-userland/userland-gate.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/oi-userland/userland-gate.kdl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/openjdk11/package.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/openjdk11/package.kdl" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -47,6 +39,9 @@
   <component name="MacroExpansionManager">
     <option name="directoryName" value="y8i8k11z" />
   </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 5
@@ -63,8 +58,11 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "ASKED_ADD_EXTERNAL_FILES": "true",
+    "Cargo.Build `Run forged`.executor": "Run",
     "Cargo.Build `Run parse`.executor": "Run",
+    "Cargo.Run forged.executor": "Run",
     "Cargo.Run parse.executor": "Run",
+    "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.rust.reset.selective.auto.import": "true",
@@ -88,9 +86,9 @@
   <component name="RsExternalLinterProjectSettings">
     <option name="runOnTheFly" value="true" />
   </component>
-  <component name="RunManager">
-    <configuration name="Run parse" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="run --package component --example parse" />
+  <component name="RunManager" selected="Cargo.Run forged">
+    <configuration name="Run forged" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="command" value="run --package forged --bin forged" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <envs />
       <option name="emulateTerminal" value="true" />
@@ -106,9 +104,26 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
+    <configuration default="true" type="docker-deploy" factoryName="docker-compose.yml" temporary="true">
+      <deployment type="docker-compose.yml" />
+      <method v="2" />
+    </configuration>
+    <configuration name="docker-compose.yml: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
+      <deployment type="docker-compose.yml">
+        <settings>
+          <option name="envFilePath" value="" />
+          <option name="sourceFilePath" value="docker-compose.yml" />
+        </settings>
+      </deployment>
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Cargo.Run forged" />
+      <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
+    </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Run parse" />
+        <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
       </list>
     </recent_temporary>
   </component>
@@ -128,8 +143,17 @@
       <updated>1710527849298</updated>
       <workItem from="1710527850361" duration="1860000" />
       <workItem from="1710609537337" duration="3389000" />
-      <workItem from="1710669786539" duration="25201000" />
+      <workItem from="1710669786539" duration="28971000" />
     </task>
+    <task id="LOCAL-00001" summary="Implement Forged message queue">
+      <option name="closed" value="true" />
+      <created>1710712044633</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1710712044633</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -137,5 +161,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
+    <MESSAGE value="Implement Forged message queue" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implement Forged message queue" />
   </component>
 </project>

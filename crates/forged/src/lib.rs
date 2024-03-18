@@ -254,7 +254,7 @@ async fn handle_rabbitmq(
     pool: Pool,
     database: &PrismaClient,
     inbox_name: &str,
-    job_inbox_name: &str,
+    _job_inbox_name: &str,
 ) -> Result<()> {
     let rmq_con = pool.get().await.map_err(|e| Error::String(e.to_string()))?;
     let channel = rmq_con.create_channel().await?;

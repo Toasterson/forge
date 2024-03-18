@@ -11,7 +11,6 @@ pub struct CreateGateInput {
     pub name: String,
     pub publisher: String,
     pub version: String,
-    pub r#ref: String,
     pub branch: String,
     pub transforms: Vec<String>,
 }
@@ -21,7 +20,6 @@ pub struct UpdateGateInput {
     pub id: String,
     pub name: Option<String>,
     pub version: Option<String>,
-    pub r#ref: Option<String>,
     pub branch: Option<String>,
     pub transforms: Option<Vec<String>>,
 }
@@ -39,7 +37,6 @@ impl GateMutation {
             .create(
                 input.name,
                 input.version,
-                input.r#ref,
                 input.branch,
                 prisma::publisher::name::equals(input.publisher),
                 encoded_transforms,
@@ -53,7 +50,6 @@ impl GateMutation {
             id: gate.id,
             name: gate.name,
             version: gate.version,
-            r#ref: gate.r#ref,
             branch: gate.branch,
             transforms,
         })
@@ -69,10 +65,6 @@ impl GateMutation {
 
         if let Some(version) = input.version {
             updates.push(prisma::gate::version::set(version));
-        }
-
-        if let Some(r#ref) = input.r#ref {
-            updates.push(prisma::gate::r#ref::set(r#ref));
         }
 
         if let Some(branch) = input.branch {
@@ -95,7 +87,6 @@ impl GateMutation {
             id: gate.id,
             name: gate.name,
             version: gate.version,
-            r#ref: gate.r#ref,
             branch: gate.branch,
             transforms,
         })

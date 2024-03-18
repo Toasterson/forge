@@ -1,7 +1,9 @@
-use component::{Component, Recipe, RecipeDiff};
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, format};
 use url::{ParseError, Url};
+
+use component::{Component, Recipe, RecipeDiff};
 use gate::Gate;
 
 pub enum IdKind {

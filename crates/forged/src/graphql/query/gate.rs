@@ -29,7 +29,6 @@ impl GateQuery {
             id: gate.id,
             name: gate.name,
             version: gate.version,
-            r#ref: gate.r#ref,
             branch: gate.branch,
             transforms,
         })
@@ -59,7 +58,6 @@ impl GateQuery {
                     id: g.id,
                     name: g.name,
                     version: g.version,
-                    r#ref: g.r#ref,
                     branch: g.branch,
                     transforms,
                 }

@@ -56,6 +56,7 @@ pub struct Gate {
 impl Default for Gate {
     fn default() -> Self {
         Self {
+            id: String::new(),
             path: PathBuf::new(),
             name: String::new(),
             version: String::from("0.5.11"),
@@ -120,7 +121,10 @@ impl Gate {
             doc.nodes_mut().push(tr_node);
         }
 
-        for mt in &self.metadata_transforms {}
+        for mt in &self.metadata_transforms {
+            let meta_node = mt.to_node();
+            doc.nodes_mut().push(meta_node);
+        }
 
         node
     }
