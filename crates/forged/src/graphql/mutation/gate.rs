@@ -12,7 +12,7 @@ pub struct CreateGateInput {
     pub publisher: String,
     pub version: String,
     pub branch: String,
-    pub transforms: Vec<String>,
+    pub transforms: Option<Vec<String>>,
 }
 
 #[derive(Debug, InputObject)]
@@ -32,6 +32,10 @@ impl GateMutation {
     async fn create_gate(&self, ctx: &Context<'_>, input: CreateGateInput) -> Result<Gate> {
         let database = &ctx.data_unchecked::<SharedState>().lock().await.prisma;
         let encoded_transforms = serde_json::to_value(input.transforms)?;
+        if database.publisher().find_unique(prisma::publisher::UniqueWhereParam::NameEquals(input.publisher.clone())).exec().await?.is_none() {
+            database.publisher().create(input.publisher.clone(), vec![]).exec().await?;
+        } 
+        
         let gate = database
             .gate()
             .create(
@@ -42,6 +46,7 @@ impl GateMutation {
                 encoded_transforms,
                 vec![],
             )
+            .with(prisma::gate::publisher::fetch())
             .exec()
             .await?;
 
@@ -51,6 +56,7 @@ impl GateMutation {
             name: gate.name,
             version: gate.version,
             branch: gate.branch,
+            publisher: gate.publisher.unwrap().name,
             transforms,
         })
     }
@@ -79,6 +85,7 @@ impl GateMutation {
         let gate = database
             .gate()
             .update(prisma::gate::id::equals(input.id), updates)
+            .with(prisma::gate::publisher::fetch())
             .exec()
             .await?;
 
@@ -88,6 +95,7 @@ impl GateMutation {
             name: gate.name,
             version: gate.version,
             branch: gate.branch,
+            publisher: gate.publisher.unwrap().name,
             transforms,
         })
     }

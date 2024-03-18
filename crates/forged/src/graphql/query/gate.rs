@@ -16,12 +16,16 @@ impl GateQuery {
         let database = &ctx.data_unchecked::<SharedState>().lock().await.prisma;
         let gate = database
             .gate()
-            .find_first(vec![])
+            .find_first(vec![
+                prisma::gate::publisher::is(vec![prisma::publisher::name::equals(publisher.clone())]),
+                prisma::gate::name::equals(name.clone())
+            ])
+            .with(prisma::gate::publisher::fetch())
             .exec()
             .await?
             .ok_or(Error::NotFound(format!(
                 "gate with publisher {0} and name {1}",
-                publisher, name
+                &publisher, &name
             )))?;
 
         let transforms = serde_json::from_value(gate.transforms)?;
@@ -30,6 +34,7 @@ impl GateQuery {
             name: gate.name,
             version: gate.version,
             branch: gate.branch,
+            publisher: gate.publisher.unwrap().name,
             transforms,
         })
     }
@@ -43,7 +48,7 @@ impl GateQuery {
             ]));
         }
 
-        let gates = database.gate().find_many(filter).exec().await?;
+        let gates = database.gate().find_many(filter).with(prisma::gate::publisher::fetch()).exec().await?;
         Ok(gates
             .into_iter()
             .map(|g| {
@@ -59,6 +64,7 @@ impl GateQuery {
                     name: g.name,
                     version: g.version,
                     branch: g.branch,
+                    publisher: g.publisher.unwrap().name,
                     transforms,
                 }
             })

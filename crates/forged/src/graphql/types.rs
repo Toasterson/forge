@@ -1,6 +1,7 @@
-use async_graphql::{InputObject, scalar, SimpleObject};
+use async_graphql::{InputObject, scalar, SimpleObject, Result};
 use serde::{Deserialize, Serialize};
 use component::{PackageMeta, Recipe};
+use crate::prisma;
 
 #[derive(InputObject)]
 pub struct PaginationInput {
@@ -30,6 +31,7 @@ pub struct Gate {
     pub name: String,
     pub version: String,
     pub branch: String,
+    pub publisher: String,
     pub transforms: Vec<String>,
 }
 
@@ -44,9 +46,26 @@ pub struct Component {
     pub name: String,
     pub version: String,
     pub revision: String,
-    pub anitya_id: String,
-    pub repology_id: String,
+    pub anitya_id: Option<String>,
+    pub repology_id: Option<String>,
     pub project_url: String,
-    pub gate: Gate,
+    pub gate_id: String,
     pub data: ComponentData,
+}
+
+pub fn component_from_database(component: prisma::component::Data) -> Result<Component> {
+    let r = Component {
+        name: component.name,
+        version: component.version,
+        gate_id: component.gate_id.to_string(),
+        revision: component.revision,
+        anitya_id: component.anitya_id.clone(),
+        repology_id: component.repology_id.clone(),
+        project_url: component.project_url,
+        data: ComponentData {
+            recipe: serde_json::from_value(component.recipe)?,
+            packages: serde_json::from_value(component.packages)?,
+        }
+    };
+    Ok(r)
 }

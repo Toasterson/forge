@@ -1,11 +1,11 @@
 use std::{
-    fs::{read_to_string, File},
+    fs::{File, read_to_string},
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
-use miette::{Diagnostic, IntoDiagnostic};
+use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -28,6 +28,9 @@ pub enum GateError {
     NoSuchPackage(String),
     #[error("distribution type {0} is not known use one of 'tarball', 'ips'")]
     UnknownDistributionType(String),
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Knuffel(#[from] knuffel::Error),
 }
 
 type GateResult<T> = std::result::Result<T, GateError>;
@@ -36,7 +39,7 @@ type GateResult<T> = std::result::Result<T, GateError>;
 pub struct Gate {
     path: PathBuf,
     #[knuffel(child, unwrap(argument))]
-    pub id: String,
+    pub id: Option<String>,
     #[knuffel(child, unwrap(argument))]
     pub name: String,
     #[knuffel(child, unwrap(argument))]
@@ -56,7 +59,7 @@ pub struct Gate {
 impl Default for Gate {
     fn default() -> Self {
         Self {
-            id: String::new(),
+            id: None,
             path: PathBuf::new(),
             name: String::new(),
             version: String::from("0.5.11"),
@@ -70,14 +73,20 @@ impl Default for Gate {
 }
 
 impl Gate {
-    pub fn new<P: AsRef<Path>>(path: P) -> miette::Result<Self> {
+    pub fn empty<P: AsRef<Path>>(path: P) -> GateResult<Self> {
+        Ok(Self {
+            path: path.as_ref().to_path_buf(),
+            ..Default::default()
+        })
+    }
+    pub fn new<P: AsRef<Path>>(path: P) -> GateResult<Self> {
         let path = if !path.as_ref().is_absolute() {
-            path.as_ref().canonicalize().into_diagnostic()?
+            path.as_ref().canonicalize()?
         } else {
             path.as_ref().to_path_buf()
         };
 
-        let gate_document_contents = read_to_string(&path).into_diagnostic()?;
+        let gate_document_contents = read_to_string(&path)?;
         let name = path
             .file_name()
             .ok_or(GateError::NoFileNameError(
@@ -99,6 +108,13 @@ impl Gate {
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("gate");
         let doc = node.ensure_children();
+        
+        if let Some(id) = &self.id {
+            let mut id_node = kdl::KdlNode::new("id");
+            id_node.insert(0, id.as_str());
+            doc.nodes_mut().push(id_node);    
+        }
+        
         let mut name_node = kdl::KdlNode::new("name");
         name_node.insert(0, self.name.as_str());
         doc.nodes_mut().push(name_node);
@@ -111,10 +127,16 @@ impl Gate {
         branch_node.insert(0, self.branch.as_str());
         doc.nodes_mut().push(branch_node);
 
+        let mut publisher_node = kdl::KdlNode::new("publisher");
+        publisher_node.insert(0, self.publisher.as_str());
+        doc.nodes_mut().push(publisher_node);
+
         if let Some(distribution) = &self.distribution {
             let distribution_node = distribution.to_node();
             doc.nodes_mut().push(distribution_node);
         }
+        
+        
 
         for tr in &self.default_transforms {
             let tr_node = tr.to_node();

@@ -1,0 +1,75 @@
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project version=\"4\">\n  <component name=\"AutoImportSettings\">\n    <option name=\"autoReloadType\" value=\"ALL\" />\n  </component>\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision d880df7d44b7fcb52e9db77544d064a7255d63f7)
++++ b/.idea/workspace.xml	(date 1710231611049)
+@@ -3,4 +3,63 @@
+   <component name="AutoImportSettings">
+     <option name="autoReloadType" value="ALL" />
+   </component>
++  <component name="CargoProjects">
++    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
++  </component>
++  <component name="ChangeListManager">
++    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="">
++      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
++    </list>
++    <option name="SHOW_DIALOG" value="false" />
++    <option name="HIGHLIGHT_CONFLICTS" value="true" />
++    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
++    <option name="LAST_RESOLUTION" value="IGNORE" />
++  </component>
++  <component name="Git.Settings">
++    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
++    <option name="ROOT_SYNC" value="DONT_SYNC" />
++  </component>
++  <component name="MacroExpansionManager">
++    <option name="directoryName" value="g3whi2mu" />
++  </component>
++  <component name="ProjectColorInfo">{
++  &quot;associatedIndex&quot;: 7
++}</component>
++  <component name="ProjectId" id="2dVo5Tcl8uTCkS8j95qPcUqs0pV" />
++  <component name="ProjectViewState">
++    <option name="hideEmptyMiddlePackages" value="true" />
++    <option name="showLibraryContents" value="true" />
++  </component>
++  <component name="PropertiesComponent"><![CDATA[{
++  "keyToString": {
++    "RunOnceActivity.OpenProjectViewOnStart": "true",
++    "RunOnceActivity.ShowReadmeOnStart": "true",
++    "RunOnceActivity.rust.reset.selective.auto.import": "true",
++    "git-widget-placeholder": "master",
++    "last_opened_file_path": "/export/home/toast/workspace/games/von-neumann-rts",
++    "nodejs_package_manager_path": "npm",
++    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
++    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
++    "vue.rearranger.settings.migration": "true"
++  }
++}]]></component>
++  <component name="RustProjectSettings">
++    <option name="toolchainHomeDirectory" value="/usr/bin" />
++  </component>
++  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
++  <component name="TaskManager">
++    <task active="true" id="Default" summary="Default task">
++      <changelist id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="" />
++      <created>1710102422479</created>
++      <option name="number" value="Default" />
++      <option name="presentableId" value="Default" />
++      <updated>1710102422479</updated>
++      <workItem from="1710102423499" duration="135000" />
++      <workItem from="1710231532171" duration="79000" />
++    </task>
++    <servers />
++  </component>
++  <component name="TypeScriptGeneratedFilesManager">
++    <option name="version" value="3" />
++  </component>
+ </project>
+\ No newline at end of file
