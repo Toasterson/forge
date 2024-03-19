@@ -17,8 +17,10 @@ impl GateQuery {
         let gate = database
             .gate()
             .find_first(vec![
-                prisma::gate::publisher::is(vec![prisma::publisher::name::equals(publisher.clone())]),
-                prisma::gate::name::equals(name.clone())
+                prisma::gate::publisher::is(vec![prisma::publisher::name::equals(
+                    publisher.clone(),
+                )]),
+                prisma::gate::name::equals(name.clone()),
             ])
             .with(prisma::gate::publisher::fetch())
             .exec()
@@ -48,7 +50,12 @@ impl GateQuery {
             ]));
         }
 
-        let gates = database.gate().find_many(filter).with(prisma::gate::publisher::fetch()).exec().await?;
+        let gates = database
+            .gate()
+            .find_many(filter)
+            .with(prisma::gate::publisher::fetch())
+            .exec()
+            .await?;
         Ok(gates
             .into_iter()
             .map(|g| {

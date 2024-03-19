@@ -8,8 +8,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/oi-userland" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/oi-userland" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/pkg5" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/queries/importComponent.graphql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/forged.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/component.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/gate.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/component.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/gate.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/types.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/forge.graphql.schema.json" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/forge.graphql.schema.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/package.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/package.kdl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/create.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/create.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -19,9 +42,16 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="GraphQL File" />
         <option value="Rust File" />
+        <option value="GraphQL File" />
       </list>
+    </option>
+  </component>
+  <component name="FormatOnSaveOptions">
+    <option name="myRunOnSave" value="false" />
+    <option name="myAllFileTypesSelected" value="true" />
+    <option name="mySelectedFileTypes">
+      <set />
     </option>
   </component>
   <component name="Git.Settings">
@@ -52,6 +82,7 @@
     "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "Cargo.Build `Run forged`.executor": "Run",
     "Cargo.Run forged.executor": "Run",
+    "Docker.docker-compose.yml.minio: Compose Deployment.executor": "Run",
     "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
@@ -65,7 +96,7 @@
     "nodejs_package_manager_path": "npm",
     "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
     "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
-    "settings.editor.selected.configurable": "language.rust",
+    "settings.editor.selected.configurable": "language.rust.cargo.check",
     "vue.rearranger.settings.migration": "true"
   },
   "keyToStringList": {
@@ -97,18 +128,33 @@
       </deployment>
       <method v="2" />
     </configuration>
+    <configuration name="docker-compose.yml.minio: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
+      <deployment type="docker-compose.yml">
+        <settings>
+          <option name="services">
+            <list>
+              <option value="minio" />
+            </list>
+          </option>
+          <option name="sourceFilePath" value="docker-compose.yml" />
+        </settings>
+      </deployment>
+      <method v="2" />
+    </configuration>
     <list>
       <item itemvalue="Cargo.Run forged" />
+      <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
       <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
         <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
       </list>
     </recent_temporary>
   </component>
   <component name="RustProjectSettings">
-    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+    <option name="toolchainHomeDirectory" value="/usr/bin" />
   </component>
   <component name="RustfmtProjectSettings">
     <option name="useRustfmt" value="true" />
@@ -123,12 +169,24 @@
       <updated>1710102422479</updated>
       <workItem from="1710102423499" duration="135000" />
       <workItem from="1710231532171" duration="79000" />
-      <workItem from="1710762048675" duration="22937000" />
+      <workItem from="1710762048675" duration="23058000" />
+      <workItem from="1710839460631" duration="32276000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />

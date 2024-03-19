@@ -1,9 +1,9 @@
+mod component;
 mod gate;
 mod publisher;
-mod component;
 
-pub use publisher::PublisherMutation;
 use crate::graphql::mutation::component::ComponentMutation;
+pub use publisher::PublisherMutation;
 
 use self::gate::GateMutation;
 

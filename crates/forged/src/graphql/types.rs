@@ -1,7 +1,7 @@
-use async_graphql::{InputObject, scalar, SimpleObject, Result};
-use serde::{Deserialize, Serialize};
-use component::{PackageMeta, Recipe};
 use crate::prisma;
+use async_graphql::{scalar, InputObject, Result, SimpleObject};
+use component::{PackageMeta, Recipe};
+use serde::{Deserialize, Serialize};
 
 #[derive(InputObject)]
 pub struct PaginationInput {
@@ -65,7 +65,7 @@ pub fn component_from_database(component: prisma::component::Data) -> Result<Com
         data: ComponentData {
             recipe: serde_json::from_value(component.recipe)?,
             packages: serde_json::from_value(component.packages)?,
-        }
+        },
     };
     Ok(r)
 }

@@ -32,10 +32,22 @@ impl GateMutation {
     async fn create_gate(&self, ctx: &Context<'_>, input: CreateGateInput) -> Result<Gate> {
         let database = &ctx.data_unchecked::<SharedState>().lock().await.prisma;
         let encoded_transforms = serde_json::to_value(input.transforms)?;
-        if database.publisher().find_unique(prisma::publisher::UniqueWhereParam::NameEquals(input.publisher.clone())).exec().await?.is_none() {
-            database.publisher().create(input.publisher.clone(), vec![]).exec().await?;
-        } 
-        
+        if database
+            .publisher()
+            .find_unique(prisma::publisher::UniqueWhereParam::NameEquals(
+                input.publisher.clone(),
+            ))
+            .exec()
+            .await?
+            .is_none()
+        {
+            database
+                .publisher()
+                .create(input.publisher.clone(), vec![])
+                .exec()
+                .await?;
+        }
+
         let gate = database
             .gate()
             .create(

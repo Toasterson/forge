@@ -17,6 +17,7 @@ use deadpool_lapin::Pool;
 use futures::{join, StreamExt};
 use message_queue::handle_message;
 use miette::Diagnostic;
+use opendal::Operator;
 use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -62,10 +63,13 @@ pub enum Error {
 
     #[error(transparent)]
     NewClient(#[from] prisma_client_rust::NewClientError),
-    
+
     #[error(transparent)]
     QueryError(#[from] prisma_client_rust::QueryError),
-    
+
+    #[error(transparent)]
+    OpenDal(#[from] opendal::Error),
+
     #[error("no version found in component with name: {0}")]
     NoVersionFoundInRecipe(String),
 
@@ -75,11 +79,20 @@ pub enum Error {
     #[error("no project URL found in component with name: {0}")]
     NoProjectUrlFoundInRecipe(String),
 
+    #[error("no component found")]
+    NoComponentFound,
+
+    #[error("no id found in gate object: {0}")]
+    NoIdFoundINGate(String),
+
     #[error("{0}")]
     String(String),
 
     #[error("entity not found {0}")]
     NotFound(String),
+    
+    #[error("neither url nor file provided in upload")]
+    NoFileOrUrl,
 }
 
 pub type Result<T> = miette::Result<T, Error>;
@@ -100,6 +113,16 @@ pub struct Config {
     pub inbox: String,
     pub connection_string: String,
     pub graphql: GraphQLConfig,
+    pub opendal: OpenDalConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OpenDalConfig {
+    pub service: String,
+    pub endpoint: String,
+    pub bucket: String,
+    pub key_id: String,
+    pub secret_key: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -114,6 +137,7 @@ pub struct GraphQLConfig {
 pub fn load_config(args: Args) -> Result<Config> {
     let cfg = config::Config::builder()
         .add_source(config::File::with_name("/etc/forge/forged").required(false))
+        .add_source(config::File::with_name("forged").required(false))
         .add_source(
             Environment::with_prefix("APP")
                 .separator("_")
@@ -127,6 +151,11 @@ pub fn load_config(args: Args) -> Result<Config> {
         .set_default("graphql.use_ssl", false)?
         .set_default("graphql.domain", "localhost")?
         .set_default("graphql.port", 3100)?
+        .set_default("opendal.endpoint", "http://localhost:9000")?
+        .set_default("opendal.bucket", "forge")?
+        .set_default("opendal.service", "s3")?
+        .set_default("opendal.key_id", "")?
+        .set_default("opendal.secret_key", "")?
         .set_default(
             "connection_string",
             "postgres://forge:forge@localhost/forge",
@@ -145,6 +174,7 @@ struct AppState {
     inbox: String,
     prisma: PrismaClient,
     graphql: GraphQLConfig,
+    fs_operator: opendal::Operator,
 }
 
 type SharedState = Arc<Mutex<AppState>>;
@@ -155,6 +185,22 @@ pub async fn listen(cfg: Config) -> Result<()> {
         .with_url(cfg.connection_string.clone())
         .build()
         .await?;
+
+    debug!("Setting up Filesystem Operator");
+    let mut op_builder = opendal::services::S3::default();
+    op_builder.endpoint(&cfg.opendal.endpoint);
+    op_builder.region("default");
+    op_builder.bucket(&cfg.opendal.bucket);
+    op_builder.access_key_id(&cfg.opendal.key_id);
+    op_builder.secret_access_key(&cfg.opendal.secret_key);
+
+    let fs_operator = Operator::new(op_builder)?
+        .layer(opendal::layers::LoggingLayer::default())
+        .finish();
+
+    debug!("Checking if operator is setup correctly");
+    fs_operator.check().await?;
+
     debug!("Opening RabbitMQ Connection");
     let state = Arc::new(Mutex::new(AppState {
         graphql: cfg.graphql.clone(),
@@ -164,6 +210,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
         job_inbox: cfg.job_inbox,
         inbox: cfg.inbox,
         prisma: db_conn,
+        fs_operator,
     }));
     let conn = state.lock().await.amqp.get().await?;
     let job_inbox = state.lock().await.job_inbox.clone();

@@ -1,14 +1,15 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::path::PathBuf;
-use clap::Subcommand;
+use crate::get_project_dir;
+use clap::{Subcommand, ValueEnum};
+use component::{Component, ComponentError, PackageMeta, Recipe};
+use gate::{Gate, GateError};
 use graphql_client::{GraphQLQuery, Response};
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::PathBuf;
 use thiserror::Error;
 use url::{ParseError, Url};
-use gate::{Gate, GateError};
-use crate::get_project_dir;
 
 #[derive(Debug, Subcommand)]
 pub enum ForgeArgs {
@@ -28,6 +29,36 @@ pub enum ForgeArgs {
         branch: Option<String>,
         #[arg(short, long)]
         publisher: Option<String>,
+    },
+    ImportComponent {
+        gate: PathBuf,
+        path: PathBuf,
+    },
+    UploadFile {
+        gate: PathBuf,
+        path: PathBuf,
+        kind: ComponentFileKind,
+        #[arg(short, long)]
+        url: Option<Url>,
+        #[arg(short, long)]
+        file: Option<PathBuf>,
+    },
+}
+
+#[derive(Debug, ValueEnum, Clone)]
+pub(crate) enum ComponentFileKind {
+    Patch,
+    Archive,
+    Script,
+}
+
+impl Into<upload_component_file::ComponentFileKind> for &ComponentFileKind {
+    fn into(self) -> upload_component_file::ComponentFileKind {
+        match self {
+            ComponentFileKind::Patch => upload_component_file::ComponentFileKind::PATCH,
+            ComponentFileKind::Archive => upload_component_file::ComponentFileKind::ARCHIVE,
+            ComponentFileKind::Script => upload_component_file::ComponentFileKind::SCRIPT,
+        }
     }
 }
 
@@ -58,6 +89,16 @@ pub enum Error {
     #[error(transparent)]
     #[diagnostic(transparent)]
     Gate(#[from] GateError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Component(#[from] ComponentError),
+
+    #[error("component is missing {0}")]
+    ComponentIncomplete(String),
+
+    #[error("gate document has no id defined")]
+    GateNoId,
 }
 
 type Result<T, E = Error> = miette::Result<T, E>;
@@ -65,7 +106,7 @@ type Result<T, E = Error> = miette::Result<T, E>;
 #[derive(Serialize, Deserialize)]
 pub struct ForgeConfig {
     pub forges: HashMap<String, Url>,
-    pub selected_forge: Option<String>
+    pub selected_forge: Option<String>,
 }
 
 impl ForgeConfig {
@@ -76,7 +117,12 @@ impl ForgeConfig {
             if let Some(idx) = &self.selected_forge {
                 self.forges.get(idx).map(|u| u.clone())
             } else {
-                self.forges.clone().into_iter().collect::<Vec<(String,Url)>>().first().map(|(_,u)|u.clone())
+                self.forges
+                    .clone()
+                    .into_iter()
+                    .collect::<Vec<(String, Url)>>()
+                    .first()
+                    .map(|(_, u)| u.clone())
             }
         }
     }
@@ -89,7 +135,7 @@ pub fn get_forge_config() -> Result<ForgeConfig> {
         let f = File::open(config_dir.join("forge.json"))?;
         serde_json::from_reader(f)?
     } else {
-        ForgeConfig{
+        ForgeConfig {
             forges: HashMap::new(),
             selected_forge: None,
         }
@@ -97,25 +143,55 @@ pub fn get_forge_config() -> Result<ForgeConfig> {
     Ok(forge_config)
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct ComponentData {
+    pub recipe: Recipe,
+    pub packages: PackageMeta,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Upload(usize);
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "forge.graphql.schema.json",
     query_path = "queries/defineGate.graphql",
-    response_derives = "Debug,Serialize,PartialEq",
+    response_derives = "Debug,Serialize,PartialEq"
 )]
 pub struct DefineGateMutation;
 
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "forge.graphql.schema.json",
+    query_path = "queries/importComponent.graphql",
+    response_derives = "Debug,Serialize,PartialEq"
+)]
+pub struct ImportComponentMutation;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "forge.graphql.schema.json",
+    query_path = "queries/importComponent.graphql",
+    response_derives = "Debug,Serialize,PartialEq"
+)]
+pub struct UploadComponentFile;
+
 pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
     let mut forge_config = get_forge_config()?;
+    let forge_url = forge_config.get_selected();
+    if forge_url.is_none() {
+        return Err(Error::NoForgeConnected);
+    }
+    let forge_url = forge_url.unwrap();
 
     match args {
-        ForgeArgs::DefineGate { file, name, version, branch, publisher } => {
-            let forge_url = forge_config.get_selected();
-            if forge_url.is_none() {
-                return Err(Error::NoForgeConnected);
-            }
-            let forge_url = forge_url.unwrap();
-
+        ForgeArgs::DefineGate {
+            file,
+            name,
+            version,
+            branch,
+            publisher,
+        } => {
             let gate: Option<Gate> = if let Some(file) = file {
                 if file.exists() {
                     Some(Gate::new(file)?)
@@ -126,23 +202,40 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 None
             };
 
-            let (name, version, branch, publisher, transforms) = if name.is_some() && version.is_some() && branch.is_some() && publisher.is_some() {
-                // We define everything on the commandline and thus use those variables.
-                (name.clone().unwrap(), version.clone().unwrap(), branch.clone().unwrap(), publisher.clone().unwrap(), None)
-            } else if let Some(gate) = gate {
-                // take the variables from the file
-                (gate.name, gate.version, gate.branch, gate.publisher, Some(gate.default_transforms))
-            } else {
-                // All other cases are user error
-                return Err(Error::MissingParameter(String::from("name")))
-            };
-            
-            let variables: define_gate_mutation::Variables = define_gate_mutation::Variables{
+            let (name, version, branch, publisher, transforms) =
+                if name.is_some() && version.is_some() && branch.is_some() && publisher.is_some() {
+                    // We define everything on the commandline and thus use those variables.
+                    (
+                        name.clone().unwrap(),
+                        version.clone().unwrap(),
+                        branch.clone().unwrap(),
+                        publisher.clone().unwrap(),
+                        None,
+                    )
+                } else if let Some(gate) = gate {
+                    // take the variables from the file
+                    (
+                        gate.name,
+                        gate.version,
+                        gate.branch,
+                        gate.publisher,
+                        Some(gate.default_transforms),
+                    )
+                } else {
+                    // All other cases are user error
+                    return Err(Error::MissingParameter(String::from("name")));
+                };
+
+            let variables: define_gate_mutation::Variables = define_gate_mutation::Variables {
                 name,
                 version,
                 branch,
                 publisher,
-                transforms: transforms.unwrap_or(vec![]).into_iter().map(|t| t.to_string()).collect(),
+                transforms: transforms
+                    .unwrap_or(vec![])
+                    .into_iter()
+                    .map(|t| t.to_string())
+                    .collect(),
             };
 
             let request_body = DefineGateMutation::build_query(variables);
@@ -170,11 +263,15 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
         ForgeArgs::Connect { target, select } => {
             let host = target.host_str();
             if host.is_none() {
-                return Err(Error::MissingParameter(String::from("no host in forge URL")))
+                return Err(Error::MissingParameter(String::from(
+                    "no host in forge URL",
+                )));
             }
-            
-            forge_config.forges.insert(host.unwrap().to_owned(), target.clone());
-            
+
+            forge_config
+                .forges
+                .insert(host.unwrap().to_owned(), target.clone());
+
             if *select {
                 forge_config.selected_forge = Some(host.unwrap().to_owned());
             }
@@ -182,11 +279,130 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             let project_dirs = get_project_dir()?;
             let config_dir = project_dirs.config_dir();
             if !config_dir.exists() {
-                std::fs::DirBuilder::new().recursive(true).create(config_dir)?;
+                std::fs::DirBuilder::new()
+                    .recursive(true)
+                    .create(config_dir)?;
             }
             let mut f = File::create(config_dir.join("forge.json"))?;
             serde_json::to_writer_pretty(&mut f, &forge_config)?;
+
+            Ok(())
+        }
+        ForgeArgs::ImportComponent { gate, path } => {
+            let gate = Gate::new(gate)?;
+            let component = Component::open_local(path)?;
+
+            let gate_id = gate.id.ok_or(Error::GateNoId)?;
+
+            let vars = import_component_mutation::Variables {
+                anitya_id: None,
+                data: ComponentData {
+                    recipe: component.recipe,
+                    packages: component
+                        .package_meta
+                        .ok_or(Error::ComponentIncomplete(String::from("pkg5")))?,
+                },
+                repology_id: None,
+                gate: gate_id,
+            };
+
+            let request_body = ImportComponentMutation::build_query(vars);
+            let client = reqwest::blocking::Client::new();
+            let res = client.post(forge_url).json(&request_body).send()?;
+            let response_body: Response<import_component_mutation::ResponseData> = res.json()?;
+
+            if let Some(data) = response_body.data {
+                println!(
+                    "Component {}@{} revision: {} in gate {} imported",
+                    data.import_component.name,
+                    data.import_component.version,
+                    data.import_component.revision,
+                    data.import_component.gate_id,
+                );
+            } else {
+                let errors = response_body.errors.unwrap();
+                for error in errors {
+                    println!("the server returned errors");
+                    println!("{}", error);
+                }
+            }
+
+            Ok(())
+        }
+        ForgeArgs::UploadFile {
+            gate,
+            path,
+            kind,
+            url,
+            file,
+        } => {
+            let gate = Gate::new(gate)?;
+            let component = Component::open_local(path)?;
+
+            let gate_id = gate.id.ok_or(Error::GateNoId)?;
+
+            let name = component.recipe.name;
+            let version = component
+                .recipe
+                .version
+                .ok_or(Error::ComponentIncomplete(String::from("version")))?;
+            let revision = component.recipe.revision.unwrap_or(String::from("0"));
+
             
+
+            let response_body: Response<upload_component_file::ResponseData> =
+                if let Some(file) = file {
+                    let vars = upload_component_file::Variables {
+                        name,
+                        version,
+                        revision,
+                        gate: gate_id,
+                        url: None,
+                        file: Some(Upload(0)),
+                        kind: kind.into(),
+                    };
+                    let request_body = UploadComponentFile::build_query(vars);
+                    let request_str = serde_json::to_string(&request_body)?;
+                    let client = reqwest::blocking::Client::new();
+
+                    let file_map = "{ \"0\": [\"variables.file\"] }";
+
+                    let some_file = reqwest::blocking::multipart::Part::file(file)?;
+
+                    let form = reqwest::blocking::multipart::Form::new()
+                        .text("operations", request_str)
+                        .text("map", file_map)
+                        .part("0", some_file);
+
+                    let res = client.post(forge_url).multipart(form).send()?;
+                    res.json()?
+                } else {
+                    let vars = upload_component_file::Variables {
+                        name,
+                        version,
+                        revision,
+                        gate: gate_id,
+                        url: url.clone().map(|u|u.to_string()),
+                        file: None,
+                        kind: kind.into(),
+                    };
+                    let client = reqwest::blocking::Client::new();
+                    let request_body = UploadComponentFile::build_query(vars);
+
+                    let res = client.post(forge_url).json(&request_body).send()?;
+                    res.json()?
+                };
+
+            if let Some(_) = response_body.data {
+                println!("File Uploaded");
+            } else {
+                let errors = response_body.errors.unwrap();
+                for error in errors {
+                    println!("the server returned errors");
+                    println!("{}", error);
+                }
+            }
+
             Ok(())
         }
     }

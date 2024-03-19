@@ -7,7 +7,7 @@ use strum::Display;
 use gate::Gate;
 
 use crate::create::create_component;
-use crate::forge::{ForgeArgs, handle_forge_interaction};
+use crate::forge::{handle_forge_interaction, ForgeArgs};
 use crate::metadata;
 use crate::modify::{edit_component, EditArgs};
 use crate::sources::download_sources;
@@ -59,7 +59,7 @@ pub(crate) enum Commands {
     Forge {
         #[clap(subcommand)]
         args: ForgeArgs,
-    }
+    },
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -110,8 +110,6 @@ pub(crate) fn run(args: Args) -> miette::Result<()> {
         } => download_sources(component, gate, target_dir),
         Commands::Create { fmri, args } => create_component(args, fmri),
         Commands::Edit { component, args } => edit_component(component, gate, args),
-        Commands::Forge { args } => {
-            Ok(handle_forge_interaction(&args)?)
-        }
+        Commands::Forge { args } => Ok(handle_forge_interaction(&args)?),
     }
 }

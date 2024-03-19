@@ -1,0 +1,43 @@
+mutation ImportComponentMutation(
+    $anityaId: String
+    $data: ComponentData!
+    $repologyId: String
+    $gate: String!
+) {
+    importComponent(
+        input: {
+            anityaId: $anityaId
+            data: $data
+            repologyId: $repologyId
+            gate: $gate
+        }
+    ) {
+        anityaId
+        data
+        gateId
+        name
+        projectUrl
+        repologyId
+        revision
+        version
+    }
+}
+
+mutation UploadComponentFile(
+    $name: String!,
+    $version: String!,
+    $revision: String!,
+    $gate: String!,
+    $url: String,
+    $file: Upload,
+    $kind: ComponentFileKind!,
+) {
+    uploadComponentFile(
+        component: {revision: $revision, name: $name, version: $version, gateId: $gate}
+        url: $url,
+        file: $file
+        kind: $kind
+    ) {
+        success
+    }
+}

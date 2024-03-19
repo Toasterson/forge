@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 use url::{ParseError, Url};
@@ -15,6 +15,32 @@ pub fn build_public_id(kind: IdKind, base_url: &Url, parent: &str, id: &str) -> 
         IdKind::Actor => format!("{}/actors/{}", base_url, id),
         IdKind::ChangeRequest => format!("{}/objects/changeRequests/{}/{}", base_url, parent, id),
     }.parse()
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum ComponentFileKind {
+    Patch,
+    Script,
+    Archive,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ComponentFile {
+    pub kind: ComponentFileKind,
+    pub component: String,
+    pub name: String,
+    pub hash: String,
+}
+
+impl Display for ComponentFile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let kind_str = match self.kind {
+            ComponentFileKind::Patch => "patch",
+            ComponentFileKind::Script => "script",
+            ComponentFileKind::Archive => "archive",
+        };
+        write!(f, "{}:{}:{}:{}", kind_str, self.component.replace("/", "_"), self.name.replace("/", "_"), self.hash)
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone)]
