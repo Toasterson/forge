@@ -13,7 +13,7 @@
 # Copyright 2023 Till Wegmueller
 #
 
-PKGDEV=/Users/toasty/ws/openindiana/forge/target/release/pkgdev --gate $(WS_TOP)/userland-gate.kdl
+PKGDEV=$${HOME}/.cargo/bin/pkgdev --gate $(WS_TOP)/userland-gate.kdl
 
 generate-pakage-kdl:
 	@echo "generating package.kdl for $(COMPONENT_NAME)@$(COMPONENT_VERSION)"

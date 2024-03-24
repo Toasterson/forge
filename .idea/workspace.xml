@@ -8,8 +8,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/make-rules/shared-macros.mk" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/make-rules/shared-macros.mk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sample_data/make-rules/repology.mk" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/make-rules/repology.mk" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -158,7 +157,7 @@
       <workItem from="1710762048675" duration="23058000" />
       <workItem from="1710839460631" duration="33862000" />
       <workItem from="1711193093683" duration="11961000" />
-      <workItem from="1711270805597" duration="963000" />
+      <workItem from="1711270805597" duration="1145000" />
     </task>
     <servers />
   </component>
