@@ -14,3 +14,7 @@ metadata-transform matcher="CC" drop=true
 metadata-transform matcher="CXX" drop=true
 metadata-transform matcher="F77" drop=true
 metadata-transform matcher="FC" drop=true
+metadata-transform matcher="FFLAGS" drop=true
+metadata-transform matcher="CFLAGS" drop=true
+metadata-transform matcher="LDFLAGS" drop=true
+metadata-transform matcher="PKG_CONFIG_PATH" drop=true
