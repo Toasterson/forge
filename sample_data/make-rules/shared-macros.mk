@@ -56,8 +56,7 @@ export DOWNLOAD_FALLBACK_PATH =  $(DLC_ARCHIVE_MIRROR)
 
 # The workspace starts at the mercurial root
 ifeq ($(origin WS_TOP), undefined)
-export WS_TOP := \
-	$(shell git rev-parse --show-toplevel || hg root 2>/dev/null)
+export WS_TOP := $(shell git rev-parse --show-toplevel || hg root 2>/dev/null)/sample_data
 endif
 
 USERLAND_ARCHIVES ?=	$(WS_TOP)/archives/
