@@ -1,0 +1,135 @@
+datasource db {
+  provider   = "postgres"
+  url        = env("FORGE_DB_URL")
+  extensions = [uuidOssp(map: "uuid-ossp")]
+}
+
+generator client {
+  provider = "prisma-client-js"
+
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+model Domain {
+  id      String  @id @default(uuid()) @db.Uuid
+  dnsName String  @unique
+  actors  Actor[] @relation("Members")
+}
+
+model Actor {
+  id          String @id @default(uuid()) @db.Uuid
+  displayName String
+  handle      String @unique
+  domain      Domain @relation("Members", fields: [domainId], references: [id])
+  domainId    String @db.Uuid
+  Key         Key[]
+}
+
+model Key {
+  id          String  @id @default(uuid()) @db.Uuid
+  actor       Actor   @relation(fields: [actorId], references: [id])
+  actorId     String  @db.Uuid
+  name        String
+  private_key String
+  public_key  String
+  key_type    KeyType @default(Ed25519)
+}
+
+enum KeyType {
+  Ed25519
+}
+
+model Publisher {
+  id           String              @id @default(uuid()) @db.Uuid
+  name         String              @unique
+  repositories PackageRepository[]
+  Gate         Gate[]
+}
+
+model PackageRepository {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  publisher   Publisher @relation(fields: [publisherId], references: [id])
+  publisherId String    @db.Uuid
+}
+
+model Gate {
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String
+  version         String
+  branch          String
+  publisher       Publisher         @relation(fields: [publisherId], references: [id])
+  transforms      Json              @db.JsonB
+  publisherId     String            @db.Uuid
+  Component       Component[]
+  ComponentChange ComponentChange[]
+}
+
+model Component {
+  name            String
+  version         String
+  revision        String
+  anitya_id       String?
+  repology_id     String?
+  project_url     String
+  gate            Gate              @relation(fields: [gateId], references: [id])
+  recipe          Json              @db.JsonB
+  patches         String[]
+  scripts         String[]
+  archives        String[]
+  packages        Json              @db.JsonB
+  gateId          String            @db.Uuid
+  ComponentChange ComponentChange[]
+  BuildJob        BuildJob[]
+
+  @@id([name, gateId, version, revision])
+}
+
+model ComponentChange {
+  id                String              @id @default(uuid()) @db.Uuid
+  kind              ComponentChangeKind
+  diff              Json                @db.JsonB
+  component         Component?          @relation(fields: [componentName, gateId, componentVersion, componentRevision], references: [name, gateId, version, revision])
+  recipe            Json                @db.JsonB
+  version           String
+  revision          String
+  gate              Gate?               @relation(fields: [gateId], references: [id])
+  patches           String[]
+  scripts           String[]
+  archives          String[]
+  change_request    ChangeRequest       @relation(fields: [changeRequestId], references: [id])
+  componentName     String?
+  componentVersion  String?
+  componentRevision String?
+  gateId            String?             @db.Uuid
+  changeRequestId   String              @db.Uuid
+}
+
+enum ComponentChangeKind {
+  Added
+  Updated
+  Removed
+}
+
+model ChangeRequest {
+  id                 String            @id @default(uuid()) @db.Uuid
+  processing         Boolean           @default(false)
+  component_changes  ComponentChange[]
+  waitForRequest     ChangeRequest?    @relation("waitForRequest", fields: [waitForRequestId], references: [id])
+  waitForRequestId   String?           @db.Uuid
+  dependantRequests  ChangeRequest[]   @relation("waitForRequest")
+  build_order        String[]
+  external_reference String?
+  Jobs               BuildJob[]
+}
+
+model BuildJob {
+  id                String        @id @default(uuid()) @db.Uuid
+  component         Component?    @relation(fields: [componentName, gateId, componentVersion, componentRevision], references: [name, gateId, version, revision])
+  change_request    ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  componentName     String?
+  componentVersion  String?
+  componentRevision String?
+  gateId            String?       @db.Uuid
+  changeRequestId   String        @db.Uuid
+}
