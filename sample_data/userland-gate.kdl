@@ -1,0 +1,16 @@
+id "a1a6a18e-61bf-4d13-b00b-ff543c91e890"
+name "userland"
+version "0.5.11"
+branch "2024.0.0"
+publisher "openindiana.org"
+
+metadata-transform matcher="--libexecdir" replacement="--libexecdir=${LIBEXECDIR}"
+metadata-transform matcher="--bindir" replacement="--bindir=${BINDIR}"
+metadata-transform matcher="--sbindir" replacement="--sbindir=${SBINDIR}"
+metadata-transform matcher="--mandir" replacement="--mandir=${MANDIR}"
+metadata-transform matcher="--libdir" replacement="--bindir=${LIBDIR}"
+metadata-transform matcher="--with-jobs" drop=true
+metadata-transform matcher="CC" drop=true
+metadata-transform matcher="CXX" drop=true
+metadata-transform matcher="F77" drop=true
+metadata-transform matcher="FC" drop=true

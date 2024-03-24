@@ -1,3 +1,0 @@
-[submodule "sample_data/oi-userland"]
-	path = sample_data/oi-userland
-	url = git@github.com:Toasterson/oi-userland.git

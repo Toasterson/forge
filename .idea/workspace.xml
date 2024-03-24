@@ -8,31 +8,147 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/pkg5" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/queries/importComponent.graphql" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/forged.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/Makefile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/manifests/sample-manifest.p5m" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/openjdk-demo.p5m" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/openjdk.license" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/openjdk.p5m" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/package.kdl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/README.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/fontpath.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/illumos-port-6.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_GenerateLinkOptData.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_autoconf_flags-cflags.m4.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_autoconf_jdk-options.m4.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_autoconf_lib-x11.m4.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_autoconf_libraries.m4.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_autoconf_spec.gmk.in.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_autoconf_toolchain.m4.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_hotspot_gensrc_GensrcAdlc.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_hotspot_gensrc_GensrcDtrace.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_hotspot_lib_CompileJvm.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_hotspot_lib_JvmOverrideFiles.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_install.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_launcher_Launcher-jdk.pack.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_launcher_LauncherCommon.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_lib_Awt2dLibraries.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_lib_Lib-jdk.crypto.ec.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_lib_Lib-jdk.crypto.ucrypto.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/make_lib_LibCommon.gmk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/security-pkcs11.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_os__cpu_solaris__x86_atomic__solaris__x86.hpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_os__cpu_solaris__x86_bytes__solaris__x86.inline.hpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_os__cpu_solaris__x86_os__solaris__x86.cpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_os__cpu_solaris__x86_os__solaris__x86.inline.hpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_os__cpu_solaris__x86_prefetch__solaris__x86.inline.hpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_os_solaris_os__solaris.cpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_share_gc_g1_g1Analytics.cpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_hotspot_share_utilities_globalDefinitions__gcc.hpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_java.base_solaris_native_libnio_ch_DevPollArrayWrapper.c.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_java.desktop_share_classes_javax_swing_UIManager.java.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_java.desktop_share_native_libsplashscreen_libpng_pngpriv.h.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/src_jdk.crypto.ec_share_native_libsunec_ECC__JNI.cpp.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/sunpkcs11-solaris.cfg.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-Launcher-jdk.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-LauncherCommon.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-agent-mt.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-attachListener_solaris.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-demangle1.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-demangle2.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-demangle3.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-demangle4.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-flags-cflags.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-flags-ldflags.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-flags-ldflags2.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-flags-ldflags3.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-sparc1.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-sparc2.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-sparc3.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/patches/tribblix-thrstat001.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/runtime/openjdk-11/pkg5" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/Makefile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/Solaris/curl-config" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/Solaris/curl-config-64" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/curl.p5m" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/manifests/sample-manifest.p5m" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/package.kdl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/patches/000-configure.ac.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/patches/005-libcurl.pc.in.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/pkg5" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/web/curl/test/results-all.master" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/ant.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/attpackagemake.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/cmake.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/common-lisp.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/common.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/component-report" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/component.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/configure.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/depend.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/encumbered.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/environment.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/font.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/gcc-component.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/gem.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/gnome.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/install.rb.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/ips-buildinfo.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/ips.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/justmake.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/makemaker-defaults.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/makemaker.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/mate.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/meson.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/modulebuild-defaults.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/modulebuild.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/modules.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/mpi-macros.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/ninja.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/ocaml.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/prep-download.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/prep-git.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/prep-hg.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/prep-patch.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/prep-svn.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/prep-unpack.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/prep.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/pyproject-defaults.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/pyproject.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/repology.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/ruby.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/setup.py-defaults.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/setup.py.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/shared-macros.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/shared-targets.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/waf.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/make-rules/x11.mk" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/userland-gate.kdl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/.npmrc" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/.vscode/settings.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/package-lock.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/package.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/postcss.config.cjs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/src/[gate]/+page.svelte" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/src/app.d.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/src/app.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/src/app.postcss" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/src/lib/index.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/src/routes/+layout.svelte" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/src/routes/+page.svelte" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/static/favicon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/static/favicon.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/static/fonts/SpaceGrotesk.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/svelte.config.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/tailwind.config.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/tsconfig.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/vite.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitmodules" beforeDir="false" afterPath="$PROJECT_DIR$/.gitmodules" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/component.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/gate.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/mutation/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/component.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/gate.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/query/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/query/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/graphql/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/graphql/types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/forge.graphql.schema.json" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/forge.graphql.schema.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/package.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/package.kdl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/create.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/create.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/main.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sample_data/oi-userland" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/sample_data/openjdk11/package.kdl" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,6 +160,7 @@
       <list>
         <option value="Rust File" />
         <option value="GraphQL File" />
+        <option value="+page" />
       </list>
     </option>
   </component>
@@ -84,6 +201,7 @@
     "Cargo.Run forged.executor": "Run",
     "Docker.docker-compose.yml.minio: Compose Deployment.executor": "Run",
     "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
+    "JavaScript Debug.localhost:5173.executor": "Debug",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.rust.reset.selective.auto.import": "true",
@@ -96,7 +214,9 @@
     "nodejs_package_manager_path": "npm",
     "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
     "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
-    "settings.editor.selected.configurable": "language.rust.cargo.check",
+    "org.rust.first.attach.projects.stats": "true",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "ts.external.directory.path": "/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib",
     "vue.rearranger.settings.migration": "true"
   },
   "keyToStringList": {
@@ -113,7 +233,10 @@
   <component name="RsExternalLinterProjectSettings">
     <option name="runOnTheFly" value="true" />
   </component>
-  <component name="RunManager" selected="Cargo.Run forged">
+  <component name="RunManager" selected="JavaScript Debug.localhost:5173">
+    <configuration name="localhost:5173" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:5173/">
+      <method v="2" />
+    </configuration>
     <configuration default="true" type="docker-deploy" factoryName="docker-compose.yml" temporary="true">
       <deployment type="docker-compose.yml">
         <settings />
@@ -145,11 +268,13 @@
       <item itemvalue="Cargo.Run forged" />
       <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
       <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
+      <item itemvalue="JavaScript Debug.localhost:5173" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
+        <item itemvalue="JavaScript Debug.localhost:5173" />
         <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
+        <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
       </list>
     </recent_temporary>
   </component>
@@ -170,7 +295,9 @@
       <workItem from="1710102423499" duration="135000" />
       <workItem from="1710231532171" duration="79000" />
       <workItem from="1710762048675" duration="23058000" />
-      <workItem from="1710839460631" duration="32276000" />
+      <workItem from="1710839460631" duration="33862000" />
+      <workItem from="1711193093683" duration="11961000" />
+      <workItem from="1711270805597" duration="785000" />
     </task>
     <servers />
   </component>
