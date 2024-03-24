@@ -179,11 +179,7 @@ pub struct UploadComponentFile;
 pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
     let mut forge_config = get_forge_config()?;
     let forge_url = forge_config.get_selected();
-    if forge_url.is_none() {
-        return Err(Error::NoForgeConnected);
-    }
-    let forge_url = forge_url.unwrap();
-
+    
     match args {
         ForgeArgs::DefineGate {
             file,
@@ -192,6 +188,10 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             branch,
             publisher,
         } => {
+            if forge_url.is_none() {
+                return Err(Error::NoForgeConnected);
+            }
+            let forge_url = forge_url.unwrap();
             let gate: Option<Gate> = if let Some(file) = file {
                 if file.exists() {
                     Some(Gate::new(file)?)
@@ -289,6 +289,10 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             Ok(())
         }
         ForgeArgs::ImportComponent { gate, path } => {
+            if forge_url.is_none() {
+                return Err(Error::NoForgeConnected);
+            }
+            let forge_url = forge_url.unwrap();
             let gate = Gate::new(gate)?;
             let component = Component::open_local(path)?;
 
@@ -336,6 +340,10 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             url,
             file,
         } => {
+            if forge_url.is_none() {
+                return Err(Error::NoForgeConnected);
+            }
+            let forge_url = forge_url.unwrap();
             let gate = Gate::new(gate)?;
             let component = Component::open_local(path)?;
 

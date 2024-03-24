@@ -242,6 +242,8 @@ impl ComponentMutation {
                 &component.name,
                 uuid::Uuid::new_v4().to_string()
             );
+            
+            trace!("starting download of {} to {}", &url, &tmp_name);
 
             let mut writer = fs.writer_with(&tmp_name).buffer(8 * 1024 * 1024).await?;
             let response = reqwest::get(url).await?;
@@ -260,7 +262,12 @@ impl ComponentMutation {
                 hash: result,
             };
 
-            fs.copy(&tmp_name, &final_name.to_string()).await?;
+            trace!("placing file on the final location {}", &final_name.to_string());
+            // Only copy the file to the final destination if none exists there already
+            if !fs.is_exist(&filename.to_string()).await? {
+                fs.copy(&tmp_name, &final_name.to_string()).await?;
+            }
+            
             fs.delete(&tmp_name).await?;
             Ok(Empty { success: true })
         } else if let Some(upload) = file {
@@ -270,6 +277,7 @@ impl ComponentMutation {
                 &component.name,
                 uuid::Uuid::new_v4().to_string()
             );
+            
             trace!("starting upload of file to {}", &tmp_name);
 
             let mut writer = fs.writer_with(&tmp_name).buffer(8 * 1024 * 1024).await?;
@@ -290,7 +298,11 @@ impl ComponentMutation {
             };
 
             trace!("placing file on the final location {}", &final_name.to_string());
-            fs.copy(&tmp_name, &final_name.to_string()).await?;
+            // Only copy the file to the final destination if none exists there already
+            if !fs.is_exist(&final_name.to_string()).await? {
+                fs.copy(&tmp_name, &final_name.to_string()).await?;
+            }
+            
             fs.delete(&tmp_name).await?;
             Ok(Empty { success: true })
         } else {
