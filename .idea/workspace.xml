@@ -8,18 +8,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docker-compose.deployment.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/web/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.dockerignore" beforeDir="false" afterPath="$PROJECT_DIR$/.dockerignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/modify/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/modify/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/components/web/curl/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/components/web/curl/Makefile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/components/web/curl/package.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/components/web/curl/package.kdl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/routes/+layout.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/+layout.svelte" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/routes/+page.server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/+page.server.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/routes/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/+page.svelte" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.server.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.dev.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/forged.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/svelte.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/web/svelte.config.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -104,9 +101,10 @@
       <recent name="$PROJECT_DIR$/web/prisma" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/crates/forged" />
+      <recent name="$PROJECT_DIR$/" />
       <recent name="$PROJECT_DIR$/web/src/routes/[gate]/[...component]" />
       <recent name="$PROJECT_DIR$/web/src/routes" />
-      <recent name="$PROJECT_DIR$/crates/forged" />
     </key>
   </component>
   <component name="RsExternalLinterProjectSettings">
@@ -122,15 +120,15 @@
       </deployment>
       <method v="2" />
     </configuration>
-    <configuration name="docker-compose.yml: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
+    <configuration name="docker-compose.dev.yml: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
       <deployment type="docker-compose.yml">
         <settings>
-          <option name="sourceFilePath" value="docker-compose.yml" />
+          <option name="sourceFilePath" value="docker-compose.dev.yml" />
         </settings>
       </deployment>
       <method v="2" />
     </configuration>
-    <configuration name="docker-compose.yml.minio: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
+    <configuration name="docker-compose.dev.yml.minio: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
       <deployment type="docker-compose.yml">
         <settings>
           <option name="services">
@@ -138,23 +136,23 @@
               <option value="minio" />
             </list>
           </option>
-          <option name="sourceFilePath" value="docker-compose.yml" />
+          <option name="sourceFilePath" value="docker-compose.dev.yml" />
         </settings>
       </deployment>
       <method v="2" />
     </configuration>
     <list>
       <item itemvalue="Cargo.Run forged" />
-      <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
-      <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
+      <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
+      <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
       <item itemvalue="JavaScript Debug.localhost:5173" />
       <item itemvalue="npm.dev" />
     </list>
     <recent_temporary>
       <list>
         <item itemvalue="JavaScript Debug.localhost:5173" />
-        <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
-        <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
+        <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
+        <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
       </list>
     </recent_temporary>
   </component>
@@ -178,7 +176,7 @@
       <workItem from="1710839460631" duration="33862000" />
       <workItem from="1711193093683" duration="11961000" />
       <workItem from="1711270805597" duration="17358000" />
-      <workItem from="1711351873229" duration="20257000" />
+      <workItem from="1711351873229" duration="26272000" />
     </task>
     <servers />
   </component>

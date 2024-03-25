@@ -1,0 +1,40 @@
+version: '3.4'
+name: forge
+
+services:
+  web:
+    build: web
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./production.env
+
+  forged:
+    build:
+      dockerfile: crates/forged/Dockerfile
+      context: .
+    ports:
+      - "3100:3100"
+    volumes:
+      - "./forged.yaml:/etc/forge/forged.yaml"
+
+  minio:
+    image: quay.io/minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - ./production.env
+    volumes:
+      - "./minio:/data"
+    command: [ "server", "/data", "--console-address", ":9001" ]
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    env_file:
+      - ./production.env
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    ports:
+      - "15672:15672"
+      - "5672:5672"
