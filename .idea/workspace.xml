@@ -8,15 +8,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/web/prisma/schema.prisma" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/web/src/lib/prisma.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/web/src/routes/+page.server.ts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/web/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web/src/[gate]/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/modify/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/modify/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sample_data/components/web/curl/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/components/web/curl/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sample_data/components/web/curl/package.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/components/web/curl/package.kdl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/routes/+layout.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/+layout.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/routes/+page.server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/+page.server.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web/src/routes/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/web/src/routes/[gate]/[...component]/+page.svelte" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,7 +89,7 @@
     "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
     "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
     "org.rust.first.attach.projects.stats": "true",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "settings.editor.selected.configurable": "project.propVCSSupport.DirectoryMappings",
     "ts.external.directory.path": "/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib",
     "vue.rearranger.settings.migration": "true"
   },
@@ -109,7 +112,7 @@
   <component name="RsExternalLinterProjectSettings">
     <option name="runOnTheFly" value="true" />
   </component>
-  <component name="RunManager" selected="npm.dev">
+  <component name="RunManager" selected="Cargo.Run forged">
     <configuration name="localhost:5173" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:5173/">
       <method v="2" />
     </configuration>
@@ -149,7 +152,6 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="npm.dev" />
         <item itemvalue="JavaScript Debug.localhost:5173" />
         <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
         <item itemvalue="Docker.docker-compose.yml.minio: Compose Deployment" />
@@ -175,7 +177,8 @@
       <workItem from="1710762048675" duration="23058000" />
       <workItem from="1710839460631" duration="33862000" />
       <workItem from="1711193093683" duration="11961000" />
-      <workItem from="1711270805597" duration="16721000" />
+      <workItem from="1711270805597" duration="17358000" />
+      <workItem from="1711351873229" duration="20257000" />
     </task>
     <servers />
   </component>

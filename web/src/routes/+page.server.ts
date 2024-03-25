@@ -1,16 +1,28 @@
 import type { Actions } from './$types';
+import prisma from '$lib/prisma';
 
 export const actions = {
-    default: async (event) => {
-        return {
-            components: [
-                {
-                    gate: "userland",
-                    name: "web/curl",
-                    version: "8.3.0",
-                    revison: "0",
+    default: async ({request}) => {
+        const data = await request.formData();
+        const component_search = data.get('package_search')
+        const components = await prisma.component.findMany({
+            select: {
+                name: true,
+                gateId: true,
+                version: true,
+                revision: true,
+            },
+            where:{
+                name: {
+                    contains: component_search?.toString()
                 }
-            ]
+            },
+            orderBy: {
+                version: "asc"
+            }
+        });
+        return {
+            components
         }
     },
 } satisfies Actions;

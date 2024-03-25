@@ -297,16 +297,31 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             let component = Component::open_local(path)?;
 
             let gate_id = gate.id.ok_or(Error::GateNoId)?;
+            
+            let (anitya_id, repology_id) = if let Some(metadata) = &component.recipe.metadata {
+                let mut anytia_id = None;
+                let mut repology_id = None;
+                for item in &metadata.0 {
+                    match item.name.as_str() {
+                        "anitya_id" => anytia_id = Some(item.value.clone()),
+                        "repology_id" => repology_id = Some(item.value.clone()),
+                        _ => {}
+                    }
+                }
+                (anytia_id, repology_id)
+            } else {
+                (None, None)
+            };
 
             let vars = import_component_mutation::Variables {
-                anitya_id: None,
+                anitya_id,
                 data: ComponentData {
                     recipe: component.recipe,
                     packages: component
                         .package_meta
                         .ok_or(Error::ComponentIncomplete(String::from("pkg5")))?,
                 },
-                repology_id: None,
+                repology_id,
                 gate: gate_id,
             };
 

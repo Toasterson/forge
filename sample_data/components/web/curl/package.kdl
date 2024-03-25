@@ -1,11 +1,15 @@
 name "web/curl"
 project-name "curl"
+metadata {
+    anitya_id "381"
+    repology_id "curl"
+}
 classification "System/Libraries"
 summary "The CURL Network Utility and Library"
 license-file "COPYING"
 license "CURL"
 version "8.6.0"
-project-url "https://curl.haxx.se"
+project-url "https://curl.se"
 maintainer "The OpenIndiana Maintainers"
 source {
     archive "https://curl.haxx.se/download/curl-8.6.0.tar.xz" sha256="3ccd55d91af9516539df80625f818c734dc6f2ecf9bada33c76765e99121db15"

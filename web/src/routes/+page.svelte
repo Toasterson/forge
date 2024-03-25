@@ -1,9 +1,32 @@
 <script lang="ts">
-	import {focusTrap} from "@skeletonlabs/skeleton";
+	import {focusTrap, tableMapperValues} from "@skeletonlabs/skeleton";
+	import { Table } from '@skeletonlabs/skeleton';
+	import type { TableSource } from '@skeletonlabs/skeleton';
 
 	import type { ActionData } from './$types';
 
 	export let form: ActionData;
+
+	let tableSimple: TableSource = {
+		head: ['Name', 'Version', 'Revision'],
+		body: [],
+	};
+	if (form?.components) {
+		tableSimple = {
+			// A list of heading labels.
+			head: ['Name', 'Version', 'Revision'],
+			// The data visibly shown in your table body UI.
+			body: tableMapperValues(form?.components, ['name', 'version', 'revision']),
+			// Optional: The data returned when interactive is enabled and a row is clicked.
+			meta: tableMapperValues(form?.components, ['gateId', 'name', 'version', 'revision']),
+		};
+
+	}
+
+	function mySelectionHandler(e: CustomEvent) {
+		const [gateId, name, version, revision] = e.detail;
+		window.location.replace(`/${gateId}/${name}?version=${version}&revision=${revision}`);
+	}
 </script>
 
 <div class="grid grid-cols-1 m-72">
@@ -13,27 +36,7 @@
 	</form>
 	{#if form }
 		<div class="table-container my-10">
-			<!-- Native Table Element -->
-			<table class="table table-hover">
-				<thead>
-				<tr>
-					<th>Gate</th>
-					<th>Name</th>
-					<th>Version</th>
-					<th>Revision</th>
-				</tr>
-				</thead>
-				<tbody>
-				{#each form?.components as { gate, name, version, revison }}
-					<tr>
-						<td>{gate}</td>
-						<td>{name}</td>
-						<td>{version}</td>
-						<td>{revison}</td>
-					</tr>
-				{/each}
-				</tbody>
-			</table>
+			<Table source={tableSimple} interactive={true} on:selected={mySelectionHandler}></Table>
 		</div>
 	{/if}
 </div>

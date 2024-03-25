@@ -286,6 +286,18 @@ impl Recipe {
             .unwrap_or(&kdl::KdlDocument::new())
             .clone()
     }
+    
+    pub fn insert_metadata(&mut self, key: &str, value: &str) {
+        if self.metadata.is_none() {
+            self.metadata = Some(ComponentMetadata(vec![]));
+        }
+        if let Some(metadata) = &mut self.metadata {
+            metadata.0.push(ComponentMetadataItem{ 
+                name: key.to_string(), 
+                value: value.to_string(),
+            });
+        }
+    }
 
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("package");
@@ -307,6 +319,7 @@ impl Recipe {
                 item_node.insert(0, item.value.clone());
                 metadata_node.ensure_children().nodes_mut().push(item_node);
             }
+            doc.nodes_mut().push(metadata_node);
         }
 
         if let Some(classification) = &self.classification {
@@ -362,14 +375,12 @@ impl Recipe {
             maintainer_node.insert(0, maintainer.as_str());
             doc.nodes_mut().push(maintainer_node);
         }
-
-        if self.sources.len() > 0 {
-            for src in &self.sources {
-                let source_node = src.to_node();
-                doc.nodes_mut().push(source_node);
-            }
+        
+        for src in &self.sources {
+            let source_node = src.to_node();
+            doc.nodes_mut().push(source_node);
         }
-
+        
         for build in &self.build_sections {
             let build_node = build.to_node();
             doc.nodes_mut().push(build_node);

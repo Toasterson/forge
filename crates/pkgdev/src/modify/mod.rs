@@ -44,6 +44,10 @@ pub(crate) enum SetArgs {
     ProjectUrl {
         arg: String,
     },
+    Metadata {
+        key: String,
+        value: String,
+    },
     Build {
         #[arg(short, long, value_parser)]
         index: usize,
@@ -264,6 +268,9 @@ pub(crate) fn edit_component(
                 } else {
                     return Err(miette::miette!("No build section for that index"));
                 }
+            }
+            SetArgs::Metadata { key, value } => {
+                c.recipe.insert_metadata(&key, &value);
             }
         },
     }
