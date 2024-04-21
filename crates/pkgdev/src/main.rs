@@ -11,6 +11,7 @@ mod forge;
 mod metadata;
 mod modify;
 mod sources;
+mod openid;
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum Error {

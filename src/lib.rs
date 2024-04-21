@@ -1,10 +1,26 @@
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+use miette::Diagnostic;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use url::{ParseError, Url};
 
 use component::{Component, Recipe, RecipeDiff};
 use gate::Gate;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AuthConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gitlab: Option<OpenIdConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub github: Option<OpenIdConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OpenIdConfig {
+    pub client_id: String,
+}
 
 pub enum IdKind {
     Actor,
@@ -22,6 +38,34 @@ pub enum ComponentFileKind {
     Patch,
     Script,
     Archive,
+}
+
+#[derive(Error, Debug, Diagnostic)]
+pub enum FileKindError {
+    #[error("file kind not known use patch, archive or script")]
+    NotKnown
+}
+impl FromStr for ComponentFileKind {
+    type Err = FileKindError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "patch" => Ok(Self::Patch),
+            "archive" => Ok(Self::Archive),
+            "script" => Ok(Self::Script),
+            _ => Err(Self::Err::NotKnown),
+        }
+    }
+}
+impl Display for ComponentFileKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            ComponentFileKind::Archive => "archive",
+            ComponentFileKind::Patch => "patch",
+            ComponentFileKind::Script => "script",
+        };
+        write!(f, "{name}")
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -172,7 +216,7 @@ pub enum ExternalReference {
 }
 
 impl Display for ExternalReference {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GitHub { pull_request } => write!(f, "github:pr:{}", pull_request),
         }

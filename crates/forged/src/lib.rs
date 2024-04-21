@@ -1,10 +1,6 @@
-use crate::graphql::{mutation::MutationRoot, query::QueryRoot};
-
-use async_graphql::{EmptySubscription, Schema};
-use async_graphql_axum::GraphQL;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse};
+use axum::response::{IntoResponse};
 use axum::routing::get;
 use axum::{Json, Router};
 use clap::Parser;
@@ -21,14 +17,16 @@ use opendal::Operator;
 use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use axum::extract::multipart::MultipartError;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
+use forge::FileKindError;
 
-mod graphql;
 mod message_queue;
 #[allow(warnings, unused)]
 mod prisma;
+mod api;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -78,6 +76,9 @@ pub enum Error {
 
     #[error("no project URL found in component with name: {0}")]
     NoProjectUrlFoundInRecipe(String),
+    
+    #[error(transparent)]
+    MultipartError(#[from] MultipartError),
 
     #[error("no component found")]
     NoComponentFound,
@@ -93,6 +94,22 @@ pub enum Error {
     
     #[error("neither url nor file provided in upload")]
     NoFileOrUrl,
+
+    #[error("no domain found")]
+    NoDomainFound,
+
+    #[error("invalid multipart request ")]
+    InvalidMultipartRequest,
+    
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
+    
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+    
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    FileKindError(#[from] FileKindError),
 }
 
 pub type Result<T> = miette::Result<T, Error>;
@@ -249,18 +266,10 @@ pub async fn listen(cfg: Config) -> Result<()> {
         )
         .await?;
 
-    let schema = Schema::build(
-        QueryRoot::default(),
-        MutationRoot::default(),
-        EmptySubscription,
-    )
-    .data(state.clone())
-    .finish();
-
     let amqp_consume_pool = state.lock().await.amqp.clone();
     let app = Router::new()
         .route("/healthz", get(health_check))
-        .route("/", get(playground).post_service(GraphQL::new(schema)))
+        .nest("/api", api::get_api_router())
         .with_state(state);
     info!("Listening on {0}", &cfg.listen);
     // run it with hyper on localhost:3100
@@ -336,21 +345,6 @@ async fn handle_rabbitmq(
     }
 
     Ok(())
-}
-
-async fn playground(State(state): State<SharedState>) -> impl IntoResponse {
-    use async_graphql::http::*;
-    let scheme = if state.lock().await.graphql.use_ssl {
-        "https"
-    } else {
-        "http"
-    };
-    let domain = state.lock().await.graphql.domain.clone();
-    let port = state.lock().await.graphql.port.clone();
-    let endpoint = format!("{}://{}:{}", scheme, domain, port);
-    Html(playground_source(GraphQLPlaygroundConfig::new(
-        endpoint.as_str(),
-    )))
 }
 
 #[derive(Serialize, Default)]

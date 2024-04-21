@@ -16,7 +16,12 @@ pub enum ForgeArgs {
     Connect {
         target: Url,
         #[arg(short, long)]
+        provider: LoginProvider,
+        #[arg(short, long)]
         select: bool,
+        /// Useful for debugging. Do not contact forge at target but set the target as header and contact this Url instead.
+        #[arg(long, hide(true))]
+        target_override: Option<Url>,
     },
     DefineGate {
         #[arg(short, long)]
@@ -43,6 +48,12 @@ pub enum ForgeArgs {
         #[arg(short, long)]
         file: Option<PathBuf>,
     },
+}
+
+#[derive(Debug, ValueEnum, Clone)]
+pub(crate) enum LoginProvider {
+    Github,
+    Gitlab,
 }
 
 #[derive(Debug, ValueEnum, Clone)]
@@ -99,14 +110,26 @@ pub enum Error {
 
     #[error("gate document has no id defined")]
     GateNoId,
+
+    #[error("forge has no provided no login details for the selected provider please use a connected provider fir this domain")]
+    OAuthProviderNotConnected,
+    
+    #[error("login aborted")]
+    LoginAborted
 }
 
-type Result<T, E = Error> = miette::Result<T, E>;
+pub type Result<T, E = Error> = miette::Result<T, E>;
 
 #[derive(Serialize, Deserialize)]
 pub struct ForgeConfig {
-    pub forges: HashMap<String, Url>,
+    pub forges: HashMap<String, ForgeConnection>,
     pub selected_forge: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ForgeConnection {
+    target: Url,
+    login_token: crate::openid::OauthToken,
 }
 
 impl ForgeConfig {
@@ -115,14 +138,14 @@ impl ForgeConfig {
             None
         } else {
             if let Some(idx) = &self.selected_forge {
-                self.forges.get(idx).map(|u| u.clone())
+                self.forges.get(idx).map(|u| u.target.clone())
             } else {
                 self.forges
                     .clone()
                     .into_iter()
-                    .collect::<Vec<(String, Url)>>()
+                    .collect::<Vec<(String, ForgeConnection)>>()
                     .first()
-                    .map(|(_, u)| u.clone())
+                    .map(|(_, u)| u.target.clone())
             }
         }
     }
@@ -260,20 +283,43 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             }
             Ok(())
         }
-        ForgeArgs::Connect { target, select } => {
+        ForgeArgs::Connect { target, select, provider, target_override } => {
             let host = target.host_str();
             if host.is_none() {
                 return Err(Error::MissingParameter(String::from(
                     "no host in forge URL",
                 )));
             }
+            
+            let host = host.unwrap();
+            let scheme = target.scheme();
+            
+            let resp = if let Some(target_override) = target_override {
+                let mut target_override = target_override.clone();
+                target_override.set_path("/api/v1/auth/login_info");
+                reqwest::blocking::Client::new()
+                    .get(target_override)
+                    .header(reqwest::header::HOST, host)
+                    .send()?
+            } else {
+                reqwest::blocking::get(
+                    format!("{scheme}://{host}/api/v1/auth/login_info")
+                )?
+            };
+            
+            let login_info: forge::AuthConfig = resp.json()?;
+            
+            let token = crate::openid::login_to_provider(provider, &login_info)?;
 
             forge_config
                 .forges
-                .insert(host.unwrap().to_owned(), target.clone());
+                .insert(host.to_owned(), ForgeConnection{
+                    target: target.clone(),
+                    login_token: token,
+                });
 
             if *select {
-                forge_config.selected_forge = Some(host.unwrap().to_owned());
+                forge_config.selected_forge = Some(host.to_owned());
             }
 
             let project_dirs = get_project_dir()?;

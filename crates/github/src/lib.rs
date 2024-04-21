@@ -24,6 +24,7 @@ pub mod headers {
 
     pub static SIGNATURE: HeaderName = HeaderName::from_static("x-hub-signature-256");
 
+    #[allow(dead_code)]
     #[derive(Debug)]
     pub struct Signature(String);
 
