@@ -36,3 +36,6 @@ twox-hash = "1.6.3"
 sha3 = "0.10.8"
 hex = "0.4.3"
 rusty_paseto.workspace = true
+octorust = "0.7.0"
+chrono = "0.4.38"
+openssh-keys = "0.6.2"

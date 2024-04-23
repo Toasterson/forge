@@ -15,16 +15,18 @@ model Domain {
   id       String  @id @default(uuid()) @db.Uuid
   dnsName  String  @unique
   authconf Json    @db.JsonB
+  key      Bytes
   actors   Actor[] @relation("Members")
 }
 
 model Actor {
-  id          String @id @default(uuid()) @db.Uuid
-  displayName String
-  handle      String @unique
-  domain      Domain @relation("Members", fields: [domainId], references: [id])
-  domainId    String @db.Uuid
-  Key         Key[]
+  id             String   @id @default(uuid()) @db.Uuid
+  displayName    String
+  handle         String   @unique
+  domain         Domain   @relation("Members", fields: [domainId], references: [id])
+  domainId       String   @db.Uuid
+  keys           Key[]
+  remote_handles String[]
 }
 
 model Key {
@@ -32,13 +34,15 @@ model Key {
   actor       Actor   @relation(fields: [actorId], references: [id])
   actorId     String  @db.Uuid
   name        String
-  private_key String
+  private_key String?
   public_key  String
   key_type    KeyType @default(Ed25519)
 }
 
 enum KeyType {
   Ed25519
+  Rsa
+  ECDSA
 }
 
 model Publisher {

@@ -253,3 +253,32 @@ pub enum ComponentChangeKind {
 pub enum Job {
     GetRecipies { cr_id: Url, cr: ChangeRequest },
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ActorConnectRequest {
+    GitHub {
+        handle: String,
+        token: String,
+        display_name: Option<String>,
+    },
+    GitLab {
+        handle: String,
+        token: String,
+        display_name: Option<String>,
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ActorConnectResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub ssh_keys: Vec<ActorSSHKeyFingerprint>,
+    pub handle: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ActorSSHKeyFingerprint {
+    Ed25519(String),
+    Rsa(String),
+    ECDSA(String),
+}

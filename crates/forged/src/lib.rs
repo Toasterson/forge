@@ -112,6 +112,18 @@ pub enum Error {
     #[error(transparent)]
     #[diagnostic(transparent)]
     FileKindError(#[from] FileKindError),
+
+    #[error("user is unauthorized to claim this existing handle")]
+    UnauthorizedToClaimHandle,
+    
+    #[error(transparent)]
+    PasetoGenericBuilderError(#[from] rusty_paseto::prelude::GenericBuilderError),
+
+    #[error(transparent)]
+    PasetoClaimError(#[from] rusty_paseto::prelude::PasetoClaimError),
+    
+    #[error(transparent)]
+    OctoRustClientError(#[from] octorust::ClientError),
 }
 
 pub type Result<T> = miette::Result<T, Error>;
@@ -193,7 +205,7 @@ struct AppState {
     inbox: String,
     prisma: PrismaClient,
     graphql: GraphQLConfig,
-    fs_operator: opendal::Operator,
+    fs_operator: Operator,
 }
 
 type SharedState = Arc<Mutex<AppState>>;

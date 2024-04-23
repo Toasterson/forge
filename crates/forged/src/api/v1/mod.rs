@@ -2,6 +2,7 @@ mod auth;
 mod component;
 mod gate;
 mod publisher;
+mod actor;
 
 use crate::SharedState;
 use axum::Router;
@@ -9,6 +10,7 @@ use serde::Deserialize;
 
 pub fn get_v1_router() -> Router<SharedState> {
     Router::new()
+        .nest("/actors", actor::get_router())
         .nest("/components", component::get_router())
         .nest("/publishers", publisher::get_router())
         .nest("/gates", gate::get_router())
