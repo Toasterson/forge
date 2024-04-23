@@ -14,9 +14,12 @@ use deadpool_lapin::lapin::{
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::net::TcpListener;
 use tracing::{debug, error, event, info, instrument, span, Level};
 
-use forge::{build_public_id, ChangeRequest, ChangeRequestState, CommitRef, IdKind, Label, Milestone, Scheme};
+use forge::{
+    build_public_id, ChangeRequest, ChangeRequestState, CommitRef, IdKind, Label, Milestone, Scheme,
+};
 use github::{GitHubError, GitHubEvent, GitHubWebhookRequest, PullRequestPayloadSharedFields};
 use url::Url;
 
@@ -48,6 +51,9 @@ pub enum Error {
 
     #[error(transparent)]
     ParseError(#[from] url::ParseError),
+    
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
 }
 
 impl IntoResponse for Error {
@@ -167,9 +173,8 @@ pub async fn listen(cfg: Config) -> Result<()> {
         .with_state(state);
     info!("Listening on {0}", &cfg.listen);
     // run it with hyper on localhost:3000
-    axum::Server::bind(&cfg.listen.parse()?)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = TcpListener::bind(&cfg.listen).await?;
+    axum::serve(listener, app.into_make_service()).await?;
     Ok(())
 }
 
@@ -244,8 +249,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
             let span = span!(Level::DEBUG, "PullRequest match arm");
             let _enter = span.enter();
             event!(Level::INFO, pr = ?event.clone(), "Received pull request event");
-            let from_actor: Url = build_public_id(IdKind::Actor, &state.base_url,"", "github")?;
-            let to_actor: Url = build_public_id(IdKind::Actor, &state.base_url,"", "forge")?;
+            let from_actor: Url = build_public_id(IdKind::Actor, &state.base_url, "", "github")?;
+            let to_actor: Url = build_public_id(IdKind::Actor, &state.base_url, "", "forge")?;
 
             let (payload, job_payload) = match event {
                 github::PullRequestPayload::Assigned { .. } => {
@@ -261,10 +266,13 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                     (None, None)
                 }
                 github::PullRequestPayload::Closed { shared } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                        &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(shared,  false, false)?;
+                    let cr = build_change_request(shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -273,12 +281,18 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::ConvertedToDraft { shared } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
                     let cr = build_change_request(shared, false, true)?;
                     (
@@ -289,14 +303,20 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::ReadyForReview { shared } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(shared,false, false)?;
+                    let cr = build_change_request(shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -305,12 +325,18 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::Demilestoned { shared, .. } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
                     let cr = build_change_request(shared, false, false)?;
                     (
@@ -321,12 +347,18 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::Milestoned { shared, .. } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
                     let cr = build_change_request(shared, false, false)?;
                     (
@@ -337,7 +369,10 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::Dequeued { .. } => {
@@ -345,8 +380,11 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                     (None, None)
                 }
                 github::PullRequestPayload::Edited { shared } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
                     let cr = build_change_request(shared, false, false)?;
                     (
@@ -357,14 +395,20 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::Opened { shared } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(shared,false, false)?;
+                    let cr = build_change_request(shared, false, false)?;
                     (
                         Some(forge::Event::Create(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -373,12 +417,18 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::Reopened { shared } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest,
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
                     let cr = build_change_request(shared, false, false)?;
                     (
@@ -389,14 +439,20 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
                 github::PullRequestPayload::Synchronize { shared, .. } => {
-                    let change_request_id: Url = build_public_id(IdKind::ChangeRequest, 
-                                                                 &state.base_url, &shared.repository.full_name, &shared.number.to_string()
+                    let change_request_id: Url = build_public_id(
+                        IdKind::ChangeRequest,
+                        &state.base_url,
+                        &shared.repository.full_name,
+                        &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(shared,false, false)?;
+                    let cr = build_change_request(shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -405,7 +461,10 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies { cr_id: change_request_id.clone(), cr }),
+                        Some(forge::Job::GetRecipies {
+                            cr_id: change_request_id.clone(),
+                            cr,
+                        }),
                     )
                 }
             };

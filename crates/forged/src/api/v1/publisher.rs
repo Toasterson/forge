@@ -1,10 +1,10 @@
-use axum::{Json, Router};
 use axum::extract::State;
 use axum::routing::{get, post};
+use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
-use crate::{prisma, Result, SharedState};
 use crate::api::v1::PaginationInput;
+use crate::{prisma, Result, SharedState};
 
 pub fn get_router() -> Router<SharedState> {
     Router::new()
@@ -27,7 +27,10 @@ async fn create_publisher(
     State(state): State<SharedState>,
     Json(request): Json<CreatePublisherInput>,
 ) -> Result<Json<Publisher>> {
-    let publisher = state.lock().await.prisma
+    let publisher = state
+        .lock()
+        .await
+        .prisma
         .publisher()
         .create(request.name, vec![])
         .exec()
@@ -44,7 +47,8 @@ async fn list_publishers(
 ) -> Result<Json<Vec<Publisher>>> {
     let state = state.lock().await;
     let pagination = pagination.unwrap_or_default();
-    let mut query = state.prisma
+    let mut query = state
+        .prisma
         .publisher()
         .find_many(vec![])
         .take(pagination.limit);
@@ -55,11 +59,13 @@ async fn list_publishers(
 
     let publishers = query.exec().await?;
 
-    Ok(Json(publishers
-        .into_iter()
-        .map(|p| Publisher {
-            id: p.id,
-            name: p.name,
-        })
-        .collect()))
+    Ok(Json(
+        publishers
+            .into_iter()
+            .map(|p| Publisher {
+                id: p.id,
+                name: p.name,
+            })
+            .collect(),
+    ))
 }

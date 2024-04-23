@@ -1,5 +1,5 @@
 use std::{
-    fs::{File, read_to_string},
+    fs::{read_to_string, File},
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
@@ -108,13 +108,13 @@ impl Gate {
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("gate");
         let doc = node.ensure_children();
-        
+
         if let Some(id) = &self.id {
             let mut id_node = kdl::KdlNode::new("id");
             id_node.insert(0, id.as_str());
-            doc.nodes_mut().push(id_node);    
+            doc.nodes_mut().push(id_node);
         }
-        
+
         let mut name_node = kdl::KdlNode::new("name");
         name_node.insert(0, self.name.as_str());
         doc.nodes_mut().push(name_node);
@@ -135,8 +135,6 @@ impl Gate {
             let distribution_node = distribution.to_node();
             doc.nodes_mut().push(distribution_node);
         }
-        
-        
 
         for tr in &self.default_transforms {
             let tr_node = tr.to_node();

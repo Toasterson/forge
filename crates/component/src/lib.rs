@@ -85,9 +85,8 @@ impl Component {
                     .ok_or(ComponentError::NoPackageDocumentParentDir)?
                     .to_string_lossy()
                     .to_string(),
-                path
-                    .parent()
-                    .ok_or(ComponentError::NoPackageDocumentParentDir)?
+                path.parent()
+                    .ok_or(ComponentError::NoPackageDocumentParentDir)?,
             )
         } else {
             (
@@ -108,8 +107,7 @@ impl Component {
         if path.is_file() {
             let package_document = knuffel::parse::<Recipe>(&name, &package_document_string)?;
             Ok(Self {
-                path: dir
-                    .to_path_buf(),
+                path: dir.to_path_buf(),
                 recipe: package_document,
                 package_meta,
             })
@@ -171,7 +169,7 @@ impl Component {
 }
 
 #[derive(
-Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -180,12 +178,11 @@ Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq,
 pub struct PackageMeta {
     name: String,
     fmris: Vec<String>,
-    dependencies: Vec<String>
+    dependencies: Vec<String>,
 }
 
-
 #[derive(
-Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -198,13 +195,11 @@ pub struct ComponentMetadataItem {
     pub value: String,
 }
 
-#[derive(
-Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff, PartialEq, JsonSchema,
-)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff, PartialEq, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
-pub struct ComponentMetadata (#[knuffel(children)] pub Vec<ComponentMetadataItem>);
+pub struct ComponentMetadata(#[knuffel(children)] pub Vec<ComponentMetadataItem>);
 
 #[derive(
     Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
@@ -286,14 +281,14 @@ impl Recipe {
             .unwrap_or(&kdl::KdlDocument::new())
             .clone()
     }
-    
+
     pub fn insert_metadata(&mut self, key: &str, value: &str) {
         if self.metadata.is_none() {
             self.metadata = Some(ComponentMetadata(vec![]));
         }
         if let Some(metadata) = &mut self.metadata {
-            metadata.0.push(ComponentMetadataItem{ 
-                name: key.to_string(), 
+            metadata.0.push(ComponentMetadataItem {
+                name: key.to_string(),
                 value: value.to_string(),
             });
         }
@@ -311,7 +306,7 @@ impl Recipe {
             project_name_node.insert(0, project_name.as_str());
             doc.nodes_mut().push(project_name_node);
         }
-        
+
         if let Some(metadata) = &self.metadata {
             let mut metadata_node = kdl::KdlNode::new("metadata");
             for item in &metadata.0 {
@@ -375,12 +370,12 @@ impl Recipe {
             maintainer_node.insert(0, maintainer.as_str());
             doc.nodes_mut().push(maintainer_node);
         }
-        
+
         for src in &self.sources {
             let source_node = src.to_node();
             doc.nodes_mut().push(source_node);
         }
-        
+
         for build in &self.build_sections {
             let build_node = build.to_node();
             doc.nodes_mut().push(build_node);

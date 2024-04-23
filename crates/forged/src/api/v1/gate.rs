@@ -1,11 +1,10 @@
+use crate::prisma::gate::{SetParam, WhereParam};
+use crate::{prisma, Error, Result, SharedState};
 use axum::extract::{Path, State};
-use axum::{Json, Router};
 use axum::routing::{post, put};
+use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use tracing::error;
-use crate::{Error, prisma, SharedState, Result};
-use crate::prisma::gate::{SetParam, WhereParam};
-
 
 pub fn get_router() -> Router<SharedState> {
     Router::new()
@@ -16,7 +15,7 @@ pub fn get_router() -> Router<SharedState> {
 }
 
 #[derive(Deserialize, Debug, Serialize)]
-pub struct GateSearchRequest{
+pub struct GateSearchRequest {
     publisher: String,
     name: String,
 }
@@ -35,7 +34,10 @@ async fn get_gate(
     State(state): State<SharedState>,
     Json(request): Json<GateSearchRequest>,
 ) -> Result<Json<Gate>> {
-    let gate = state.lock().await.prisma
+    let gate = state
+        .lock()
+        .await
+        .prisma
         .gate()
         .find_first(vec![
             prisma::gate::publisher::is(vec![prisma::publisher::name::equals(
@@ -63,7 +65,7 @@ async fn get_gate(
 }
 
 #[derive(Deserialize, Debug, Serialize)]
-pub struct GateListRequest{
+pub struct GateListRequest {
     publisher: Option<String>,
 }
 async fn list_gates(
@@ -77,7 +79,10 @@ async fn list_gates(
         ]));
     }
 
-    let gates = state.lock().await.prisma
+    let gates = state
+        .lock()
+        .await
+        .prisma
         .gate()
         .find_many(filter)
         .with(prisma::gate::publisher::fetch())
@@ -127,7 +132,10 @@ async fn create_gate(
     Json(request): Json<CreateGateInput>,
 ) -> Result<Json<Gate>> {
     let encoded_transforms = serde_json::to_value(request.transforms)?;
-    if state.lock().await.prisma
+    if state
+        .lock()
+        .await
+        .prisma
         .publisher()
         .find_unique(prisma::publisher::UniqueWhereParam::NameEquals(
             request.publisher.clone(),
@@ -136,14 +144,20 @@ async fn create_gate(
         .await?
         .is_none()
     {
-        state.lock().await.prisma
+        state
+            .lock()
+            .await
+            .prisma
             .publisher()
             .create(request.publisher.clone(), vec![])
             .exec()
             .await?;
     }
 
-    let gate = state.lock().await.prisma
+    let gate = state
+        .lock()
+        .await
+        .prisma
         .gate()
         .create(
             request.name,
@@ -192,7 +206,10 @@ async fn update_gate(
         updates.push(prisma::gate::transforms::set(encoded_transforms));
     }
 
-    let gate = state.lock().await.prisma
+    let gate = state
+        .lock()
+        .await
+        .prisma
         .gate()
         .update(prisma::gate::id::equals(id), updates)
         .with(prisma::gate::publisher::fetch())

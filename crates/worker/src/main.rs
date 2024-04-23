@@ -1,6 +1,6 @@
 use clap::Parser;
-use worker::*;
 use tracing_subscriber::prelude::*;
+use worker::*;
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {

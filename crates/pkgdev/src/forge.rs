@@ -1,6 +1,8 @@
-use crate::get_project_dir;
+use crate::openid::OAuthConfig;
+use crate::{get_project_dir, openid};
 use clap::{Subcommand, ValueEnum};
 use component::{Component, ComponentError, PackageMeta, Recipe};
+use forge::AuthConfig;
 use gate::{Gate, GateError};
 use graphql_client::{GraphQLQuery, Response};
 use miette::Diagnostic;
@@ -51,13 +53,13 @@ pub enum ForgeArgs {
 }
 
 #[derive(Debug, ValueEnum, Clone)]
-pub(crate) enum LoginProvider {
+pub enum LoginProvider {
     Github,
     Gitlab,
 }
 
 #[derive(Debug, ValueEnum, Clone)]
-pub(crate) enum ComponentFileKind {
+pub enum ComponentFileKind {
     Patch,
     Archive,
     Script,
@@ -105,6 +107,9 @@ pub enum Error {
     #[diagnostic(transparent)]
     Component(#[from] ComponentError),
 
+    #[error(transparent)]
+    Octocrab(#[from] octocrab::Error),
+
     #[error("component is missing {0}")]
     ComponentIncomplete(String),
 
@@ -113,9 +118,9 @@ pub enum Error {
 
     #[error("forge has no provided no login details for the selected provider please use a connected provider fir this domain")]
     OAuthProviderNotConnected,
-    
+
     #[error("login aborted")]
-    LoginAborted
+    LoginAborted,
 }
 
 pub type Result<T, E = Error> = miette::Result<T, E>;
@@ -128,11 +133,54 @@ pub struct ForgeConfig {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ForgeConnection {
-    target: Url,
-    login_token: crate::openid::OauthToken,
+    pub target: Url,
+    pub login_token: openid::OAuthConfig,
 }
 
 impl ForgeConfig {
+    pub fn insert_forge(
+        &mut self,
+        host: String,
+        target: Url,
+        login_token: OAuthConfig,
+        select: bool,
+    ) {
+        self.forges.insert(
+            host.clone(),
+            ForgeConnection {
+                target,
+                login_token,
+            },
+        );
+
+        if select {
+            self.selected_forge = Some(host);
+        }
+    }
+
+    pub fn select_forge(&mut self, target: Option<String>) {
+        if let Some(target) = target {
+            for (name, _) in &self.forges {
+                if &target == name {
+                    self.selected_forge = Some(name.clone());
+                }
+            }
+        } else {
+            for (name, _) in &self.forges {
+                self.selected_forge = Some(name.clone());
+                break;
+            }
+        }
+    }
+
+    pub fn update_token(&mut self, token: &OAuthConfig) {
+        if let Some(selected) = &self.selected_forge {
+            if let Some(conn) = self.forges.get_mut(selected) {
+                conn.login_token = token.clone();
+            }
+        }
+    }
+
     pub fn get_selected(&self) -> Option<Url> {
         if self.forges.len() == 0 {
             None
@@ -146,6 +194,23 @@ impl ForgeConfig {
                     .collect::<Vec<(String, ForgeConnection)>>()
                     .first()
                     .map(|(_, u)| u.target.clone())
+            }
+        }
+    }
+
+    pub fn get_selected_config(&self) -> Option<ForgeConnection> {
+        if self.forges.len() == 0 {
+            None
+        } else {
+            if let Some(idx) = &self.selected_forge {
+                self.forges.get(idx).map(|v| v.clone())
+            } else {
+                self.forges
+                    .clone()
+                    .into_iter()
+                    .collect::<Vec<(String, ForgeConnection)>>()
+                    .first()
+                    .map(|(_, v)| v.clone())
             }
         }
     }
@@ -164,6 +229,19 @@ pub fn get_forge_config() -> Result<ForgeConfig> {
         }
     };
     Ok(forge_config)
+}
+
+pub fn save_forge_config(forge_config: &mut ForgeConfig) -> Result<(), Error> {
+    let project_dirs = get_project_dir()?;
+    let config_dir = project_dirs.config_dir();
+    if !config_dir.exists() {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .create(config_dir)?;
+    }
+    let mut f = File::create(config_dir.join("forge.json"))?;
+    serde_json::to_writer_pretty(&mut f, &forge_config)?;
+    Ok(())
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -199,10 +277,10 @@ pub struct ImportComponentMutation;
 )]
 pub struct UploadComponentFile;
 
-pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
+pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
     let mut forge_config = get_forge_config()?;
     let forge_url = forge_config.get_selected();
-    
+
     match args {
         ForgeArgs::DefineGate {
             file,
@@ -262,9 +340,9 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             };
 
             let request_body = DefineGateMutation::build_query(variables);
-            let client = reqwest::blocking::Client::new();
-            let res = client.post(forge_url).json(&request_body).send()?;
-            let response_body: Response<define_gate_mutation::ResponseData> = res.json()?;
+            let client = reqwest::Client::new();
+            let res = client.post(forge_url).json(&request_body).send().await?;
+            let response_body: Response<define_gate_mutation::ResponseData> = res.json().await?;
             if let Some(data) = response_body.data {
                 let mut gate = Gate::empty(file.clone().unwrap_or(PathBuf::from("./gate.kdl")))?;
                 gate.id = Some(data.create_gate.id);
@@ -283,54 +361,29 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             }
             Ok(())
         }
-        ForgeArgs::Connect { target, select, provider, target_override } => {
+        ForgeArgs::Connect {
+            target,
+            select,
+            provider,
+            target_override,
+        } => {
             let host = target.host_str();
             if host.is_none() {
                 return Err(Error::MissingParameter(String::from(
                     "no host in forge URL",
                 )));
             }
-            
+
             let host = host.unwrap();
             let scheme = target.scheme();
-            
-            let resp = if let Some(target_override) = target_override {
-                let mut target_override = target_override.clone();
-                target_override.set_path("/api/v1/auth/login_info");
-                reqwest::blocking::Client::new()
-                    .get(target_override)
-                    .header(reqwest::header::HOST, host)
-                    .send()?
-            } else {
-                reqwest::blocking::get(
-                    format!("{scheme}://{host}/api/v1/auth/login_info")
-                )?
-            };
-            
-            let login_info: forge::AuthConfig = resp.json()?;
-            
-            let token = crate::openid::login_to_provider(provider, &login_info)?;
 
-            forge_config
-                .forges
-                .insert(host.to_owned(), ForgeConnection{
-                    target: target.clone(),
-                    login_token: token,
-                });
+            let login_info = get_oauth_login_info(target_override.clone(), host, scheme).await?;
 
-            if *select {
-                forge_config.selected_forge = Some(host.to_owned());
-            }
+            let token = openid::login_to_provider(provider, &login_info).await?;
 
-            let project_dirs = get_project_dir()?;
-            let config_dir = project_dirs.config_dir();
-            if !config_dir.exists() {
-                std::fs::DirBuilder::new()
-                    .recursive(true)
-                    .create(config_dir)?;
-            }
-            let mut f = File::create(config_dir.join("forge.json"))?;
-            serde_json::to_writer_pretty(&mut f, &forge_config)?;
+            forge_config.insert_forge(host.to_string(), target.clone(), token.into(), *select);
+
+            save_forge_config(&mut forge_config)?;
 
             Ok(())
         }
@@ -343,7 +396,7 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             let component = Component::open_local(path)?;
 
             let gate_id = gate.id.ok_or(Error::GateNoId)?;
-            
+
             let (anitya_id, repology_id) = if let Some(metadata) = &component.recipe.metadata {
                 let mut anytia_id = None;
                 let mut repology_id = None;
@@ -372,9 +425,10 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             };
 
             let request_body = ImportComponentMutation::build_query(vars);
-            let client = reqwest::blocking::Client::new();
-            let res = client.post(forge_url).json(&request_body).send()?;
-            let response_body: Response<import_component_mutation::ResponseData> = res.json()?;
+            let client = reqwest::Client::new();
+            let res = client.post(forge_url).json(&request_body).send().await?;
+            let response_body: Response<import_component_mutation::ResponseData> =
+                res.json().await?;
 
             if let Some(data) = response_body.data {
                 println!(
@@ -417,8 +471,6 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 .ok_or(Error::ComponentIncomplete(String::from("version")))?;
             let revision = component.recipe.revision.unwrap_or(String::from("0"));
 
-            
-
             let response_body: Response<upload_component_file::ResponseData> =
                 if let Some(file) = file {
                     let vars = upload_component_file::Variables {
@@ -432,34 +484,36 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                     };
                     let request_body = UploadComponentFile::build_query(vars);
                     let request_str = serde_json::to_string(&request_body)?;
-                    let client = reqwest::blocking::Client::new();
+                    let client = reqwest::Client::new();
 
                     let file_map = "{ \"0\": [\"variables.file\"] }";
 
-                    let some_file = reqwest::blocking::multipart::Part::file(file)?;
+                    let async_file = tokio::fs::File::open(file).await?;
 
-                    let form = reqwest::blocking::multipart::Form::new()
+                    let some_file = reqwest::multipart::Part::stream(async_file);
+
+                    let form = reqwest::multipart::Form::new()
                         .text("operations", request_str)
                         .text("map", file_map)
                         .part("0", some_file);
 
-                    let res = client.post(forge_url).multipart(form).send()?;
-                    res.json()?
+                    let res = client.post(forge_url).multipart(form).send().await?;
+                    res.json().await?
                 } else {
                     let vars = upload_component_file::Variables {
                         name,
                         version,
                         revision,
                         gate: gate_id,
-                        url: url.clone().map(|u|u.to_string()),
+                        url: url.clone().map(|u| u.to_string()),
                         file: None,
                         kind: kind.into(),
                     };
-                    let client = reqwest::blocking::Client::new();
+                    let client = reqwest::Client::new();
                     let request_body = UploadComponentFile::build_query(vars);
 
-                    let res = client.post(forge_url).json(&request_body).send()?;
-                    res.json()?
+                    let res = client.post(forge_url).json(&request_body).send().await?;
+                    res.json().await?
                 };
 
             if let Some(_) = response_body.data {
@@ -475,4 +529,25 @@ pub fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             Ok(())
         }
     }
+}
+
+pub async fn get_oauth_login_info(
+    target_override: Option<Url>,
+    host: &str,
+    scheme: &str,
+) -> Result<AuthConfig, Error> {
+    let resp = if let Some(target_override) = target_override {
+        let mut target_override = target_override.clone();
+        target_override.set_path("/api/v1/auth/login_info");
+        reqwest::Client::new()
+            .get(target_override)
+            .header(reqwest::header::HOST, host)
+            .send()
+            .await?
+    } else {
+        reqwest::get(format!("{scheme}://{host}/api/v1/auth/login_info")).await?
+    };
+
+    let login_info: AuthConfig = resp.json().await?;
+    Ok(login_info)
 }

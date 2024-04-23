@@ -7,13 +7,13 @@ use crate::args::ComponentArgs;
 mod repology;
 
 #[derive(Debug, ValueEnum, Clone, Default, Display)]
-pub(crate) enum MetadataFormat {
+pub enum MetadataFormat {
     #[default]
     Forge,
     Repology,
 }
 
-pub(crate) fn print_component(args: ComponentArgs, format: MetadataFormat) -> miette::Result<()> {
+pub fn print_component(args: ComponentArgs, format: MetadataFormat) -> miette::Result<()> {
     let component = component::Component::open_local(&args.component)?;
     match format {
         MetadataFormat::Forge => {

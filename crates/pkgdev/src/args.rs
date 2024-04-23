@@ -13,7 +13,7 @@ use crate::modify::{edit_component, EditArgs};
 use crate::sources::download_sources;
 
 #[derive(Debug, Parser)]
-pub(crate) struct Args {
+pub struct Args {
     #[arg(long, global = true)]
     /// Path to the gate kdl file adding gate wide settings to this all components
     gate: Option<PathBuf>,
@@ -22,7 +22,7 @@ pub(crate) struct Args {
 }
 
 #[derive(Debug, Subcommand)]
-pub(crate) enum Commands {
+pub enum Commands {
     #[clap(name = "download")]
     Download {
         #[clap(short, long, default_value = ".")]
@@ -63,20 +63,20 @@ pub(crate) enum Commands {
 }
 
 #[derive(Debug, Parser, Clone)]
-pub(crate) struct ComponentArgs {
+pub struct ComponentArgs {
     #[clap(short, long, default_value = ".")]
     pub component: PathBuf,
 }
 
 #[derive(Debug, Default, Display, Clone, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
-pub(crate) enum GenerateSchemaKind {
+pub enum GenerateSchemaKind {
     #[default]
     ComponentRecipe,
     ForgeIntegrationManifest,
 }
 
-pub(crate) fn run(args: Args) -> miette::Result<()> {
+pub async fn run(args: Args) -> miette::Result<()> {
     let gate = if let Some(gate_path) = args.gate {
         let gate = Gate::new(gate_path)?;
         Some(gate)
@@ -107,9 +107,9 @@ pub(crate) fn run(args: Args) -> miette::Result<()> {
         Commands::Download {
             component,
             target_dir,
-        } => download_sources(component, gate, target_dir),
+        } => download_sources(component, gate, target_dir).await,
         Commands::Create { fmri, args } => create_component(args, fmri),
         Commands::Edit { component, args } => edit_component(component, gate, args),
-        Commands::Forge { args } => Ok(handle_forge_interaction(&args)?),
+        Commands::Forge { args } => Ok(handle_forge_interaction(&args).await?),
     }
 }

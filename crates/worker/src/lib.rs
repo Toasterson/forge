@@ -11,9 +11,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{types::FieldTable, Channel};
-use forge::{build_public_id, ComponentChange, ComponentChangeKind, Event, IdKind, Job, JobReport};
-use forge::JobReportData;
-use forge::JobReportResult;
+use forge::{build_public_id, ComponentChange, ComponentChangeKind, Event, IdKind, Job};
 use forge::{ActivityEnvelope, CommitRef, Scheme};
 use futures::{join, StreamExt};
 use github::GitHubError;
@@ -22,10 +20,12 @@ use itertools::Itertools;
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, remove_dir_all};
+use std::future::IntoFuture;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use thiserror::Error;
+use tokio::net::TcpListener;
 use tracing::trace;
 use tracing::{debug, error, event, info, instrument, Level};
 use url::Url;
@@ -213,9 +213,10 @@ pub async fn listen(cfg: Config) -> Result<()> {
         .with_state(state.clone());
     info!("Listening on {0}", &cfg.listen);
     // run it with hyper on localhost:3000
+    let listener = TcpListener::bind(&cfg.listen).await?;
     let _ = join!(
         rabbitmq_listen(state,),
-        axum::Server::bind(&cfg.listen.parse()?).serve(app.into_make_service()),
+        axum::serve(listener, app.into_make_service()).into_future(),
     );
     Ok(())
 }
@@ -302,22 +303,13 @@ async fn handle_message(
     let worker_actor: Url = build_public_id(IdKind::Actor, base_url, "", "github")?;
     let forge_actor: Url = build_public_id(IdKind::Actor, base_url, "", "forge")?;
     match envelope {
-        Job::GetRecipies{cr_id, cr} => {
+        Job::GetRecipies { cr_id, cr } => {
             info!("getting recipes for change_request {}", cr.id);
-            let build_dir = get_repo_path(
-                worker_dir,
-                &cr.git_url,
-                &cr.head.sha,
-            );
+            let build_dir = get_repo_path(worker_dir, &cr.git_url, &cr.head.sha);
             debug!("cleaning workspace {}", &build_dir.display());
             clean_ws(&build_dir)?;
             debug!("cloning repo {}", &cr.git_url);
-            let manifest = clone_repo(
-                &build_dir,
-                &cr.git_url,
-                &cr.head,
-                None,
-            )?;
+            let manifest = clone_repo(&build_dir, &cr.git_url, &cr.head, None)?;
             let component_list = get_component_list_in_repo(&build_dir, &manifest)?;
             let changed_files = get_changed_files(&build_dir, &cr.base)?;
             let changed_components = get_changed_components(component_list, changed_files);
@@ -332,10 +324,10 @@ async fn handle_message(
                 )?;
                 recipes.push((component, recipe));
             }
-            
+
             let mut updated_cr = cr.clone();
             for (component_ref, recipe) in recipes {
-                let change_definition = ComponentChange{
+                let change_definition = ComponentChange {
                     kind: ComponentChangeKind::Processing,
                     component_ref,
                     recipe,
@@ -343,7 +335,7 @@ async fn handle_message(
                 };
                 updated_cr.changes.push(change_definition);
             }
-            
+
             let envelope = Event::Update(ActivityEnvelope {
                 id: cr_id,
                 actor: worker_actor,

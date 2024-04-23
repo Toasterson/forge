@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use axum::{
     body::Bytes,
     extract::{
-        rejection::{BytesRejection, JsonRejection, TypedHeaderRejection},
-        FromRequest, TypedHeader,
+        rejection::{BytesRejection, JsonRejection},
+        FromRequest,
     },
     http::StatusCode,
     response::IntoResponse,
 };
+use axum_extra::typed_header::{TypedHeader, TypedHeaderRejection, TypedHeaderRejectionReason};
 use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
@@ -19,7 +20,8 @@ use headers::Signature;
 use crate::headers::Event;
 
 pub mod headers {
-    use axum::{headers::Header, http::HeaderName};
+    use axum::http::HeaderName;
+    use axum_extra::headers::Header;
     use strum::{Display, EnumString};
 
     pub static SIGNATURE: HeaderName = HeaderName::from_static("x-hub-signature-256");
@@ -33,16 +35,18 @@ pub mod headers {
             &SIGNATURE
         }
 
-        fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
+        fn decode<'i, I>(values: &mut I) -> Result<Self, axum_extra::headers::Error>
         where
             Self: Sized,
             I: Iterator<Item = &'i axum::http::HeaderValue>,
         {
-            let value = values.next().ok_or_else(axum::headers::Error::invalid)?;
+            let value = values
+                .next()
+                .ok_or_else(axum_extra::headers::Error::invalid)?;
             Ok(Signature(
                 value
                     .to_str()
-                    .map_err(|_| axum::headers::Error::invalid())?
+                    .map_err(|_| axum_extra::headers::Error::invalid())?
                     .to_string(),
             ))
         }
@@ -68,20 +72,22 @@ pub mod headers {
             &EVENT
         }
 
-        fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
+        fn decode<'i, I>(values: &mut I) -> Result<Self, axum_extra::headers::Error>
         where
             Self: Sized,
             I: Iterator<Item = &'i axum::http::HeaderValue>,
         {
-            let value = values.next().ok_or_else(axum::headers::Error::invalid)?;
+            let value = values
+                .next()
+                .ok_or_else(axum_extra::headers::Error::invalid)?;
             match value
                 .to_str()
-                .map_err(|_| axum::headers::Error::invalid())?
+                .map_err(|_| axum_extra::headers::Error::invalid())?
             {
                 "push" => Ok(Self::Push),
                 "ping" => Ok(Self::Ping),
                 "pull_request" => Ok(Self::PullRequest),
-                _ => Err(axum::headers::Error::invalid()),
+                _ => Err(axum_extra::headers::Error::invalid()),
             }
         }
 
@@ -175,10 +181,8 @@ impl From<TypedHeaderRejection> for GitHubError {
         Self::TypedHeaderRejection {
             name: value.name().to_string(),
             reason: match value.reason() {
-                axum::extract::rejection::TypedHeaderRejectionReason::Missing => {
-                    String::from("missing header")
-                }
-                axum::extract::rejection::TypedHeaderRejectionReason::Error(err) => err.to_string(),
+                TypedHeaderRejectionReason::Missing => String::from("missing header"),
+                TypedHeaderRejectionReason::Error(err) => err.to_string(),
                 _ => todo!(),
             },
         }

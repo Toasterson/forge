@@ -1,11 +1,11 @@
 mod auth;
+mod component;
 mod gate;
 mod publisher;
-mod component;
 
+use crate::SharedState;
 use axum::Router;
 use serde::Deserialize;
-use crate::SharedState;
 
 pub fn get_v1_router() -> Router<SharedState> {
     Router::new()

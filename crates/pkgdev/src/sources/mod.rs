@@ -20,7 +20,7 @@ pub struct HashMismatchError {
     actual: String,
 }
 
-pub(crate) fn download_sources<P: AsRef<Path>>(
+pub async fn download_sources<P: AsRef<Path>>(
     component: P,
     _gate: Option<Gate>,
     target_dir: P,
@@ -33,7 +33,7 @@ pub(crate) fn download_sources<P: AsRef<Path>>(
         for src in source.sources {
             if let SourceNode::Archive(ar) = src {
                 println!("Downloading archive: {}", &ar.src);
-                match download_archive(&wks, &ar) {
+                match download_archive(&wks, &ar).await {
                     Ok(_) => println!("Download finished"),
                     Err(err) => println!("{}\nwill continue with other downloads", err),
                 }
@@ -46,8 +46,8 @@ pub(crate) fn download_sources<P: AsRef<Path>>(
     Ok(())
 }
 
-fn download_archive(wks: &Workspace, archive: &ArchiveSource) -> miette::Result<()> {
-    let response = reqwest::blocking::get(&archive.src).into_diagnostic()?;
+async fn download_archive(wks: &Workspace, archive: &ArchiveSource) -> miette::Result<()> {
+    let response = reqwest::get(&archive.src).await.into_diagnostic()?;
     let (hash, hasher_kind) = if let Some(sha256) = &archive.sha256 {
         Ok((sha256.clone(), HasherKind::Sha256))
     } else if let Some(sha512) = &archive.sha512 {
@@ -60,7 +60,7 @@ fn download_archive(wks: &Workspace, archive: &ArchiveSource) -> miette::Result<
 
     let mut dest =
         wks.open_or_truncate_local_file(&archive.src.parse().into_diagnostic()?, hasher_kind)?;
-    let mut content = Cursor::new(response.bytes().into_diagnostic()?);
+    let mut content = Cursor::new(response.bytes().await.into_diagnostic()?);
     copy(&mut content, &mut dest).into_diagnostic()?;
     let computed_hash = dest.get_hash();
     if hash != computed_hash {

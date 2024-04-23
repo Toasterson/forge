@@ -1,13 +1,12 @@
-use axum::extract::{Host, State};
-use axum::{Json, Router};
-use axum::routing::get;
-use serde::{Deserialize, Serialize};
-use crate::{Error, prisma, SharedState};
 use crate::Result;
+use crate::{prisma, Error, SharedState};
+use axum::extract::{Host, State};
+use axum::routing::get;
+use axum::{Json, Router};
+use serde::{Deserialize, Serialize};
 
 pub fn get_router() -> Router<SharedState> {
-    Router::new()
-        .route("/login_info", get(login_info))
+    Router::new().route("/login_info", get(login_info))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -22,11 +21,14 @@ pub enum OauthProvider {
 }
 
 async fn login_info(
-    State(state): State<SharedState>, 
+    State(state): State<SharedState>,
     Host(host): Host,
 ) -> Result<Json<forge::AuthConfig>> {
-    
-    let domain = state.lock().await.prisma.domain()
+    let domain = state
+        .lock()
+        .await
+        .prisma
+        .domain()
         .find_unique(prisma::domain::UniqueWhereParam::DnsNameEquals(host))
         .exec()
         .await?;

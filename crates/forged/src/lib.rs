@@ -1,6 +1,7 @@
+use axum::extract::multipart::MultipartError;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse};
+use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
 use clap::Parser;
@@ -10,6 +11,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::types::FieldTable;
 use deadpool_lapin::Pool;
+use forge::FileKindError;
 use futures::{join, StreamExt};
 use message_queue::handle_message;
 use miette::Diagnostic;
@@ -17,16 +19,16 @@ use opendal::Operator;
 use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use axum::extract::multipart::MultipartError;
 use thiserror::Error;
+use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
-use forge::FileKindError;
+use std::future::IntoFuture;
 
+mod api;
 mod message_queue;
 #[allow(warnings, unused)]
 mod prisma;
-mod api;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -76,7 +78,7 @@ pub enum Error {
 
     #[error("no project URL found in component with name: {0}")]
     NoProjectUrlFoundInRecipe(String),
-    
+
     #[error(transparent)]
     MultipartError(#[from] MultipartError),
 
@@ -91,7 +93,7 @@ pub enum Error {
 
     #[error("entity not found {0}")]
     NotFound(String),
-    
+
     #[error("neither url nor file provided in upload")]
     NoFileOrUrl,
 
@@ -100,13 +102,13 @@ pub enum Error {
 
     #[error("invalid multipart request ")]
     InvalidMultipartRequest,
-    
+
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
-    
+
     #[error(transparent)]
     IOError(#[from] std::io::Error),
-    
+
     #[error(transparent)]
     #[diagnostic(transparent)]
     FileKindError(#[from] FileKindError),
@@ -273,6 +275,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
         .with_state(state);
     info!("Listening on {0}", &cfg.listen);
     // run it with hyper on localhost:3100
+    let listener = TcpListener::bind(&cfg.listen).await?;
     let _ = join!(
         rabbitmq_listen(
             amqp_consume_pool,
@@ -280,7 +283,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
             inbox.as_str(),
             job_inbox.as_str()
         ),
-        axum::Server::bind(&cfg.listen.parse()?).serve(app.into_make_service()),
+        axum::serve(listener, app.into_make_service()).into_future(),
     );
     Ok(())
 }

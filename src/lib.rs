@@ -1,6 +1,6 @@
+use miette::Diagnostic;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use miette::Diagnostic;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -26,11 +26,17 @@ pub enum IdKind {
     Actor,
     ChangeRequest,
 }
-pub fn build_public_id(kind: IdKind, base_url: &Url, parent: &str, id: &str) -> Result<Url, ParseError> {
+pub fn build_public_id(
+    kind: IdKind,
+    base_url: &Url,
+    parent: &str,
+    id: &str,
+) -> Result<Url, ParseError> {
     match kind {
         IdKind::Actor => format!("{}/actors/{}", base_url, id),
         IdKind::ChangeRequest => format!("{}/objects/changeRequests/{}/{}", base_url, parent, id),
-    }.parse()
+    }
+    .parse()
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -43,7 +49,7 @@ pub enum ComponentFileKind {
 #[derive(Error, Debug, Diagnostic)]
 pub enum FileKindError {
     #[error("file kind not known use patch, archive or script")]
-    NotKnown
+    NotKnown,
 }
 impl FromStr for ComponentFileKind {
     type Err = FileKindError;
@@ -83,7 +89,14 @@ impl Display for ComponentFile {
             ComponentFileKind::Script => "script",
             ComponentFileKind::Archive => "archive",
         };
-        write!(f, "{}:{}:{}:{}", kind_str, self.component.replace("/", "_"), self.name.replace("/", "_"), self.hash)
+        write!(
+            f,
+            "{}:{}:{}:{}",
+            kind_str,
+            self.component.replace("/", "_"),
+            self.name.replace("/", "_"),
+            self.hash
+        )
     }
 }
 
@@ -137,11 +150,8 @@ pub struct ActivityEnvelope {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ActivityObject {
     ChangeRequest(ChangeRequest),
-    Component{
-        component: Component,
-        gate: String,
-    },
-    Gate(Gate)
+    Component { component: Component, gate: String },
+    Gate(Gate),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -241,8 +251,5 @@ pub enum ComponentChangeKind {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Job {
-    GetRecipies{
-        cr_id: Url,
-        cr: ChangeRequest
-    },
+    GetRecipies { cr_id: Url, cr: ChangeRequest },
 }

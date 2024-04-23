@@ -11,7 +11,7 @@ use component::{
 use gate::Gate;
 
 #[derive(Debug, Subcommand)]
-pub(crate) enum EditArgs {
+pub enum EditArgs {
     Add {
         #[clap(subcommand)]
         args: AddArgs,
@@ -23,7 +23,7 @@ pub(crate) enum EditArgs {
 }
 
 #[derive(Debug, Subcommand)]
-pub(crate) enum SetArgs {
+pub enum SetArgs {
     ProjectName {
         arg: String,
     },
@@ -64,7 +64,7 @@ struct DummyCommandArgs {
 }
 
 #[derive(Debug, Subcommand, Clone)]
-pub(crate) enum AddArgs {
+pub enum AddArgs {
     Dependency {
         #[clap(long)]
         dev: bool,
@@ -85,7 +85,7 @@ pub(crate) enum AddArgs {
 }
 
 #[derive(Debug, Clone, Subcommand)]
-pub(crate) enum SourceKind {
+pub enum SourceKind {
     Archive {
         source_url: url::Url,
         source_hash: String,
@@ -98,7 +98,7 @@ pub(crate) enum SourceKind {
 }
 
 #[derive(Debug, Clone, ValueEnum, Default)]
-pub(crate) enum BuildKind {
+pub enum BuildKind {
     Configure,
     Script,
     Cmake,
@@ -107,7 +107,7 @@ pub(crate) enum BuildKind {
     None,
 }
 
-pub(crate) fn edit_component(
+pub fn edit_component(
     component_path: PathBuf,
     gate: Option<Gate>,
     args: EditArgs,

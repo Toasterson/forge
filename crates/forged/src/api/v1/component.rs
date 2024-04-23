@@ -1,13 +1,13 @@
-use axum::extract::{DefaultBodyLimit, Path, State};
-use axum::{Json, Router};
+use crate::{prisma, Error, Result, SharedState};
 use axum::body::Bytes;
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::routing::post;
+use axum::{Json, Router};
+use component::{PackageMeta, Recipe};
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
 use tracing::trace;
 use url::Url;
-use component::{PackageMeta, Recipe};
-use crate::{prisma, SharedState, Result, Error};
 
 pub fn get_router() -> Router<SharedState> {
     Router::new()
@@ -36,7 +36,7 @@ pub struct Component {
     pub project_url: String,
     pub gate_id: String,
     pub recipe: Recipe,
-    pub packages: PackageMeta
+    pub packages: PackageMeta,
 }
 
 pub fn component_from_database(component: prisma::component::Data) -> Result<Component> {
@@ -58,11 +58,17 @@ async fn get_component(
     State(state): State<SharedState>,
     Json(request): Json<GetComponentRequest>,
 ) -> Result<Json<Component>> {
-    let component = state.lock().await.prisma
+    let component = state
+        .lock()
+        .await
+        .prisma
         .component()
         .find_unique(
             prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
-                request.name, request.version, request.revision, request.gate_id,
+                request.name,
+                request.version,
+                request.revision,
+                request.gate_id,
             ),
         )
         .exec()
@@ -100,7 +106,14 @@ async fn list_components(
         filter.push(prisma::component::gate_id::equals(gate_id))
     }
 
-    let components = state.lock().await.prisma.component().find_many(filter).exec().await?;
+    let components = state
+        .lock()
+        .await
+        .prisma
+        .component()
+        .find_many(filter)
+        .exec()
+        .await?;
 
     let components = components
         .into_iter()
@@ -134,32 +147,33 @@ async fn create_component(
     let encoded_recipe = serde_json::to_value(&request.recipe)?;
     let encoded_package_meta = serde_json::to_value(&request.packages)?;
 
-    let component =
-        state.lock().await.prisma.component()
-            .create(
-                request.recipe.name.clone(),
-                request
-                    .recipe
-                    .version
-                    .clone()
-                    .ok_or(Error::NoVersionFoundInRecipe(
-                        request.recipe.name.clone(),
-                    ))?,
-                request
-                    .recipe
-                    .revision
-                    .clone()
-                    .unwrap_or(String::from("0")),
-                request.recipe.project_url.clone().ok_or(
-                    Error::NoProjectUrlFoundInRecipe(request.recipe.name.clone()),
-                )?,
-                prisma::gate::UniqueWhereParam::IdEquals(request.gate),
-                encoded_recipe,
-                encoded_package_meta,
-                vec![],
-            )
-            .exec()
-            .await?;
+    let component = state
+        .lock()
+        .await
+        .prisma
+        .component()
+        .create(
+            request.recipe.name.clone(),
+            request
+                .recipe
+                .version
+                .clone()
+                .ok_or(Error::NoVersionFoundInRecipe(request.recipe.name.clone()))?,
+            request.recipe.revision.clone().unwrap_or(String::from("0")),
+            request
+                .recipe
+                .project_url
+                .clone()
+                .ok_or(Error::NoProjectUrlFoundInRecipe(
+                    request.recipe.name.clone(),
+                ))?,
+            prisma::gate::UniqueWhereParam::IdEquals(request.gate),
+            encoded_recipe,
+            encoded_package_meta,
+            vec![],
+        )
+        .exec()
+        .await?;
 
     Ok(Json(component_from_database(component)?))
 }
@@ -177,14 +191,8 @@ async fn import_component(
             .recipe
             .version
             .clone()
-            .ok_or(Error::NoVersionFoundInRecipe(
-                request.recipe.name.clone(),
-            ))?,
-        request
-            .recipe
-            .revision
-            .clone()
-            .unwrap_or(String::from("0")),
+            .ok_or(Error::NoVersionFoundInRecipe(request.recipe.name.clone()))?,
+        request.recipe.revision.clone().unwrap_or(String::from("0")),
         request.gate,
     );
 
@@ -220,7 +228,10 @@ async fn import_component(
         )));
     }
 
-    let component = state.lock().await.prisma
+    let component = state
+        .lock()
+        .await
+        .prisma
         .component()
         .upsert(
             prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
@@ -250,7 +261,7 @@ async fn import_component(
 async fn upload_to_component(
     State(state): State<SharedState>,
     Path(kind): Path<String>,
-    mut multipart: axum::extract::Multipart
+    mut multipart: axum::extract::Multipart,
 ) -> Result<()> {
     let component_ident: ComponentIdentifier = if let Some(field) = multipart.next_field().await? {
         let buf = field.bytes().await?.to_vec();
@@ -258,7 +269,7 @@ async fn upload_to_component(
     } else {
         return Err(Error::InvalidMultipartRequest);
     };
-    
+
     let mut files: Vec<(String, Bytes)> = vec![];
     let mut urls: Vec<String> = vec![];
 
@@ -269,11 +280,17 @@ async fn upload_to_component(
             urls.push(field.text().await?);
         }
     }
-    
-    trace!("processing file upload for component {}", &component_ident.name);
+
+    trace!(
+        "processing file upload for component {}",
+        &component_ident.name
+    );
 
     trace!("fetching component from database");
-    let component = state.lock().await.prisma
+    let component = state
+        .lock()
+        .await
+        .prisma
         .component()
         .find_unique(
             prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
@@ -290,7 +307,9 @@ async fn upload_to_component(
     trace!("component found proceeding with upload");
     for url in urls {
         let url: Url = url.parse()?;
-        let filename = url.to_file_path().map_err(|_| Error::InvalidMultipartRequest)?;
+        let filename = url
+            .to_file_path()
+            .map_err(|_| Error::InvalidMultipartRequest)?;
         let filename = filename
             .file_name()
             .ok_or(Error::String(String::from("no filename")))?
@@ -306,7 +325,13 @@ async fn upload_to_component(
 
         trace!("starting download of {} to {}", &url, &tmp_name);
 
-        let mut writer = state.lock().await.fs_operator.writer_with(&tmp_name).buffer(8 * 1024 * 1024).await?;
+        let mut writer = state
+            .lock()
+            .await
+            .fs_operator
+            .writer_with(&tmp_name)
+            .buffer(8 * 1024 * 1024)
+            .await?;
         let response = reqwest::get(url).await?;
         let content = response.bytes().await?;
         tokio::io::copy(&mut content.to_vec().as_slice(), &mut writer).await?;
@@ -323,15 +348,29 @@ async fn upload_to_component(
             hash: result,
         };
 
-        trace!("placing file on the final location {}", &final_name.to_string());
+        trace!(
+            "placing file on the final location {}",
+            &final_name.to_string()
+        );
         // Only copy the file to the final destination if none exists there already
-        if !state.lock().await.fs_operator.is_exist(&filename.to_string()).await? {
-            state.lock().await.fs_operator.copy(&tmp_name, &final_name.to_string()).await?;
+        if !state
+            .lock()
+            .await
+            .fs_operator
+            .is_exist(&filename.to_string())
+            .await?
+        {
+            state
+                .lock()
+                .await
+                .fs_operator
+                .copy(&tmp_name, &final_name.to_string())
+                .await?;
         }
 
         state.lock().await.fs_operator.delete(&tmp_name).await?;
     }
-    
+
     for file in files {
         let tmp_name = format!(
             "trans/{}:{}:{}",
@@ -342,7 +381,13 @@ async fn upload_to_component(
 
         trace!("starting upload of file to {}", &tmp_name);
 
-        let mut writer = state.lock().await.fs_operator.writer_with(&tmp_name).buffer(8 * 1024 * 1024).await?;
+        let mut writer = state
+            .lock()
+            .await
+            .fs_operator
+            .writer_with(&tmp_name)
+            .buffer(8 * 1024 * 1024)
+            .await?;
         let filename = file.0;
         tokio::io::copy(&mut file.1.to_vec().as_slice(), &mut writer).await?;
         writer.close().await?;
@@ -358,15 +403,28 @@ async fn upload_to_component(
             hash: result,
         };
 
-        trace!("placing file on the final location {}", &final_name.to_string());
+        trace!(
+            "placing file on the final location {}",
+            &final_name.to_string()
+        );
         // Only copy the file to the final destination if none exists there already
-        if !state.lock().await.fs_operator.is_exist(&final_name.to_string()).await? {
-            state.lock().await.fs_operator.copy(&tmp_name, &final_name.to_string()).await?;
+        if !state
+            .lock()
+            .await
+            .fs_operator
+            .is_exist(&final_name.to_string())
+            .await?
+        {
+            state
+                .lock()
+                .await
+                .fs_operator
+                .copy(&tmp_name, &final_name.to_string())
+                .await?;
         }
 
         state.lock().await.fs_operator.delete(&tmp_name).await?;
-        
     }
-    
+
     Ok(())
 }
