@@ -2,7 +2,7 @@ mod auth;
 mod component;
 mod gate;
 mod publisher;
-mod actor;
+pub mod actor;
 
 use crate::SharedState;
 use axum::Router;

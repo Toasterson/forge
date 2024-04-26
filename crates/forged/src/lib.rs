@@ -24,6 +24,10 @@ use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 use std::future::IntoFuture;
+use utoipa::{openapi::security::{ApiKey, ApiKeyValue, SecurityScheme}, Modify, OpenApi, ToSchema};
+use utoipa_rapidoc::RapiDoc;
+use utoipa_redoc::{Redoc, Servable};
+use utoipa_swagger_ui::SwaggerUi;
 
 mod api;
 mod message_queue;
@@ -103,6 +107,9 @@ pub enum Error {
     #[error("invalid multipart request ")]
     InvalidMultipartRequest,
 
+    #[error("unauthorized")]
+    Unauthorized,
+
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
 
@@ -128,10 +135,41 @@ pub enum Error {
 
 pub type Result<T> = miette::Result<T, Error>;
 
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub enum ApiError {
+    // Bad input Request
+    BadRequest(String),
+    // Not Authorized
+    Unauthorized,
+    // Entity not found
+    NotFound(String),
+    // Internal server error
+    ServerError(String),
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
         match self {
-            err => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+            Error::NoRevisionFoundInRecipe(msg) => (StatusCode::BAD_REQUEST, Json(ApiError::BadRequest(msg))).into_response(),
+            Error::NoProjectUrlFoundInRecipe(msg) => (StatusCode::BAD_REQUEST, Json(ApiError::BadRequest(msg))).into_response(),
+            Error::NoDomainFound => (StatusCode::NOT_FOUND, Json(ApiError::NotFound("no domain found".to_string()))).into_response(),
+            Error::NoComponentFound => (StatusCode::NOT_FOUND, Json(ApiError::NotFound("no component found".to_string()))).into_response(),
+            Error::NoIdFoundINGate(msg) => (StatusCode::NOT_FOUND, Json(ApiError::NotFound(msg))).into_response(),
+            Error::NotFound(msg) => (StatusCode::NOT_FOUND, Json(ApiError::NotFound(msg))).into_response(),
+            err => (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiError::ServerError(err.to_string()))).into_response(),
+        }
+    }
+}
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "api_key",
+                SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("apikey"))),
+            )
         }
     }
 }
@@ -143,7 +181,6 @@ pub struct Config {
     pub job_inbox: String,
     pub inbox: String,
     pub connection_string: String,
-    pub graphql: GraphQLConfig,
     pub opendal: OpenDalConfig,
 }
 
@@ -154,15 +191,6 @@ pub struct OpenDalConfig {
     pub bucket: String,
     pub key_id: String,
     pub secret_key: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct GraphQLConfig {
-    pub depth_limit: usize,
-    pub complexity_limit: usize,
-    pub use_ssl: bool,
-    pub domain: String,
-    pub port: u16,
 }
 
 pub fn load_config(args: Args) -> Result<Config> {
@@ -177,11 +205,6 @@ pub fn load_config(args: Args) -> Result<Config> {
         .set_default("listen", "0.0.0.0:3100")?
         .set_default("job_inbox", "JOB_INBOX")?
         .set_default("inbox", "INBOX")?
-        .set_default("graphql.depth_limit", 10)?
-        .set_default("graphql.complexity_limit", 1000)?
-        .set_default("graphql.use_ssl", false)?
-        .set_default("graphql.domain", "localhost")?
-        .set_default("graphql.port", 3100)?
         .set_default("opendal.endpoint", "http://localhost:9000")?
         .set_default("opendal.bucket", "forge")?
         .set_default("opendal.service", "s3")?
@@ -197,6 +220,21 @@ pub fn load_config(args: Args) -> Result<Config> {
     Ok(cfg.try_deserialize()?)
 }
 
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        api::v1::actor::actor_connect,
+    ),
+    components(
+      schemas(api::v1::actor::ActorConnectRequest, api::v1::actor::ActorSSHKeyFingerprint, api::v1::actor::ActorConnectResponse, ApiError)
+    ),
+    modifiers(&SecurityAddon),
+    tags(
+        (name = "forge", description = "Forge your packages")
+    )
+)]
+struct ApiDoc;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 struct AppState {
@@ -204,7 +242,6 @@ struct AppState {
     job_inbox: String,
     inbox: String,
     prisma: PrismaClient,
-    graphql: GraphQLConfig,
     fs_operator: Operator,
 }
 
@@ -234,7 +271,6 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     debug!("Opening RabbitMQ Connection");
     let state = Arc::new(Mutex::new(AppState {
-        graphql: cfg.graphql.clone(),
         amqp: cfg
             .amqp
             .create_pool(Some(deadpool_lapin::Runtime::Tokio1))?,
@@ -282,6 +318,9 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     let amqp_consume_pool = state.lock().await.amqp.clone();
     let app = Router::new()
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .merge(Redoc::with_url("/redoc", ApiDoc::openapi()))
+        .merge(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
         .route("/healthz", get(health_check))
         .nest("/api", api::get_api_router())
         .with_state(state);

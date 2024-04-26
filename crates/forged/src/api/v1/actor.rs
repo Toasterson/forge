@@ -6,8 +6,8 @@ use axum::routing::post;
 use chrono::TimeDelta;
 use octorust::auth::Credentials;
 use rusty_paseto::prelude::*;
-
-use forge::{ActorConnectRequest, ActorConnectResponse, ActorSSHKeyFingerprint};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{Error, prisma, Result, SharedState};
 use crate::prisma::KeyType;
@@ -22,6 +22,46 @@ pub fn get_router() -> Router<SharedState> {
     Router::new().route("/connect", post(actor_connect))
 }
 
+
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+pub enum ActorConnectRequest {
+    GitHub {
+        handle: String,
+        token: String,
+        display_name: Option<String>,
+    },
+    GitLab {
+        handle: String,
+        token: String,
+        display_name: Option<String>,
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+pub struct ActorConnectResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub ssh_keys: Vec<ActorSSHKeyFingerprint>,
+    pub handle: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+pub enum ActorSSHKeyFingerprint {
+    Ed25519(String),
+    Rsa(String),
+    ECDSA(String),
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/actors/connect",
+    request_body = ActorConnectRequest,
+    responses (
+        (status = 200, description = "Actor successfully connected to the Oauth Provider", body = ActorConnectResponse),
+        (status = 401, description = "Unauthorized to delete Todo", body = ApiError, example = json!(crate::ApiError::Unauthorized)),
+        (status = 404, description = "Todo not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn actor_connect(
     State(state): State<SharedState>,
     Host(host): Host,
