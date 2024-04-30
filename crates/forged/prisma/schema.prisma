@@ -12,11 +12,12 @@ generator client {
 }
 
 model Domain {
-  id       String  @id @default(uuid()) @db.Uuid
-  dnsName  String  @unique
-  authconf Json    @db.JsonB
-  key      Bytes
-  actors   Actor[] @relation("Members")
+  id          String  @id @default(uuid()) @db.Uuid
+  dnsName     String  @unique
+  authconf    Json    @db.JsonB
+  private_key String
+  public_key  String
+  actors      Actor[] @relation("Members")
 }
 
 model Actor {

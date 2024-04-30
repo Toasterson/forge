@@ -1,13 +1,9 @@
-use crate::Result;
-use crate::{prisma, Error, SharedState};
 use axum::extract::{Host, State};
-use axum::routing::get;
-use axum::{Json, Router};
+use axum::Json;
 use serde::{Deserialize, Serialize};
 
-pub fn get_router() -> Router<SharedState> {
-    Router::new().route("/login_info", get(login_info))
-}
+use crate::{Error, prisma, SharedState};
+use crate::Result;
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -20,7 +16,7 @@ pub enum OauthProvider {
     Gitlab,
 }
 
-async fn login_info(
+pub async fn login_info(
     State(state): State<SharedState>,
     Host(host): Host,
 ) -> Result<Json<forge::AuthConfig>> {

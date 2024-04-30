@@ -1,8 +1,8 @@
-mod auth;
+pub mod actor;
+pub mod auth;
 mod component;
 mod gate;
 mod publisher;
-pub mod actor;
 
 use crate::SharedState;
 use axum::Router;
@@ -14,7 +14,6 @@ pub fn get_v1_router() -> Router<SharedState> {
         .nest("/components", component::get_router())
         .nest("/publishers", publisher::get_router())
         .nest("/gates", gate::get_router())
-        .nest("/auth", auth::get_router())
 }
 
 #[derive(Deserialize, Debug)]

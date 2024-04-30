@@ -35,11 +35,13 @@ reqwest = { version = "0.12.4", features = ["blocking"] }
 twox-hash = "1.6.3"
 sha3 = "0.10.8"
 hex = "0.4.3"
-rusty_paseto.workspace = true
 octorust = "0.7.0"
 chrono = "0.4.38"
 openssh-keys = "0.6.2"
 utoipa.workspace = true
+pasetors.workspace = true
 utoipa-rapidoc = { version = "3.0.0", features = ["axum"] }
 utoipa-redoc = { version = "3.0.0", features = ["axum"] }
 utoipa-swagger-ui = { version = "6.0.0", features = ["axum"] }
+pkcs8 = { version = "0.10.2", features = ["std", "pem"] }
+axum-extra = { version = "0.9.3", features = ["typed-header"] }

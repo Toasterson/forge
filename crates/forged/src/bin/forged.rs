@@ -16,8 +16,22 @@ async fn main() -> miette::Result<()> {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    let cfg = load_config(args)?;
-    listen(cfg).await?;
+    let cfg = load_config(&args)?;
+    match &args.command {
+        Commands::Start => {
+            listen(cfg).await?;
+        }
+        Commands::GenDomain {
+            name, gh_client_id, ..
+        } => {
+            gen_domain(cfg, name.clone(), gh_client_id.clone()).await?;
+        }
+        Commands::SetDomain {
+            name, gh_client_id, ..
+        } => {
+            set_domain(cfg, name.clone(), gh_client_id.clone()).await?;
+        }
+    }
 
     Ok(())
 }

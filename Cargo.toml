@@ -44,5 +44,5 @@ component = { version = "*", path = "crates/component" }
 integration = { version = "0.1.0", path = "crates/integration" }
 repology = { version = "*", path = "crates/repology" }
 gate = { version = "*", path = "crates/gate" }
-rusty_paseto = { version = "0.6.1", features = ["batteries_included", "v4_public"] }
 utoipa = { version = "4.2.0", features = ["axum_extras", "serde_yaml", "uuid", "chrono"] }
+pasetors = { version = "0.6.8", features = ["serde"] }
