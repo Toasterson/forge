@@ -16,7 +16,7 @@ serde_json.workspace = true
 url.workspace = true
 clap = { workspace = true, features = ["derive"] }
 strum.workspace = true
-reqwest = { version = "0.12.4", features = ["rustls-tls", "json", "multipart", "stream"], default-features = false }
+reqwest = { version = "0.11", features = ["rustls-tls", "json", "multipart", "stream"], default-features = false }
 workspace = { version = "*", path = "../workspace" }
 repology.workspace = true
 semver = { version = "1.0.22", features = ["serde"] }
@@ -30,3 +30,8 @@ tokio.workspace = true
 octocrab = "0.38.0"
 secrecy = { version = "0.8.0", features = ["serde"] }
 either = "1.11.0"
+progenitor = "0.6.0"
+futures.workspace = true
+uuid = { version = "1.8.0", features = ["serde", "v4"] }
+regress = "0.9.1"
+schemars = { version = "0.8.17", features = ["uuid", "url"] }

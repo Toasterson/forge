@@ -60,8 +60,7 @@ pub enum ActorSSHKeyFingerprint {
     request_body = ActorConnectRequest,
     responses (
         (status = 200, description = "Actor successfully connected to the Oauth Provider", body = ActorConnectResponse),
-        (status = 401, description = "Unauthorized to delete Todo", body = ApiError, example = json!(crate::ApiError::Unauthorized)),
-        (status = 404, description = "Todo not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+        (status = 404, description = "Actor not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
     )
 )]
 pub async fn actor_connect(

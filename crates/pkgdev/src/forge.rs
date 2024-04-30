@@ -1,3 +1,4 @@
+use crate::forge::api::{types, Client};
 use crate::openid::OAuthConfig;
 use crate::{get_project_dir, openid};
 use clap::{Subcommand, ValueEnum};
@@ -6,12 +7,23 @@ use forge::AuthConfig;
 use gate::{Gate, GateError};
 use graphql_client::{GraphQLQuery, Response};
 use miette::Diagnostic;
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
 use thiserror::Error;
 use url::{ParseError, Url};
+
+mod api {
+    use progenitor::generate_api;
+    generate_api!(
+        spec = "spec/forged.spec.json",
+        interface = Builder,
+        tags = Separate,
+        derives = [schemars::JsonSchema],
+    );
+}
 
 #[derive(Debug, Subcommand)]
 pub enum ForgeArgs {
@@ -24,6 +36,9 @@ pub enum ForgeArgs {
         /// Useful for debugging. Do not contact forge at target but set the target as header and contact this Url instead.
         #[arg(long, hide(true))]
         target_override: Option<Url>,
+        handle: String,
+        #[arg(short, long)]
+        display_name: Option<String>,
     },
     DefineGate {
         #[arg(short, long)]
@@ -121,6 +136,9 @@ pub enum Error {
 
     #[error("login aborted")]
     LoginAborted,
+
+    #[error(transparent)]
+    Progenitor(#[from] progenitor::progenitor_client::Error<types::ApiError>),
 }
 
 pub type Result<T, E = Error> = miette::Result<T, E>;
@@ -181,19 +199,19 @@ impl ForgeConfig {
         }
     }
 
-    pub fn get_selected(&self) -> Option<Url> {
+    pub fn get_selected(&self) -> Option<Client> {
         if self.forges.len() == 0 {
             None
         } else {
             if let Some(idx) = &self.selected_forge {
-                self.forges.get(idx).map(|u| u.target.clone())
+                self.forges.get(idx).map(|u| Client::new(u.target.as_str()))
             } else {
                 self.forges
                     .clone()
                     .into_iter()
                     .collect::<Vec<(String, ForgeConnection)>>()
                     .first()
-                    .map(|(_, u)| u.target.clone())
+                    .map(|(_, u)| Client::new(u.target.as_str()))
             }
         }
     }
@@ -278,8 +296,9 @@ pub struct ImportComponentMutation;
 pub struct UploadComponentFile;
 
 pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
+    use api::prelude::*;
     let mut forge_config = get_forge_config()?;
-    let forge_url = forge_config.get_selected();
+    let forge_client = forge_config.get_selected();
 
     match args {
         ForgeArgs::DefineGate {
@@ -289,10 +308,10 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             branch,
             publisher,
         } => {
-            if forge_url.is_none() {
+            if forge_client.is_none() {
                 return Err(Error::NoForgeConnected);
             }
-            let forge_url = forge_url.unwrap();
+            let forge_client = forge_client.unwrap();
             let gate: Option<Gate> = if let Some(file) = file {
                 if file.exists() {
                     Some(Gate::new(file)?)
@@ -320,45 +339,29 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                         gate.version,
                         gate.branch,
                         gate.publisher,
-                        Some(gate.default_transforms),
+                        Some(gate.default_transforms
+                            .iter()
+                            .map(|t| t.to_string())
+                            .collect::<Vec<String>>()),
                     )
                 } else {
                     // All other cases are user error
                     return Err(Error::MissingParameter(String::from("name")));
                 };
 
-            let variables: define_gate_mutation::Variables = define_gate_mutation::Variables {
-                name,
-                version,
-                branch,
-                publisher,
-                transforms: transforms
-                    .unwrap_or(vec![])
-                    .into_iter()
-                    .map(|t| t.to_string())
-                    .collect(),
-            };
+            forge_client
+                .create_gate()
+                .body(types::CreateGateInput {
+                    name,
+                    version,
+                    branch,
+                    publisher,
+                    transforms,
+                })
+                .send()
+                .await?;
 
-            let request_body = DefineGateMutation::build_query(variables);
-            let client = reqwest::Client::new();
-            let res = client.post(forge_url).json(&request_body).send().await?;
-            let response_body: Response<define_gate_mutation::ResponseData> = res.json().await?;
-            if let Some(data) = response_body.data {
-                let mut gate = Gate::empty(file.clone().unwrap_or(PathBuf::from("./gate.kdl")))?;
-                gate.id = Some(data.create_gate.id);
-                gate.name = data.create_gate.name;
-                gate.version = data.create_gate.version;
-                gate.branch = data.create_gate.branch;
-                gate.publisher = data.create_gate.publisher;
-                //gate.default_transforms = data.create_gate.transforms.iter().map(|s| s.clone().into()).collect();
-                gate.save()?;
-            } else {
-                let errors = response_body.errors.unwrap();
-                for error in errors {
-                    println!("the server returned errors");
-                    println!("{}", error);
-                }
-            }
+            //TODO Send gate request
             Ok(())
         }
         ForgeArgs::Connect {
@@ -366,6 +369,8 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             select,
             provider,
             target_override,
+            handle,
+            display_name,
         } => {
             let host = target.host_str();
             if host.is_none() {
@@ -385,13 +390,26 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
 
             save_forge_config(&mut forge_config)?;
 
+            let forge_client = forge_config.get_selected().unwrap();
+
+            forge_client
+                .actor_connect()
+                .body(types::ActorConnectRequest::GitHub {
+                    display_name: display_name.clone(),
+                    handle: handle.to_string(),
+                    ssh_keys: vec![],
+                    token: token.access_token.expose_secret().clone(),
+                })
+                .send()
+                .await?;
+
             Ok(())
         }
         ForgeArgs::ImportComponent { gate, path } => {
-            if forge_url.is_none() {
+            if forge_client.is_none() {
                 return Err(Error::NoForgeConnected);
             }
-            let forge_url = forge_url.unwrap();
+            let forge_client = forge_client.unwrap();
             let gate = Gate::new(gate)?;
             let component = Component::open_local(path)?;
 
@@ -412,23 +430,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 (None, None)
             };
 
-            let vars = import_component_mutation::Variables {
-                anitya_id,
-                data: ComponentData {
-                    recipe: component.recipe,
-                    packages: component
-                        .package_meta
-                        .ok_or(Error::ComponentIncomplete(String::from("pkg5")))?,
-                },
-                repology_id,
-                gate: gate_id,
-            };
-
-            let request_body = ImportComponentMutation::build_query(vars);
-            let client = reqwest::Client::new();
-            let res = client.post(forge_url).json(&request_body).send().await?;
-            let response_body: Response<import_component_mutation::ResponseData> =
-                res.json().await?;
+            
 
             if let Some(data) = response_body.data {
                 println!(
@@ -455,10 +457,10 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             url,
             file,
         } => {
-            if forge_url.is_none() {
+            if forge_client.is_none() {
                 return Err(Error::NoForgeConnected);
             }
-            let forge_url = forge_url.unwrap();
+            let forge_url = forge_client.unwrap();
             let gate = Gate::new(gate)?;
             let component = Component::open_local(path)?;
 

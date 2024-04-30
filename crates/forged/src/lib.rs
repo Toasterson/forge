@@ -23,7 +23,7 @@ use opendal::Operator;
 use pasetors::claims::ClaimsValidationRules;
 use pasetors::keys::{AsymmetricKeyPair, AsymmetricPublicKey, Generate};
 use pasetors::paserk::FormatAsPaserk;
-use pasetors::token::{UntrustedToken};
+use pasetors::token::UntrustedToken;
 use pasetors::{version4::V4, Public};
 use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
@@ -279,11 +279,54 @@ pub fn load_config(args: &Args) -> Result<Config> {
 
 #[derive(OpenApi)]
 #[openapi(
+    info(
+        description = "Manage your interactions with a distribution community",
+        version = "v1",
+        title = "Package forge API",
+        license(name= "MPL-2.0", url = "https://www.mozilla.org/en-US/MPL/2.0/"),
+        contact(
+            name = "Till Wegmüller",
+            email = "toasterson@gmail.com"
+        )
+    ),
     paths(
         api::v1::actor::actor_connect,
+        api::v1::gate::get_gate,
+        api::v1::gate::list_gates,
+        api::v1::gate::create_gate,
+        api::v1::gate::update_gate,
+        api::v1::component::get_component,
+        api::v1::component::list_components,
+        api::v1::component::create_component,
+        api::v1::component::import_component,
+        api::v1::component::upload_to_component,
+        api::v1::publisher::create_publisher,
+        api::v1::publisher::list_publishers,
+        api::v1::auth::login_info,
     ),
     components(
-      schemas(api::v1::actor::ActorConnectRequest, api::v1::actor::ActorSSHKeyFingerprint, api::v1::actor::ActorConnectResponse, ApiError)
+      schemas(
+        api::v1::actor::ActorConnectRequest, 
+        api::v1::actor::ActorSSHKeyFingerprint, 
+        api::v1::actor::ActorConnectResponse,
+        api::v1::gate::GateSearchRequest,
+        api::v1::gate::Gate,
+        api::v1::gate::GateListRequest,
+        api::v1::gate::CreateGateInput,
+        api::v1::gate::UpdateGateInput,
+        api::v1::component::GetComponentRequest,
+        api::v1::component::Component,
+        api::v1::component::ListComponentRequest,
+        api::v1::component::ComponentInput,
+        api::v1::component::ComponentIdentifier,
+        api::v1::component::Upload,
+        api::v1::publisher::Publisher,
+        api::v1::publisher::CreatePublisherInput,
+        api::v1::auth::AuthConfig,
+        api::v1::auth::OpenIdConfig,
+        api::v1::PaginationInput,
+        ApiError,
+      )
     ),
     modifiers(&SecurityAddon),
     tags(
@@ -522,10 +565,13 @@ pub async fn listen(cfg: Config) -> Result<()> {
                 authorize_token_middleware,
             )),
         )
-        .route("/apu/v1/actors/connect", post(api::v1::actor::actor_connect))
+        .route(
+            "/api/v1/actors/connect",
+            post(api::v1::actor::actor_connect),
+        )
         .route("/api/v1/auth/login_info", get(api::v1::auth::login_info))
         .with_state(state);
-    
+
     info!("Listening on {0}", &cfg.listen);
     // run it with hyper on localhost:3100
     let listener = TcpListener::bind(&cfg.listen).await?;

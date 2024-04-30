@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha3::Digest;
 use tracing::trace;
 use url::Url;
+use utoipa::ToSchema;
 
 pub fn get_router() -> Router<SharedState> {
     Router::new()
@@ -16,17 +17,17 @@ pub fn get_router() -> Router<SharedState> {
         .route("/", post(create_component))
         .route("/import", post(import_component))
         .route("/upload/:kind", post(upload_to_component))
-        .layer(DefaultBodyLimit::max(209715200))
+        .layer(DefaultBodyLimit::max(629145600))
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GetComponentRequest {
     name: String,
     version: String,
     revision: String,
     gate_id: String,
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Component {
     pub name: String,
     pub version: String,
@@ -54,6 +55,15 @@ pub fn component_from_database(component: prisma::component::Data) -> Result<Com
     Ok(r)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/components/get",
+    request_body = GetComponentRequest,
+    responses (
+        (status = 200, description = "Successfully got the Component", body = Component),
+        (status = 404, description = "Component not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn get_component(
     State(state): State<SharedState>,
     Json(request): Json<GetComponentRequest>,
@@ -81,13 +91,23 @@ async fn get_component(
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ListComponentRequest {
     name: String,
     version: Option<String>,
     revision: Option<String>,
     gate_id: Option<String>,
 }
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/components/list",
+    request_body = ListComponentRequest,
+    responses (
+        (status = 200, description = "Successfully retrieved component info", body = Vec<Component>),
+        (status = 404, description = "Component not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn list_components(
     State(state): State<SharedState>,
     Json(request): Json<ListComponentRequest>,
@@ -123,7 +143,7 @@ async fn list_components(
     Ok(Json(components))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ComponentInput {
     pub recipe: Recipe,
     pub packages: PackageMeta,
@@ -132,7 +152,7 @@ pub struct ComponentInput {
     pub gate: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ComponentIdentifier {
     pub name: String,
     pub version: String,
@@ -140,6 +160,16 @@ pub struct ComponentIdentifier {
     pub gate_id: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/components/",
+    request_body = ComponentInput,
+    responses (
+        (status = 200, description = "Successfully retrieved component info", body = Component),
+        (status = 401, description = "Unauthorized to access the API", body = ApiError, example = json!(crate::ApiError::Unauthorized)),
+        (status = 404, description = "Component not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn create_component(
     State(state): State<SharedState>,
     Json(request): Json<ComponentInput>,
@@ -178,6 +208,16 @@ async fn create_component(
     Ok(Json(component_from_database(component)?))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/components/import",
+    request_body = ComponentInput,
+    responses (
+        (status = 200, description = "Successfully retrieved component info", body = Component),
+        (status = 401, description = "Unauthorized to access the API", body = ApiError, example = json!(crate::ApiError::Unauthorized)),
+        (status = 404, description = "Component not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn import_component(
     State(state): State<SharedState>,
     Json(request): Json<ComponentInput>,
@@ -258,6 +298,27 @@ async fn import_component(
     Ok(Json(component_from_database(component)?))
 }
 
+#[derive(ToSchema, Debug)]
+pub struct Upload {
+    pub identifier: ComponentIdentifier,
+    #[schema(value_type = String, format = Binary)]
+    pub file: Option<Vec<u8>>,
+    pub url: Option<Url>,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/components/upload/{kind}",
+    request_body(content = Upload, description = "Multipart file or url", content_type = "multipart/form-data"),
+    responses (
+        (status = 200, description = "Upload successful"),
+        (status = 401, description = "Unauthorized to access the API", body = ApiError, example = json!(crate::ApiError::Unauthorized)),
+        (status = 404, description = "Component not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    ),
+    params(
+        ("kind" = String, Path, description = "Kind of file to upload"),
+    )
+)]
 async fn upload_to_component(
     State(state): State<SharedState>,
     Path(kind): Path<String>,

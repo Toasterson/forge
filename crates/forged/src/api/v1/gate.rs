@@ -5,6 +5,8 @@ use axum::routing::{post, put};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use tracing::error;
+use utoipa::ToSchema;
+use uuid::Uuid;
 
 pub fn get_router() -> Router<SharedState> {
     Router::new()
@@ -14,13 +16,13 @@ pub fn get_router() -> Router<SharedState> {
         .route("/:id", put(update_gate))
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GateSearchRequest {
     publisher: String,
     name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Gate {
     pub id: String,
     pub name: String,
@@ -30,6 +32,15 @@ pub struct Gate {
     pub transforms: Vec<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/gates/get",
+    request_body = GateSearchRequest,
+    responses (
+        (status = 200, description = "Successfully retrieved gate info", body = Gate),
+        (status = 404, description = "Gate not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn get_gate(
     State(state): State<SharedState>,
     Json(request): Json<GateSearchRequest>,
@@ -64,10 +75,20 @@ async fn get_gate(
     }))
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GateListRequest {
     publisher: Option<String>,
 }
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/gates/list",
+    request_body = GateListRequest,
+    responses (
+        (status = 200, description = "Successfully retrieved gate info", body = Vec<Gate>),
+        (status = 404, description = "Gate not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn list_gates(
     State(state): State<SharedState>,
     Json(request): Json<GateListRequest>,
@@ -110,7 +131,7 @@ async fn list_gates(
         .collect()))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct CreateGateInput {
     pub name: String,
     pub publisher: String,
@@ -119,7 +140,7 @@ pub struct CreateGateInput {
     pub transforms: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct UpdateGateInput {
     pub name: Option<String>,
     pub version: Option<String>,
@@ -127,6 +148,16 @@ pub struct UpdateGateInput {
     pub transforms: Option<Vec<String>>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/gates/",
+    request_body = CreateGateInput,
+    responses (
+        (status = 200, description = "Successfully retrieved gate info", body = Gate),
+        (status = 401, description = "Unauthorized to access the API", body = ApiError, example = json!(crate::ApiError::Unauthorized)),
+        (status = 404, description = "Gate not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    )
+)]
 async fn create_gate(
     State(state): State<SharedState>,
     Json(request): Json<CreateGateInput>,
@@ -182,9 +213,22 @@ async fn create_gate(
     }))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/v1/gates/{id}",
+    request_body = UpdateGateInput,
+    responses (
+        (status = 200, description = "Successfully retrieved gate info", body = Gate),
+        (status = 401, description = "Unauthorized to access the API", body = ApiError, example = json!(crate::ApiError::Unauthorized)),
+        (status = 404, description = "Gate not found", body = ApiError, example = json!(crate::ApiError::NotFound(String::from("id = 1"))))
+    ),
+    params(
+        ("id" = Uuid, Path, description = "Database id of the Gate to update"),
+    )
+)]
 async fn update_gate(
     State(state): State<SharedState>,
-    Path(id): Path<String>,
+    Path(id): Path<Uuid>,
     Json(request): Json<UpdateGateInput>,
 ) -> Result<Json<Gate>> {
     let mut updates: Vec<SetParam> = vec![];
@@ -211,7 +255,7 @@ async fn update_gate(
         .await
         .prisma
         .gate()
-        .update(prisma::gate::id::equals(id), updates)
+        .update(prisma::gate::id::equals(id.to_string()), updates)
         .with(prisma::gate::publisher::fetch())
         .exec()
         .await?;

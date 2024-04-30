@@ -51,7 +51,7 @@ pub enum Error {
 
     #[error(transparent)]
     ParseError(#[from] url::ParseError),
-    
+
     #[error(transparent)]
     IOError(#[from] std::io::Error),
 }

@@ -1,12 +1,13 @@
 pub mod actor;
 pub mod auth;
-mod component;
-mod gate;
-mod publisher;
+pub mod component;
+pub mod gate;
+pub mod publisher;
 
 use crate::SharedState;
 use axum::Router;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub fn get_v1_router() -> Router<SharedState> {
     Router::new()
@@ -16,7 +17,7 @@ pub fn get_v1_router() -> Router<SharedState> {
         .nest("/gates", gate::get_router())
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct PaginationInput {
     pub cursor: Option<String>,
     pub limit: i64,
