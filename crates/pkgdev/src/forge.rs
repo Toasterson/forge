@@ -1,28 +1,24 @@
-use crate::forge::api::{types, Client};
-use crate::openid::OAuthConfig;
-use crate::{get_project_dir, openid};
-use clap::{Subcommand, ValueEnum};
-use component::{Component, ComponentError, PackageMeta, Recipe};
-use forge::AuthConfig;
-use gate::{Gate, GateError};
-use graphql_client::{GraphQLQuery, Response};
-use miette::Diagnostic;
-use secrecy::ExposeSecret;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
+
+use clap::{Subcommand, ValueEnum};
+use miette::Diagnostic;
+use secrecy::ExposeSecret;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::{ParseError, Url};
 
+use component::{Component, ComponentError};
+use forge::AuthConfig;
+use gate::{Gate, GateError};
+
+use crate::{get_project_dir, openid};
+use crate::forge::api::{Client, types};
+use crate::openid::OAuthConfig;
+
 mod api {
-    use progenitor::generate_api;
-    generate_api!(
-        spec = "spec/forged.spec.json",
-        interface = Builder,
-        tags = Separate,
-        derives = [schemars::JsonSchema],
-    );
+    include!(concat!(env!("OUT_DIR"), "/forge.codegen.rs"));
 }
 
 #[derive(Debug, Subcommand)]
@@ -73,21 +69,11 @@ pub enum LoginProvider {
     Gitlab,
 }
 
-#[derive(Debug, ValueEnum, Clone)]
+#[derive(Debug, ValueEnum, Clone, strum::Display)]
 pub enum ComponentFileKind {
     Patch,
     Archive,
     Script,
-}
-
-impl Into<upload_component_file::ComponentFileKind> for &ComponentFileKind {
-    fn into(self) -> upload_component_file::ComponentFileKind {
-        match self {
-            ComponentFileKind::Patch => upload_component_file::ComponentFileKind::PATCH,
-            ComponentFileKind::Archive => upload_component_file::ComponentFileKind::ARCHIVE,
-            ComponentFileKind::Script => upload_component_file::ComponentFileKind::SCRIPT,
-        }
-    }
 }
 
 #[derive(Error, Debug, Diagnostic)]
@@ -138,7 +124,10 @@ pub enum Error {
     LoginAborted,
 
     #[error(transparent)]
-    Progenitor(#[from] progenitor::progenitor_client::Error<types::ApiError>),
+    Progenitor(#[from] progenitor_client::Error<types::ApiError>),
+
+    #[error("usage error either file or url must be provided")]
+    UploadUsageError,
 }
 
 pub type Result<T, E = Error> = miette::Result<T, E>;
@@ -152,7 +141,7 @@ pub struct ForgeConfig {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ForgeConnection {
     pub target: Url,
-    pub login_token: openid::OAuthConfig,
+    pub login_token: OAuthConfig,
 }
 
 impl ForgeConfig {
@@ -262,41 +251,7 @@ pub fn save_forge_config(forge_config: &mut ForgeConfig) -> Result<(), Error> {
     Ok(())
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComponentData {
-    pub recipe: Recipe,
-    pub packages: PackageMeta,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Upload(usize);
-
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "forge.graphql.schema.json",
-    query_path = "queries/defineGate.graphql",
-    response_derives = "Debug,Serialize,PartialEq"
-)]
-pub struct DefineGateMutation;
-
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "forge.graphql.schema.json",
-    query_path = "queries/importComponent.graphql",
-    response_derives = "Debug,Serialize,PartialEq"
-)]
-pub struct ImportComponentMutation;
-
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "forge.graphql.schema.json",
-    query_path = "queries/importComponent.graphql",
-    response_derives = "Debug,Serialize,PartialEq"
-)]
-pub struct UploadComponentFile;
-
 pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
-    use api::prelude::*;
     let mut forge_config = get_forge_config()?;
     let forge_client = forge_config.get_selected();
 
@@ -339,10 +294,12 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                         gate.version,
                         gate.branch,
                         gate.publisher,
-                        Some(gate.default_transforms
-                            .iter()
-                            .map(|t| t.to_string())
-                            .collect::<Vec<String>>()),
+                        Some(
+                            gate.default_transforms
+                                .iter()
+                                .map(|t| t.to_string())
+                                .collect::<Vec<String>>(),
+                        ),
                     )
                 } else {
                     // All other cases are user error
@@ -350,18 +307,15 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 };
 
             forge_client
-                .create_gate()
-                .body(types::CreateGateInput {
+                .create_gate(&types::CreateGateInput {
                     name,
                     version,
                     branch,
                     publisher,
                     transforms,
                 })
-                .send()
                 .await?;
 
-            //TODO Send gate request
             Ok(())
         }
         ForgeArgs::Connect {
@@ -386,21 +340,24 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
 
             let token = openid::login_to_provider(provider, &login_info).await?;
 
-            forge_config.insert_forge(host.to_string(), target.clone(), token.into(), *select);
+            forge_config.insert_forge(
+                host.to_string(),
+                target.clone(),
+                token.clone().into(),
+                *select,
+            );
 
             save_forge_config(&mut forge_config)?;
 
             let forge_client = forge_config.get_selected().unwrap();
 
             forge_client
-                .actor_connect()
-                .body(types::ActorConnectRequest::GitHub {
+                .actor_connect(&types::ActorConnectRequest::GitHub {
                     display_name: display_name.clone(),
                     handle: handle.to_string(),
                     ssh_keys: vec![],
                     token: token.access_token.expose_secret().clone(),
                 })
-                .send()
                 .await?;
 
             Ok(())
@@ -430,23 +387,19 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 (None, None)
             };
 
-            
+            let recipe_value = serde_json::to_value(&component.recipe)?;
+            let package_meta_value =
+                serde_json::to_value(&component.package_meta.unwrap_or_default())?;
 
-            if let Some(data) = response_body.data {
-                println!(
-                    "Component {}@{} revision: {} in gate {} imported",
-                    data.import_component.name,
-                    data.import_component.version,
-                    data.import_component.revision,
-                    data.import_component.gate_id,
-                );
-            } else {
-                let errors = response_body.errors.unwrap();
-                for error in errors {
-                    println!("the server returned errors");
-                    println!("{}", error);
-                }
-            }
+            forge_client
+                .import_component(&types::ComponentInput {
+                    anitya_id,
+                    gate: gate_id,
+                    packages: serde_json::from_value(package_meta_value)?,
+                    recipe: serde_json::from_value(recipe_value)?,
+                    repology_id,
+                })
+                .await?;
 
             Ok(())
         }
@@ -460,7 +413,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             if forge_client.is_none() {
                 return Err(Error::NoForgeConnected);
             }
-            let forge_url = forge_client.unwrap();
+            let forge_client = forge_client.unwrap();
             let gate = Gate::new(gate)?;
             let component = Component::open_local(path)?;
 
@@ -473,59 +426,58 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 .ok_or(Error::ComponentIncomplete(String::from("version")))?;
             let revision = component.recipe.revision.unwrap_or(String::from("0"));
 
-            let response_body: Response<upload_component_file::ResponseData> =
-                if let Some(file) = file {
-                    let vars = upload_component_file::Variables {
-                        name,
-                        version,
-                        revision,
-                        gate: gate_id,
-                        url: None,
-                        file: Some(Upload(0)),
-                        kind: kind.into(),
-                    };
-                    let request_body = UploadComponentFile::build_query(vars);
-                    let request_str = serde_json::to_string(&request_body)?;
-                    let client = reqwest::Client::new();
+            let identifier = types::ComponentIdentifier {
+                gate_id,
+                name,
+                revision,
+                version,
+            };
 
-                    let file_map = "{ \"0\": [\"variables.file\"] }";
+            let ident_str = serde_json::to_string(&identifier)?;
 
-                    let async_file = tokio::fs::File::open(file).await?;
+            let resp = if let Some(file) = file {
+                let client = reqwest::Client::new();
 
-                    let some_file = reqwest::multipart::Part::stream(async_file);
+                let async_file = tokio::fs::File::open(file).await?;
 
-                    let form = reqwest::multipart::Form::new()
-                        .text("operations", request_str)
-                        .text("map", file_map)
-                        .part("0", some_file);
+                let some_file = reqwest::multipart::Part::stream(async_file);
 
-                    let res = client.post(forge_url).multipart(form).send().await?;
-                    res.json().await?
-                } else {
-                    let vars = upload_component_file::Variables {
-                        name,
-                        version,
-                        revision,
-                        gate: gate_id,
-                        url: url.clone().map(|u| u.to_string()),
-                        file: None,
-                        kind: kind.into(),
-                    };
-                    let client = reqwest::Client::new();
-                    let request_body = UploadComponentFile::build_query(vars);
+                let form = reqwest::multipart::Form::new()
+                    .text("identifier", ident_str)
+                    .part(file.to_string_lossy().to_string(), some_file);
 
-                    let res = client.post(forge_url).json(&request_body).send().await?;
-                    res.json().await?
-                };
+                client
+                    .post(format!(
+                        "{}/api/v1/components/upload/{kind}",
+                        forge_client.baseurl()
+                    ))
+                    .multipart(form)
+                    .send()
+                    .await?
+            } else if let Some(url) = url {
+                let client = reqwest::Client::new();
 
-            if let Some(_) = response_body.data {
-                println!("File Uploaded");
+                let form = reqwest::multipart::Form::new()
+                    .text("identifier", ident_str)
+                    .text("url", url.to_string());
+
+                client
+                    .post(format!(
+                        "{}/api/v1/components/upload/{kind}",
+                        forge_client.baseurl()
+                    ))
+                    .multipart(form)
+                    .send()
+                    .await?
             } else {
-                let errors = response_body.errors.unwrap();
-                for error in errors {
-                    println!("the server returned errors");
-                    println!("{}", error);
-                }
+                return Err(Error::UploadUsageError);
+            };
+
+            if resp.status().is_success() {
+                println!("Upload successful");
+            } else {
+                let err: types::ApiError = resp.json().await?;
+                println!("error while uploading file: {:#?}", err);
             }
 
             Ok(())

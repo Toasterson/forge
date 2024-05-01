@@ -3,7 +3,11 @@ name = "pkgdev"
 version.workspace = true
 edition.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[build-dependencies]
+prettyplease = "0.1.25"
+progenitor = { git = "https://github.com/oxidecomputer/progenitor" }
+serde_json.workspace = true
+syn = "1.0"
 
 [dependencies]
 component.workspace = true
@@ -17,11 +21,11 @@ url.workspace = true
 clap = { workspace = true, features = ["derive"] }
 strum.workspace = true
 reqwest = { version = "0.11", features = ["rustls-tls", "json", "multipart", "stream"], default-features = false }
+reqwest_12 = { package = "reqwest", version = "0.12", features = ["rustls-tls", "json", "multipart", "stream"], default-features = false }
 workspace = { version = "*", path = "../workspace" }
 repology.workspace = true
 semver = { version = "1.0.22", features = ["serde"] }
 gate.workspace = true
-graphql_client = "0.14.0"
 dirs = "5.0.1"
 directories = "5.0.1"
 forge.workspace = true
@@ -30,7 +34,7 @@ tokio.workspace = true
 octocrab = "0.38.0"
 secrecy = { version = "0.8.0", features = ["serde"] }
 either = "1.11.0"
-progenitor = "0.6.0"
+progenitor-client = { git = "https://github.com/oxidecomputer/progenitor" }
 futures.workspace = true
 uuid = { version = "1.8.0", features = ["serde", "v4"] }
 regress = "0.9.1"

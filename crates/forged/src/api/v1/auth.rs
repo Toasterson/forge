@@ -9,9 +9,9 @@ use crate::{prisma, Error, SharedState};
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AuthConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gitlab: Option<forge::OpenIdConfig>,
+    pub gitlab: Option<OpenIdConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub github: Option<forge::OpenIdConfig>,
+    pub github: Option<OpenIdConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]

@@ -12,6 +12,7 @@ use schemars::schema::RootSchema;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use utoipa::ToSchema;
 
 #[derive(Error, Debug, Diagnostic)]
 pub enum ComponentError {
@@ -169,7 +170,7 @@ impl Component {
 }
 
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema, ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -181,8 +182,18 @@ pub struct PackageMeta {
     dependencies: Vec<String>,
 }
 
+impl Default for PackageMeta {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            fmris: vec![],
+            dependencies: vec![],
+        }
+    }
+}
+
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema, ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -195,14 +206,14 @@ pub struct ComponentMetadataItem {
     pub value: String,
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff, PartialEq, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff, PartialEq, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct ComponentMetadata(#[knuffel(children)] pub Vec<ComponentMetadataItem>);
 
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema,
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, ToSchema, JsonSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -445,7 +456,7 @@ impl Recipe {
 }
 
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema, Builder,
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema, Builder, ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -486,6 +497,7 @@ impl Dependency {
     PartialEq,
     Diff,
     JsonSchema,
+    ToSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -518,7 +530,7 @@ impl From<&str> for DependencyKind {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -548,7 +560,7 @@ impl SourceSection {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -572,6 +584,7 @@ pub enum SourceNode {
     Diff,
     JsonSchema,
     Builder,
+    ToSchema
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -618,7 +631,7 @@ impl ArchiveSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -680,22 +693,23 @@ impl GitSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct FileSource {
+    #[schema(value_type = String)]
     #[knuffel(argument)]
-    bundle_path: PathBuf,
+    bundle_path: String,
     #[knuffel(argument)]
-    target_path: Option<PathBuf>,
+    target_path: Option<String>,
 }
 
 impl FileSource {
-    pub fn new<P: AsRef<Path>>(bundle_path: P, target_path: Option<P>) -> ComponentResult<Self> {
+    pub fn new(bundle_path: String, target_path: Option<String>) -> ComponentResult<Self> {
         Ok(Self {
-            bundle_path: bundle_path.as_ref().to_path_buf(),
-            target_path: target_path.as_ref().map(|p| p.as_ref().to_path_buf()),
+            bundle_path,
+            target_path,
         })
     }
 
@@ -705,38 +719,39 @@ impl FileSource {
 
     pub fn get_target_path(&self) -> PathBuf {
         if let Some(p) = &self.target_path {
-            p.clone()
+            PathBuf::from(p)
         } else {
-            self.bundle_path.clone()
+            PathBuf::from(&self.bundle_path)
         }
     }
 
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("file");
-        node.insert(0, self.bundle_path.to_string_lossy().to_string().as_str());
+        node.insert(0, self.bundle_path.as_str());
         if let Some(target_path) = &self.target_path {
-            node.insert(1, target_path.to_string_lossy().to_string().as_str());
+            node.insert(1, target_path.as_str());
         }
         node
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct DirectorySource {
+    #[schema(value_type = String)]
     #[knuffel(argument)]
-    bundle_path: PathBuf,
+    bundle_path: String,
     #[knuffel(argument)]
-    target_path: Option<PathBuf>,
+    target_path: Option<String>,
 }
 
 impl DirectorySource {
-    pub fn new<P: AsRef<Path>>(bundle_path: P, target_path: Option<P>) -> ComponentResult<Self> {
+    pub fn new(bundle_path: String, target_path: Option<String>) -> ComponentResult<Self> {
         Ok(Self {
-            bundle_path: bundle_path.as_ref().to_path_buf(),
-            target_path: target_path.as_ref().map(|p| p.as_ref().to_path_buf()),
+            bundle_path,
+            target_path,
         })
     }
 
@@ -745,45 +760,46 @@ impl DirectorySource {
     }
 
     pub fn get_name(&self) -> String {
-        self.bundle_path.display().to_string()
+        self.bundle_path.clone()
     }
 
     pub fn get_target_path(&self) -> PathBuf {
         if let Some(p) = &self.target_path {
-            p.clone()
+            PathBuf::from(p)
         } else {
-            self.bundle_path.clone()
+            PathBuf::from(&self.bundle_path)
         }
     }
 
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("directory");
-        node.insert(0, self.bundle_path.to_string_lossy().to_string().as_str());
+        node.insert(0, self.bundle_path.as_str());
         if let Some(target_path) = &self.target_path {
-            node.insert(1, target_path.to_string_lossy().to_string().as_str());
+            node.insert(1, target_path.as_str());
         }
         node
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct PatchSource {
+    #[schema(value_type = String)]
     #[knuffel(argument)]
-    bundle_path: PathBuf,
+    bundle_path: String,
     #[knuffel(property)]
     pub drop_directories: Option<i64>,
 }
 
 impl PatchSource {
-    pub fn new<P: AsRef<Path>>(
-        bundle_path: P,
+    pub fn new(
+        bundle_path: String,
         drop_directories: Option<i64>,
     ) -> ComponentResult<Self> {
         Ok(Self {
-            bundle_path: bundle_path.as_ref().to_path_buf(),
+            bundle_path,
             drop_directories,
         })
     }
@@ -794,7 +810,7 @@ impl PatchSource {
 
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("patch");
-        node.insert(0, self.bundle_path.to_string_lossy().to_string().as_str());
+        node.insert(0, self.bundle_path.as_str());
         if let Some(dirs) = self.drop_directories.clone() {
             node.insert("drop-directories", dirs);
         }
@@ -802,19 +818,19 @@ impl PatchSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct OverlaySource {
     #[knuffel(argument)]
-    bundle_path: PathBuf,
+    bundle_path: String,
 }
 
 impl OverlaySource {
-    pub fn new<P: AsRef<Path>>(bundle_path: P) -> ComponentResult<Self> {
+    pub fn new(bundle_path: String) -> ComponentResult<Self> {
         Ok(Self {
-            bundle_path: bundle_path.as_ref().to_path_buf(),
+            bundle_path,
         })
     }
 
@@ -824,7 +840,7 @@ impl OverlaySource {
 
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("overlay");
-        node.insert(0, self.bundle_path.to_string_lossy().to_string().as_str());
+        node.insert(0, self.bundle_path.as_str());
         node
     }
 }
@@ -840,6 +856,7 @@ impl OverlaySource {
     Diff,
     JsonSchema,
     Builder,
+    ToSchema
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -882,7 +899,7 @@ impl BuildSection {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -927,7 +944,7 @@ impl ConfigureBuildSection {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -956,7 +973,7 @@ impl ScriptBuildSection {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -985,7 +1002,7 @@ impl InstallDirectiveNode {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema,
+    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -993,8 +1010,9 @@ impl InstallDirectiveNode {
 pub struct ScriptNode {
     #[knuffel(argument)]
     pub name: String,
+    #[schema(value_type = String)]
     #[knuffel(property)]
-    pub prototype_dir: Option<PathBuf>,
+    pub prototype_dir: Option<String>,
 }
 
 impl ScriptNode {
@@ -1004,14 +1022,14 @@ impl ScriptNode {
         if let Some(prototype_dir) = &self.prototype_dir {
             node.insert(
                 "prototype-dir",
-                prototype_dir.to_string_lossy().to_string().as_str(),
+                prototype_dir.as_str(),
             );
         }
         node
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -1030,7 +1048,7 @@ impl BuildFlagNode {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -1047,7 +1065,7 @@ impl BuildOptionNode {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff)]
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, ToSchema, Diff)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
