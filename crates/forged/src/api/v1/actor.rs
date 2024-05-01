@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::prisma::KeyType;
-use crate::{prisma, Error, Result, SharedState};
+use crate::{prisma, Error, Result, AppState};
 
 const SSH_RSA: &str = "ssh-rsa";
 const SSH_ED25519: &str = "ssh-ed25519";
@@ -19,7 +19,7 @@ const SSH_ECDSA_256: &str = "ecdsa-sha2-nistp256";
 const SSH_ECDSA_384: &str = "ecdsa-sha2-nistp384";
 const SSH_ECDSA_521: &str = "ecdsa-sha2-nistp521";
 
-pub fn get_router() -> Router<SharedState> {
+pub fn get_router() -> Router<AppState> {
     Router::new()
 }
 
@@ -64,7 +64,7 @@ pub enum ActorSSHKeyFingerprint {
     )
 )]
 pub async fn actor_connect(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
     Host(host): Host,
     Json(request): Json<ActorConnectRequest>,
 ) -> Result<Json<ActorConnectResponse>> {
@@ -79,9 +79,9 @@ pub async fn actor_connect(
                 octorust::Client::new(format!("package forge {host}"), Credentials::Token(token))?;
 
             let domain_data = state
+                .prisma
                 .lock()
                 .await
-                .prisma
                 .domain()
                 .find_unique(prisma::domain::UniqueWhereParam::DnsNameEquals(
                     host.clone(),
@@ -100,9 +100,9 @@ pub async fn actor_connect(
 
             // Try to find the user by the handle and domain
             if let Some(existing_actor) = state
+                .prisma
                 .lock()
                 .await
-                .prisma
                 .actor()
                 .find_unique(prisma::actor::UniqueWhereParam::HandleEquals(
                     handle.clone(),
@@ -188,9 +188,9 @@ pub async fn actor_connect(
                         .map(|k| prisma::key::id::equals(k.id.clone()))
                         .collect::<Vec<prisma::key::WhereParam>>();
                     state
+                        .prisma
                         .lock()
                         .await
-                        .prisma
                         .key()
                         .delete_many(delete_list)
                         .exec()
@@ -213,18 +213,18 @@ pub async fn actor_connect(
                         })
                         .collect::<Vec<(String, String, String, Vec<prisma::key::SetParam>)>>();
                     state
+                        .prisma
                         .lock()
                         .await
-                        .prisma
                         .key()
                         .create_many(create_list)
                         .exec()
                         .await?;
                 } else {
                     state
+                        .prisma
                         .lock()
                         .await
-                        .prisma
                         .key()
                         .create_many(db_keys)
                         .exec()
@@ -239,9 +239,9 @@ pub async fn actor_connect(
                 }))
             } else {
                 let actor = state
+                    .prisma
                     .lock()
                     .await
-                    .prisma
                     .actor()
                     .create(
                         display_name.unwrap_or(handle.clone()),
@@ -297,9 +297,9 @@ pub async fn actor_connect(
                 }
 
                 state
+                    .prisma
                     .lock()
                     .await
-                    .prisma
                     .key()
                     .create_many(db_keys)
                     .exec()

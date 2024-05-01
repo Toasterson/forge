@@ -1,13 +1,9 @@
 use axum::extract::multipart::MultipartError;
-use axum::extract::{Host, Request, State};
+use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::StatusCode;
-use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use axum::{middleware, Json, Router};
-use axum_extra::headers::authorization::Bearer;
-use axum_extra::headers::Authorization;
-use axum_extra::TypedHeader;
+use axum::{Json, Router, async_trait};
 use clap::{Parser, Subcommand};
 use config::Environment;
 use deadpool_lapin::lapin::options::{
@@ -20,23 +16,23 @@ use futures::{join, StreamExt};
 use message_queue::handle_message;
 use miette::Diagnostic;
 use opendal::Operator;
-use pasetors::claims::ClaimsValidationRules;
-use pasetors::keys::{AsymmetricKeyPair, AsymmetricPublicKey, Generate};
+use pasetors::keys::{AsymmetricKeyPair, Generate};
 use pasetors::paserk::FormatAsPaserk;
-use pasetors::token::UntrustedToken;
-use pasetors::{version4::V4, Public};
+use pasetors::{version4::V4};
 use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
 use std::future::IntoFuture;
 use std::sync::Arc;
+use axum::http::request::Parts;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 use utoipa::{
-    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
+    openapi::security::{SecurityScheme},
     Modify, OpenApi, ToSchema,
 };
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder};
 use utoipa_rapidoc::RapiDoc;
 use utoipa_redoc::{Redoc, Servable};
 use utoipa_swagger_ui::SwaggerUi;
@@ -185,7 +181,7 @@ pub enum ApiError {
 }
 
 impl IntoResponse for Error {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
         match self {
             Error::NoRevisionFoundInRecipe(msg) => {
                 (StatusCode::BAD_REQUEST, Json(ApiError::BadRequest(msg))).into_response()
@@ -224,8 +220,12 @@ impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         if let Some(components) = openapi.components.as_mut() {
             components.add_security_scheme(
-                "api_key",
-                SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("apikey"))),
+                "forge login",
+                SecurityScheme::Http(HttpBuilder::default()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .description(Some("Forge JWT auth token"))
+                    .build(),
+                ),
             )
         }
     }
@@ -420,88 +420,29 @@ pub async fn set_domain(cfg: Config, name: String, gh_client_id: Option<String>)
     Ok(())
 }
 
-async fn authorize_token_middleware(
-    State(state): State<SharedState>,
-    // you can add more extractors here but the last
-    // extractor must implement `FromRequest` which
-    // `Request` does
-    Host(host): Host,
-    TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
-    mut request: Request,
-    next: Next,
-) -> Response {
-    let domain = match state
-        .lock()
-        .await
-        .prisma
-        .domain()
-        .find_unique(prisma::domain::UniqueWhereParam::DnsNameEquals(host))
-        .exec()
-        .await
-    {
-        Ok(d) => d,
-        Err(err) => {
-            error!("Could not find keys in database for domain: {}", err);
-            return (StatusCode::UNAUTHORIZED, Json(ApiError::Unauthorized)).into_response();
-        }
-    };
-
-    let response: Response = if let Some(domain) = domain {
-        let public_key = match AsymmetricPublicKey::<V4>::try_from(domain.public_key.as_str()).ok()
-        {
-            None => {
-                error!(
-                    "could not deserialize public key from database for domain: {}",
-                    &domain.dns_name
-                );
-                return (StatusCode::UNAUTHORIZED, Json(ApiError::Unauthorized)).into_response();
-            }
-            Some(k) => k,
-        };
-
-        let untrusted_token = match UntrustedToken::<Public, V4>::try_from(authorization.token()) {
-            Ok(token) => token,
-            Err(err) => {
-                error!("could not get token from request: {}", err);
-                return (StatusCode::UNAUTHORIZED, Json(ApiError::Unauthorized)).into_response();
-            }
-        };
-        let validation_rules = ClaimsValidationRules::new();
-        let trusted_token = match pasetors::public::verify(
-            &public_key,
-            &untrusted_token,
-            &validation_rules,
-            None,
-            None,
-        )
-        .ok()
-        {
-            Some(token) => token,
-            None => {
-                return (StatusCode::UNAUTHORIZED, Json(ApiError::Unauthorized)).into_response();
-            }
-        };
-
-        request.extensions_mut().insert(trusted_token);
-
-        next.run(request).await
-    } else {
-        (StatusCode::UNAUTHORIZED, Json(ApiError::Unauthorized)).into_response()
-    };
-
-    response
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone, FromRef)]
 struct AppState {
     amqp: Pool,
-    prisma: PrismaClient,
+    prisma: Arc<Mutex<PrismaClient>>,
     fs_operator: Operator,
+    #[from_ref(skip)]
     job_inbox: String,
+    #[from_ref(skip)]
     inbox: String,
 }
 
-type SharedState = Arc<Mutex<AppState>>;
+#[async_trait]
+impl<S> FromRequestParts<S> for AppState
+    where
+        Self: FromRef<S>,
+        S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(_parts: &mut Parts, state: &S) -> std::result::Result<Self, Self::Rejection> {
+        Ok(Self::from_ref(state))
+    }
+}
 
 pub async fn listen(cfg: Config) -> Result<()> {
     debug!("Opening Database Connection");
@@ -526,16 +467,16 @@ pub async fn listen(cfg: Config) -> Result<()> {
     fs_operator.check().await?;
 
     debug!("Opening RabbitMQ Connection");
-    let state = Arc::new(Mutex::new(AppState {
+    let state = AppState {
         amqp: cfg
             .amqp
             .create_pool(Some(deadpool_lapin::Runtime::Tokio1))?,
-        prisma: db_conn,
+        prisma: Arc::new(Mutex::new(db_conn)),
         fs_operator,
         job_inbox: cfg.job_inbox.clone(),
         inbox: cfg.inbox.clone(),
-    }));
-    let conn = state.lock().await.amqp.get().await?;
+    };
+    let conn = state.amqp.get().await?;
     let job_inbox = cfg.job_inbox.clone();
     let inbox = cfg.inbox.clone();
     debug!(
@@ -572,19 +513,13 @@ pub async fn listen(cfg: Config) -> Result<()> {
         )
         .await?;
 
-    let amqp_consume_pool = state.lock().await.amqp.clone();
+    let amqp_consume_pool = state.amqp.clone();
     let app = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .merge(Redoc::with_url("/redoc", ApiDoc::openapi()))
         .merge(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
         .route("/healthz", get(health_check))
-        .nest(
-            "/api",
-            api::get_api_router().layer(middleware::from_fn_with_state(
-                state.clone(),
-                authorize_token_middleware,
-            )),
-        )
+        .nest("/api", api::get_api_router())
         .route(
             "/api/v1/actors/connect",
             post(api::v1::actor::actor_connect),
@@ -672,8 +607,8 @@ async fn handle_rabbitmq(
 #[derive(Serialize, Default)]
 struct HealthResponse {}
 
-async fn health_check(State(state): State<SharedState>) -> Result<Json<HealthResponse>> {
-    let conn = state.lock().await.amqp.get().await?;
+async fn health_check(State(state): State<AppState>) -> Result<Json<HealthResponse>> {
+    let conn = state.amqp.get().await?;
     if !matches!(
         conn.status().state(),
         deadpool_lapin::lapin::ConnectionState::Connected

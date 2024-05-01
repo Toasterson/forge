@@ -3,8 +3,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::Result;
-use crate::{prisma, Error, SharedState};
+use crate::{AppState, Result};
+use crate::{prisma, Error};
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AuthConfig {
@@ -28,13 +28,13 @@ pub struct OpenIdConfig {
     )
 )]
 pub async fn login_info(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
     Host(host): Host,
 ) -> Result<Json<AuthConfig>> {
     let domain = state
+        .prisma
         .lock()
         .await
-        .prisma
         .domain()
         .find_unique(prisma::domain::UniqueWhereParam::DnsNameEquals(host))
         .exec()

@@ -8,17 +8,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Set prisma schema to relative path">
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/build.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/forged/src/api/auth.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/actor.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/actor.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/auth.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/auth.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/gate.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/publisher.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/publisher.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/spec/forged.spec.json" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/spec/forged.spec.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/openid.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/openid.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -228,7 +227,7 @@
       <workItem from="1714470982005" duration="10705000" />
       <workItem from="1714491307266" duration="3264000" />
       <workItem from="1714494583333" duration="7024000" />
-      <workItem from="1714546270642" duration="8950000" />
+      <workItem from="1714546270642" duration="13400000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />

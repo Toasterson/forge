@@ -1,5 +1,5 @@
 use crate::prisma::gate::{SetParam, WhereParam};
-use crate::{prisma, Error, Result, SharedState};
+use crate::{prisma, Error, Result, AppState};
 use axum::extract::{Path, State};
 use axum::routing::{post, put};
 use axum::{Json, Router};
@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 use tracing::error;
 use utoipa::ToSchema;
 use uuid::Uuid;
+use crate::api::auth::Authentication;
 
-pub fn get_router() -> Router<SharedState> {
+pub fn get_router() -> Router<AppState> {
     Router::new()
         .route("/get", post(get_gate))
         .route("/list", post(list_gates))
@@ -42,13 +43,13 @@ pub struct Gate {
     )
 )]
 async fn get_gate(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
     Json(request): Json<GateSearchRequest>,
 ) -> Result<Json<Gate>> {
     let gate = state
+        .prisma
         .lock()
         .await
-        .prisma
         .gate()
         .find_first(vec![
             prisma::gate::publisher::is(vec![prisma::publisher::name::equals(
@@ -90,7 +91,7 @@ pub struct GateListRequest {
     )
 )]
 async fn list_gates(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
     Json(request): Json<GateListRequest>,
 ) -> Result<Json<Vec<Gate>>> {
     let mut filter: Vec<WhereParam> = vec![];
@@ -101,9 +102,9 @@ async fn list_gates(
     }
 
     let gates = state
+        .prisma
         .lock()
         .await
-        .prisma
         .gate()
         .find_many(filter)
         .with(prisma::gate::publisher::fetch())
@@ -159,14 +160,15 @@ pub struct UpdateGateInput {
     )
 )]
 async fn create_gate(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
+    Authentication { .. }: Authentication,
     Json(request): Json<CreateGateInput>,
 ) -> Result<Json<Gate>> {
     let encoded_transforms = serde_json::to_value(request.transforms)?;
     if state
+        .prisma
         .lock()
         .await
-        .prisma
         .publisher()
         .find_unique(prisma::publisher::UniqueWhereParam::NameEquals(
             request.publisher.clone(),
@@ -176,9 +178,9 @@ async fn create_gate(
         .is_none()
     {
         state
+            .prisma
             .lock()
             .await
-            .prisma
             .publisher()
             .create(request.publisher.clone(), vec![])
             .exec()
@@ -186,9 +188,9 @@ async fn create_gate(
     }
 
     let gate = state
+        .prisma
         .lock()
         .await
-        .prisma
         .gate()
         .create(
             request.name,
@@ -227,7 +229,8 @@ async fn create_gate(
     )
 )]
 async fn update_gate(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
+    Authentication { .. }: Authentication,
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateGateInput>,
 ) -> Result<Json<Gate>> {
@@ -251,9 +254,9 @@ async fn update_gate(
     }
 
     let gate = state
+        .prisma
         .lock()
         .await
-        .prisma
         .gate()
         .update(prisma::gate::id::equals(id.to_string()), updates)
         .with(prisma::gate::publisher::fetch())

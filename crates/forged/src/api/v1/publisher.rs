@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::api::v1::PaginationInput;
-use crate::{prisma, Result, SharedState};
+use crate::{AppState, prisma, Result};
+use crate::api::auth::Authentication;
 
-pub fn get_router() -> Router<SharedState> {
+pub fn get_router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_publishers))
         .route("/", post(create_publisher))
@@ -35,13 +36,14 @@ pub struct CreatePublisherInput {
     )
 )]
 async fn create_publisher(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
+    Authentication { .. }: Authentication,
     Json(request): Json<CreatePublisherInput>,
 ) -> Result<Json<Publisher>> {
     let publisher = state
+        .prisma
         .lock()
         .await
-        .prisma
         .publisher()
         .create(request.name, vec![])
         .exec()
@@ -61,13 +63,12 @@ async fn create_publisher(
     )
 )]
 async fn list_publishers(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
     Json(pagination): Json<Option<PaginationInput>>,
 ) -> Result<Json<Vec<Publisher>>> {
-    let state = state.lock().await;
+    let db_client = state.prisma.lock().await;
     let pagination = pagination.unwrap_or_default();
-    let mut query = state
-        .prisma
+    let mut query = db_client 
         .publisher()
         .find_many(vec![])
         .take(pagination.limit);

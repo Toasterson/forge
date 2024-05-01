@@ -1,4 +1,4 @@
-use crate::{prisma, Error, Result, SharedState};
+use crate::{prisma, Error, Result, AppState};
 use axum::body::Bytes;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::routing::post;
@@ -9,8 +9,9 @@ use sha3::Digest;
 use tracing::trace;
 use url::Url;
 use utoipa::ToSchema;
+use crate::api::auth::Authentication;
 
-pub fn get_router() -> Router<SharedState> {
+pub fn get_router() -> Router<AppState> {
     Router::new()
         .route("/list", post(list_components))
         .route("/get", post(get_component))
@@ -65,13 +66,13 @@ pub fn component_from_database(component: prisma::component::Data) -> Result<Com
     )
 )]
 async fn get_component(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
     Json(request): Json<GetComponentRequest>,
 ) -> Result<Json<Component>> {
     let component = state
+        .prisma
         .lock()
         .await
-        .prisma
         .component()
         .find_unique(
             prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
@@ -109,7 +110,7 @@ pub struct ListComponentRequest {
     )
 )]
 async fn list_components(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
     Json(request): Json<ListComponentRequest>,
 ) -> Result<Json<Vec<Component>>> {
     let mut filter = vec![prisma::component::name::equals(request.name)];
@@ -127,9 +128,9 @@ async fn list_components(
     }
 
     let components = state
+        .prisma
         .lock()
         .await
-        .prisma
         .component()
         .find_many(filter)
         .exec()
@@ -171,16 +172,17 @@ pub struct ComponentIdentifier {
     )
 )]
 async fn create_component(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
+    Authentication { .. }: Authentication,
     Json(request): Json<ComponentInput>,
 ) -> Result<Json<Component>> {
     let encoded_recipe = serde_json::to_value(&request.recipe)?;
     let encoded_package_meta = serde_json::to_value(&request.packages)?;
 
     let component = state
+        .prisma
         .lock()
         .await
-        .prisma
         .component()
         .create(
             request.recipe.name.clone(),
@@ -219,7 +221,8 @@ async fn create_component(
     )
 )]
 async fn import_component(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
+    Authentication { .. }: Authentication,
     Json(request): Json<ComponentInput>,
 ) -> Result<Json<Component>> {
     let encoded_recipe = serde_json::to_value(&request.recipe)?;
@@ -269,9 +272,9 @@ async fn import_component(
     }
 
     let component = state
+        .prisma
         .lock()
         .await
-        .prisma
         .component()
         .upsert(
             prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
@@ -320,7 +323,8 @@ pub struct Upload {
     )
 )]
 async fn upload_to_component(
-    State(state): State<SharedState>,
+    State(state): State<AppState>,
+    Authentication { .. }: Authentication,
     Path(kind): Path<String>,
     mut multipart: axum::extract::Multipart,
 ) -> Result<()> {
@@ -349,9 +353,9 @@ async fn upload_to_component(
 
     trace!("fetching component from database");
     let component = state
+        .prisma
         .lock()
         .await
-        .prisma
         .component()
         .find_unique(
             prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
@@ -387,8 +391,6 @@ async fn upload_to_component(
         trace!("starting download of {} to {}", &url, &tmp_name);
 
         let mut writer = state
-            .lock()
-            .await
             .fs_operator
             .writer_with(&tmp_name)
             .buffer(8 * 1024 * 1024)
@@ -399,7 +401,7 @@ async fn upload_to_component(
         writer.close().await?;
 
         let mut hasher = sha3::Sha3_256::new();
-        hasher.update(state.lock().await.fs_operator.read(&tmp_name).await?);
+        hasher.update(state.fs_operator.read(&tmp_name).await?);
         let result = hex::encode(hasher.finalize());
 
         let final_name = forge::ComponentFile {
@@ -415,21 +417,17 @@ async fn upload_to_component(
         );
         // Only copy the file to the final destination if none exists there already
         if !state
-            .lock()
-            .await
             .fs_operator
             .is_exist(&filename.to_string())
             .await?
         {
             state
-                .lock()
-                .await
                 .fs_operator
                 .copy(&tmp_name, &final_name.to_string())
                 .await?;
         }
 
-        state.lock().await.fs_operator.delete(&tmp_name).await?;
+        state.fs_operator.delete(&tmp_name).await?;
     }
 
     for file in files {
@@ -443,8 +441,6 @@ async fn upload_to_component(
         trace!("starting upload of file to {}", &tmp_name);
 
         let mut writer = state
-            .lock()
-            .await
             .fs_operator
             .writer_with(&tmp_name)
             .buffer(8 * 1024 * 1024)
@@ -454,7 +450,7 @@ async fn upload_to_component(
         writer.close().await?;
 
         let mut hasher = sha3::Sha3_256::new();
-        hasher.update(state.lock().await.fs_operator.read(&tmp_name).await?);
+        hasher.update(state.fs_operator.read(&tmp_name).await?);
         let result = hex::encode(hasher.finalize());
 
         let final_name = forge::ComponentFile {
@@ -470,21 +466,17 @@ async fn upload_to_component(
         );
         // Only copy the file to the final destination if none exists there already
         if !state
-            .lock()
-            .await
             .fs_operator
             .is_exist(&final_name.to_string())
             .await?
         {
             state
-                .lock()
-                .await
                 .fs_operator
                 .copy(&tmp_name, &final_name.to_string())
                 .await?;
         }
 
-        state.lock().await.fs_operator.delete(&tmp_name).await?;
+        state.fs_operator.delete(&tmp_name).await?;
     }
 
     Ok(())

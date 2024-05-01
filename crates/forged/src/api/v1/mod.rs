@@ -4,12 +4,12 @@ pub mod component;
 pub mod gate;
 pub mod publisher;
 
-use crate::SharedState;
 use axum::Router;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use crate::AppState;
 
-pub fn get_v1_router() -> Router<SharedState> {
+pub fn get_v1_router() -> Router<AppState> {
     Router::new()
         .nest("/actors", actor::get_router())
         .nest("/components", component::get_router())
