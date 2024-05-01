@@ -1,17 +1,19 @@
 use std::ops::Add;
 
-use axum::extract::{Host, State};
 use axum::{Json, Router};
+use axum::extract::{Host, State};
+use axum::routing::post;
 use chrono::TimeDelta;
 use octorust::auth::Credentials;
 use pasetors::claims::Claims;
 use pasetors::keys::AsymmetricSecretKey;
 use pasetors::version4::V4;
 use serde::{Deserialize, Serialize};
+use tracing::log::debug;
 use utoipa::ToSchema;
 
+use crate::{AppState, Error, prisma, Result};
 use crate::prisma::KeyType;
-use crate::{prisma, Error, Result, AppState};
 
 const SSH_RSA: &str = "ssh-rsa";
 const SSH_ED25519: &str = "ssh-ed25519";
@@ -20,7 +22,7 @@ const SSH_ECDSA_384: &str = "ecdsa-sha2-nistp384";
 const SSH_ECDSA_521: &str = "ecdsa-sha2-nistp521";
 
 pub fn get_router() -> Router<AppState> {
-    Router::new()
+    Router::new().route("/connect", post(actor_connect))
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
@@ -75,13 +77,19 @@ pub async fn actor_connect(
             display_name,
             ssh_keys,
         } => {
+            debug!("Connecting actor {} to GitHub Account", handle);
+            let host = if let Some((host,_)) = host.split_once(":") {
+                host.to_string()
+            } else {
+                host
+            };
+            
+            let db_conn = state.prisma.lock().await;
+            
             let gh_client =
                 octorust::Client::new(format!("package forge {host}"), Credentials::Token(token))?;
 
-            let domain_data = state
-                .prisma
-                .lock()
-                .await
+            let domain_data = db_conn
                 .domain()
                 .find_unique(prisma::domain::UniqueWhereParam::DnsNameEquals(
                     host.clone(),
@@ -89,6 +97,7 @@ pub async fn actor_connect(
                 .exec()
                 .await?
                 .ok_or(Error::NoDomainFound)?;
+            
             let paseto_secret_key =
                 AsymmetricSecretKey::<V4>::try_from(domain_data.private_key.as_str())?;
 
@@ -96,13 +105,11 @@ pub async fn actor_connect(
                 .users()
                 .list_all_public_ssh_keys_for_authenticated()
                 .await?;
+            
             let user_details = gh_client.users().get_authenticated_private_user().await?;
 
             // Try to find the user by the handle and domain
-            if let Some(existing_actor) = state
-                .prisma
-                .lock()
-                .await
+            if let Some(existing_actor) = db_conn
                 .actor()
                 .find_unique(prisma::actor::UniqueWhereParam::HandleEquals(
                     handle.clone(),
@@ -187,10 +194,7 @@ pub async fn actor_connect(
                         })
                         .map(|k| prisma::key::id::equals(k.id.clone()))
                         .collect::<Vec<prisma::key::WhereParam>>();
-                    state
-                        .prisma
-                        .lock()
-                        .await
+                    db_conn
                         .key()
                         .delete_many(delete_list)
                         .exec()
@@ -212,19 +216,13 @@ pub async fn actor_connect(
                                 == 0
                         })
                         .collect::<Vec<(String, String, String, Vec<prisma::key::SetParam>)>>();
-                    state
-                        .prisma
-                        .lock()
-                        .await
+                    db_conn
                         .key()
                         .create_many(create_list)
                         .exec()
                         .await?;
                 } else {
-                    state
-                        .prisma
-                        .lock()
-                        .await
+                    db_conn
                         .key()
                         .create_many(db_keys)
                         .exec()
@@ -238,10 +236,7 @@ pub async fn actor_connect(
                     handle: existing_actor.handle,
                 }))
             } else {
-                let actor = state
-                    .prisma
-                    .lock()
-                    .await
+                let actor = db_conn
                     .actor()
                     .create(
                         display_name.unwrap_or(handle.clone()),
@@ -249,7 +244,11 @@ pub async fn actor_connect(
                         prisma::domain::UniqueWhereParam::DnsNameEquals(
                             domain_data.dns_name.clone(),
                         ),
-                        vec![],
+                        vec![
+                            prisma::actor::SetParam::SetRemoteHandles(vec![
+                                user_details.body.name,
+                            ]),
+                        ],
                     )
                     .exec()
                     .await?;
@@ -296,10 +295,7 @@ pub async fn actor_connect(
                     }
                 }
 
-                state
-                    .prisma
-                    .lock()
-                    .await
+                db_conn
                     .key()
                     .create_many(db_keys)
                     .exec()

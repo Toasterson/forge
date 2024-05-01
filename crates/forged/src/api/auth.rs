@@ -1,33 +1,30 @@
-use axum::{async_trait, RequestPartsExt};
 use axum::extract::{FromRef, FromRequestParts, Host};
 use axum::http::request::Parts;
-use axum_extra::headers::Authorization;
+use axum::{async_trait, RequestPartsExt};
 use axum_extra::headers::authorization::Bearer;
+use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
 use pasetors::claims::ClaimsValidationRules;
 use pasetors::keys::AsymmetricPublicKey;
-use pasetors::Public;
 use pasetors::token::{TrustedToken, UntrustedToken};
 use pasetors::version4::V4;
+use pasetors::Public;
 
-use crate::{AppState, Error, prisma};
+use crate::{prisma, AppState, Error};
 
 pub struct Authentication {
-    pub token: TrustedToken
+    pub token: TrustedToken,
 }
 
 #[async_trait]
-impl <S> FromRequestParts<S> for Authentication
-    where
-        AppState: FromRef<S>,
-        S: Send + Sync,
+impl<S> FromRequestParts<S> for Authentication
+where
+    AppState: FromRef<S>,
+    S: Send + Sync,
 {
     type Rejection = crate::Error;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let TypedHeader(authorization) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
@@ -51,21 +48,15 @@ impl <S> FromRequestParts<S> for Authentication
             .domain()
             .find_unique(prisma::domain::UniqueWhereParam::DnsNameEquals(host))
             .exec()
-            .await?.ok_or(Error::Unauthorized)?;
-        
+            .await?
+            .ok_or(Error::Unauthorized)?;
+
         let public_key = AsymmetricPublicKey::<V4>::try_from(domain.public_key.as_str())?;
         let untrusted_token = UntrustedToken::<Public, V4>::try_from(authorization.token())?;
         let validation_rules = ClaimsValidationRules::new();
-        let token = pasetors::public::verify(
-            &public_key,
-            &untrusted_token,
-            &validation_rules,
-            None,
-            None,
-        )?;
-        
-        Ok(Self{
-            token,
-        })
+        let token =
+            pasetors::public::verify(&public_key, &untrusted_token, &validation_rules, None, None)?;
+
+        Ok(Self { token })
     }
 }

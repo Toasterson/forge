@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use clap::{Subcommand, ValueEnum};
 use miette::Diagnostic;
+use reqwest::header::HeaderMap;
+use schemars::_private::NoSerialize;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -15,7 +17,7 @@ use gate::{Gate, GateError};
 
 use crate::{get_project_dir, openid};
 use crate::forge::api::{Client, types};
-use crate::openid::OAuthConfig;
+use crate::forge::api::types::{ActorSshKeyFingerprint, ApiError};
 
 mod api {
     include!(concat!(env!("OUT_DIR"), "/forge.codegen.rs"));
@@ -24,14 +26,11 @@ mod api {
 #[derive(Debug, Subcommand)]
 pub enum ForgeArgs {
     Connect {
-        target: Url,
+        target: String,
         #[arg(short, long)]
         provider: LoginProvider,
         #[arg(short, long)]
         select: bool,
-        /// Useful for debugging. Do not contact forge at target but set the target as header and contact this Url instead.
-        #[arg(long, hide(true))]
-        target_override: Option<Url>,
         handle: String,
         #[arg(short, long)]
         display_name: Option<String>,
@@ -117,7 +116,7 @@ pub enum Error {
     #[error("gate document has no id defined")]
     GateNoId,
 
-    #[error("forge has no provided no login details for the selected provider please use a connected provider fir this domain")]
+    #[error("forge has not provided any login details for the selected provider please use a connected provider for this domain")]
     OAuthProviderNotConnected,
 
     #[error("login aborted")]
@@ -140,23 +139,45 @@ pub struct ForgeConfig {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ForgeConnection {
-    pub target: Url,
-    pub login_token: OAuthConfig,
+    pub target: String,
+    pub handle: String,
+    pub access_token: String,
+    pub refresh_token: String,
+    pub actor_ssh_key_fingerprints: Vec<ActorSshKeyFingerprint>,
+}
+
+impl ForgeConnection {
+    pub fn get_header(&self) -> HeaderMap {
+        let mut map = HeaderMap::new();
+        map.insert(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {}", self.access_token)
+                .parse()
+                .unwrap(),
+        );
+        map
+    }
 }
 
 impl ForgeConfig {
     pub fn insert_forge(
         &mut self,
         host: String,
-        target: Url,
-        login_token: OAuthConfig,
+        target: String,
+        handle: String,
+        access_token: String,
+        refresh_token: String,
+        actor_ssh_key_fingerprints: Vec<ActorSshKeyFingerprint>,
         select: bool,
     ) {
         self.forges.insert(
             host.clone(),
             ForgeConnection {
                 target,
-                login_token,
+                handle,
+                access_token,
+                refresh_token,
+                actor_ssh_key_fingerprints,
             },
         );
 
@@ -180,27 +201,37 @@ impl ForgeConfig {
         }
     }
 
-    pub fn update_token(&mut self, token: &OAuthConfig) {
-        if let Some(selected) = &self.selected_forge {
-            if let Some(conn) = self.forges.get_mut(selected) {
-                conn.login_token = token.clone();
-            }
-        }
-    }
-
     pub fn get_selected(&self) -> Option<Client> {
         if self.forges.len() == 0 {
             None
         } else {
             if let Some(idx) = &self.selected_forge {
-                self.forges.get(idx).map(|u| Client::new(u.target.as_str()))
+                self.forges.get(idx).map(|u| {
+                    let dur = std::time::Duration::from_secs(15);
+                    let client = reqwest::ClientBuilder::new()
+                        .default_headers(u.get_header())
+                        .connect_timeout(dur)
+                        .timeout(dur)
+                        .build()
+                        .unwrap();
+                    Client::new_with_client(u.target.as_str(), client)
+                })
             } else {
                 self.forges
                     .clone()
                     .into_iter()
                     .collect::<Vec<(String, ForgeConnection)>>()
                     .first()
-                    .map(|(_, u)| Client::new(u.target.as_str()))
+                    .map(|(_, u)| {
+                        let dur = std::time::Duration::from_secs(15);
+                        let client = reqwest::ClientBuilder::new()
+                            .default_headers(u.get_header())
+                            .connect_timeout(dur)
+                            .timeout(dur)
+                            .build()
+                            .unwrap();
+                        Client::new_with_client(u.target.as_str(), client)
+                    })
             }
         }
     }
@@ -322,11 +353,11 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             target,
             select,
             provider,
-            target_override,
             handle,
             display_name,
         } => {
-            let host = target.host_str();
+            let target_url: Url = target.parse()?; 
+            let host = target_url.host_str();
             if host.is_none() {
                 return Err(Error::MissingParameter(String::from(
                     "no host in forge URL",
@@ -334,24 +365,13 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             }
 
             let host = host.unwrap();
-            let scheme = target.scheme();
 
-            let login_info = get_oauth_login_info(target_override.clone(), host, scheme).await?;
+            let login_info = get_oauth_login_info(&target_url).await?;
 
             let token = openid::login_to_provider(provider, &login_info).await?;
-
-            forge_config.insert_forge(
-                host.to_string(),
-                target.clone(),
-                token.clone().into(),
-                *select,
-            );
-
-            save_forge_config(&mut forge_config)?;
-
-            let forge_client = forge_config.get_selected().unwrap();
-
-            forge_client
+            let forge_client = Client::new(target);
+            
+            let resp = forge_client
                 .actor_connect(&types::ActorConnectRequest::GitHub {
                     display_name: display_name.clone(),
                     handle: handle.to_string(),
@@ -360,6 +380,20 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 })
                 .await?;
 
+            forge_config.insert_forge(
+                host.to_string(),
+                target.clone(),
+                resp.handle.clone(),
+                resp.access_token.clone(),
+                resp.refresh_token.clone(),
+                resp.ssh_keys.clone(),
+                *select,
+            );
+
+            save_forge_config(&mut forge_config)?;
+            
+            println!("connected");
+            
             Ok(())
         }
         ForgeArgs::ImportComponent { gate, path } => {
@@ -486,21 +520,9 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
 }
 
 pub async fn get_oauth_login_info(
-    target_override: Option<Url>,
-    host: &str,
-    scheme: &str,
+    target: &Url,
 ) -> Result<AuthConfig, Error> {
-    let resp = if let Some(target_override) = target_override {
-        let mut target_override = target_override.clone();
-        target_override.set_path("/api/v1/auth/login_info");
-        reqwest::Client::new()
-            .get(target_override)
-            .header(reqwest::header::HOST, host)
-            .send()
-            .await?
-    } else {
-        reqwest::get(format!("{scheme}://{host}/api/v1/auth/login_info")).await?
-    };
+    let resp = reqwest::get(target.join("/api/v1/auth/login_info")?).await?;
 
     let login_info: AuthConfig = resp.json().await?;
     Ok(login_info)

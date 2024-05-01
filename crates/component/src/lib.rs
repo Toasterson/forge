@@ -170,7 +170,16 @@ impl Component {
 }
 
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema, ToSchema,
+    Debug,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    Builder,
+    Diff,
+    PartialEq,
+    JsonSchema,
+    ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -193,7 +202,16 @@ impl Default for PackageMeta {
 }
 
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, JsonSchema, ToSchema,
+    Debug,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    Builder,
+    Diff,
+    PartialEq,
+    JsonSchema,
+    ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -206,14 +224,25 @@ pub struct ComponentMetadataItem {
     pub value: String,
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff, PartialEq, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Diff, PartialEq, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct ComponentMetadata(#[knuffel(children)] pub Vec<ComponentMetadataItem>);
 
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, Builder, Diff, PartialEq, ToSchema, JsonSchema,
+    Debug,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    Builder,
+    Diff,
+    PartialEq,
+    ToSchema,
+    JsonSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -456,7 +485,16 @@ impl Recipe {
 }
 
 #[derive(
-    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, JsonSchema, Builder, ToSchema,
+    Debug,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    JsonSchema,
+    Builder,
+    ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -530,7 +568,9 @@ impl From<&str> for DependencyKind {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -560,7 +600,9 @@ impl SourceSection {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -584,7 +626,7 @@ pub enum SourceNode {
     Diff,
     JsonSchema,
     Builder,
-    ToSchema
+    ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -631,7 +673,9 @@ impl ArchiveSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -693,7 +737,9 @@ impl GitSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -735,7 +781,9 @@ impl FileSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -781,7 +829,9 @@ impl DirectorySource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -794,10 +844,7 @@ pub struct PatchSource {
 }
 
 impl PatchSource {
-    pub fn new(
-        bundle_path: String,
-        drop_directories: Option<i64>,
-    ) -> ComponentResult<Self> {
+    pub fn new(bundle_path: String, drop_directories: Option<i64>) -> ComponentResult<Self> {
         Ok(Self {
             bundle_path,
             drop_directories,
@@ -818,7 +865,9 @@ impl PatchSource {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -829,9 +878,7 @@ pub struct OverlaySource {
 
 impl OverlaySource {
     pub fn new(bundle_path: String) -> ComponentResult<Self> {
-        Ok(Self {
-            bundle_path,
-        })
+        Ok(Self { bundle_path })
     }
 
     pub fn get_bundle_path<P: AsRef<Path>>(&self, base_path: P) -> PathBuf {
@@ -856,7 +903,7 @@ impl OverlaySource {
     Diff,
     JsonSchema,
     Builder,
-    ToSchema
+    ToSchema,
 )]
 #[builder(setter(into, strip_option), build_fn(error = "self::ComponentError"))]
 #[diff(attr(
@@ -899,7 +946,16 @@ impl BuildSection {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    ToSchema,
+    JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -944,7 +1000,16 @@ impl ConfigureBuildSection {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    ToSchema,
+    JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -973,7 +1038,16 @@ impl ScriptBuildSection {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    ToSchema,
+    JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -1002,7 +1076,16 @@ impl InstallDirectiveNode {
 }
 
 #[derive(
-    Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Diff,
+    ToSchema,
+    JsonSchema,
 )]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
@@ -1020,16 +1103,15 @@ impl ScriptNode {
         let mut node = kdl::KdlNode::new("script");
         node.insert(0, self.name.as_str());
         if let Some(prototype_dir) = &self.prototype_dir {
-            node.insert(
-                "prototype-dir",
-                prototype_dir.as_str(),
-            );
+            node.insert("prototype-dir", prototype_dir.as_str());
         }
         node
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -1048,7 +1130,9 @@ impl BuildFlagNode {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Diff, ToSchema, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]

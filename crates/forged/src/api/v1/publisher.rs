@@ -4,9 +4,9 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::api::v1::PaginationInput;
-use crate::{AppState, prisma, Result};
 use crate::api::auth::Authentication;
+use crate::api::v1::PaginationInput;
+use crate::{prisma, AppState, Result};
 
 pub fn get_router() -> Router<AppState> {
     Router::new()
@@ -68,7 +68,7 @@ async fn list_publishers(
 ) -> Result<Json<Vec<Publisher>>> {
     let db_client = state.prisma.lock().await;
     let pagination = pagination.unwrap_or_default();
-    let mut query = db_client 
+    let mut query = db_client
         .publisher()
         .find_many(vec![])
         .take(pagination.limit);

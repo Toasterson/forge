@@ -1,10 +1,16 @@
+use axum::{Json, Router};
 use axum::extract::{Host, State};
-use axum::Json;
+use axum::routing::get;
 use serde::{Deserialize, Serialize};
+use tracing::log::debug;
 use utoipa::ToSchema;
 
+use crate::{Error, prisma};
 use crate::{AppState, Result};
-use crate::{prisma, Error};
+
+pub fn get_router() -> Router<AppState> {
+    Router::new().route("/login_info", get(login_info))
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AuthConfig {
@@ -31,6 +37,13 @@ pub async fn login_info(
     State(state): State<AppState>,
     Host(host): Host,
 ) -> Result<Json<AuthConfig>> {
+    debug!("Looking up login details for {}", &host);
+    let host = if let Some((host,_)) = host.split_once(":") {
+        host.to_string()
+    } else {
+        host
+    };
+    
     let domain = state
         .prisma
         .lock()

@@ -1,5 +1,6 @@
+use crate::api::auth::Authentication;
 use crate::prisma::gate::{SetParam, WhereParam};
-use crate::{prisma, Error, Result, AppState};
+use crate::{prisma, AppState, Error, Result};
 use axum::extract::{Path, State};
 use axum::routing::{post, put};
 use axum::{Json, Router};
@@ -7,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use tracing::error;
 use utoipa::ToSchema;
 use uuid::Uuid;
-use crate::api::auth::Authentication;
 
 pub fn get_router() -> Router<AppState> {
     Router::new()

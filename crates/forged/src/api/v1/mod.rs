@@ -4,13 +4,14 @@ pub mod component;
 pub mod gate;
 pub mod publisher;
 
+use crate::AppState;
 use axum::Router;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use crate::AppState;
 
 pub fn get_v1_router() -> Router<AppState> {
     Router::new()
+        .nest("/auth", auth::get_router())
         .nest("/actors", actor::get_router())
         .nest("/components", component::get_router())
         .nest("/publishers", publisher::get_router())

@@ -1,4 +1,5 @@
-use crate::{prisma, Error, Result, AppState};
+use crate::api::auth::Authentication;
+use crate::{prisma, AppState, Error, Result};
 use axum::body::Bytes;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::routing::post;
@@ -9,7 +10,6 @@ use sha3::Digest;
 use tracing::trace;
 use url::Url;
 use utoipa::ToSchema;
-use crate::api::auth::Authentication;
 
 pub fn get_router() -> Router<AppState> {
     Router::new()
@@ -416,11 +416,7 @@ async fn upload_to_component(
             &final_name.to_string()
         );
         // Only copy the file to the final destination if none exists there already
-        if !state
-            .fs_operator
-            .is_exist(&filename.to_string())
-            .await?
-        {
+        if !state.fs_operator.is_exist(&filename.to_string()).await? {
             state
                 .fs_operator
                 .copy(&tmp_name, &final_name.to_string())
@@ -465,11 +461,7 @@ async fn upload_to_component(
             &final_name.to_string()
         );
         // Only copy the file to the final destination if none exists there already
-        if !state
-            .fs_operator
-            .is_exist(&final_name.to_string())
-            .await?
-        {
+        if !state.fs_operator.is_exist(&final_name.to_string()).await? {
             state
                 .fs_operator
                 .copy(&tmp_name, &final_name.to_string())

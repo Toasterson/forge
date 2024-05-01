@@ -1,9 +1,10 @@
 use axum::extract::multipart::MultipartError;
 use axum::extract::{FromRef, FromRequestParts, State};
+use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
-use axum::{Json, Router, async_trait};
+use axum::routing::{get};
+use axum::{async_trait, Json, Router};
 use clap::{Parser, Subcommand};
 use config::Environment;
 use deadpool_lapin::lapin::options::{
@@ -18,21 +19,17 @@ use miette::Diagnostic;
 use opendal::Operator;
 use pasetors::keys::{AsymmetricKeyPair, Generate};
 use pasetors::paserk::FormatAsPaserk;
-use pasetors::{version4::V4};
+use pasetors::version4::V4;
 use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
 use std::future::IntoFuture;
 use std::sync::Arc;
-use axum::http::request::Parts;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
-use utoipa::{
-    openapi::security::{SecurityScheme},
-    Modify, OpenApi, ToSchema,
-};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder};
+use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi, ToSchema};
 use utoipa_rapidoc::RapiDoc;
 use utoipa_redoc::{Redoc, Servable};
 use utoipa_swagger_ui::SwaggerUi;
@@ -221,10 +218,11 @@ impl Modify for SecurityAddon {
         if let Some(components) = openapi.components.as_mut() {
             components.add_security_scheme(
                 "forge login",
-                SecurityScheme::Http(HttpBuilder::default()
-                    .scheme(HttpAuthScheme::Bearer)
-                    .description(Some("Forge JWT auth token"))
-                    .build(),
+                SecurityScheme::Http(
+                    HttpBuilder::default()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .description(Some("Forge JWT auth token"))
+                        .build(),
                 ),
             )
         }
@@ -305,8 +303,8 @@ pub fn load_config(args: &Args) -> Result<Config> {
     ),
     components(
       schemas(
-        api::v1::actor::ActorConnectRequest, 
-        api::v1::actor::ActorSSHKeyFingerprint, 
+        api::v1::actor::ActorConnectRequest,
+        api::v1::actor::ActorSSHKeyFingerprint,
         api::v1::actor::ActorConnectResponse,
         api::v1::gate::GateSearchRequest,
         api::v1::gate::Gate,
@@ -433,13 +431,16 @@ struct AppState {
 
 #[async_trait]
 impl<S> FromRequestParts<S> for AppState
-    where
-        Self: FromRef<S>,
-        S: Send + Sync,
+where
+    Self: FromRef<S>,
+    S: Send + Sync,
 {
     type Rejection = Error;
 
-    async fn from_request_parts(_parts: &mut Parts, state: &S) -> std::result::Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        _parts: &mut Parts,
+        state: &S,
+    ) -> std::result::Result<Self, Self::Rejection> {
         Ok(Self::from_ref(state))
     }
 }
@@ -520,11 +521,6 @@ pub async fn listen(cfg: Config) -> Result<()> {
         .merge(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
         .route("/healthz", get(health_check))
         .nest("/api", api::get_api_router())
-        .route(
-            "/api/v1/actors/connect",
-            post(api::v1::actor::actor_connect),
-        )
-        .route("/api/v1/auth/login_info", get(api::v1::auth::login_info))
         .with_state(state);
 
     info!("Listening on {0}", &cfg.listen);
