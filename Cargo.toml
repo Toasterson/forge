@@ -14,8 +14,7 @@ serde.workspace = true
 url.workspace = true
 component.workspace = true
 gate.workspace = true
-uuid = { version = "1.9.1", features = ["v4"] }
-
+uuid.workspace = true
 
 [workspace]
 members = ["crates/*"]
@@ -47,3 +46,5 @@ repology = { version = "*", path = "crates/repology" }
 gate = { version = "*", path = "crates/gate" }
 utoipa = { version = "4.2.0", features = ["axum_extras", "serde_yaml", "uuid", "chrono", "url"] }
 pasetors = { version = "0.6.8", features = ["serde"] }
+base64 = "0.22.1"
+uuid = { version = "1.9.1", features = ["v4"] }

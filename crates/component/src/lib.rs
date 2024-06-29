@@ -3,7 +3,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-
+use std::fmt::{Display, Formatter};
 use derive_builder::Builder;
 use diff::Diff;
 use kdl::KdlValue;
@@ -311,6 +311,12 @@ pub struct Recipe {
     #[knuffel(children(name = "build"))]
     #[builder(default)]
     pub build_sections: Vec<BuildSection>,
+}
+
+impl Display for Recipe {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@{}-{}", self.name, self.version.clone().unwrap_or("0.1.0".to_string()), self.revision.clone().unwrap_or("0".to_string()))
+    }
 }
 
 impl Recipe {
@@ -841,6 +847,12 @@ pub struct PatchSource {
     bundle_path: String,
     #[knuffel(property)]
     pub drop_directories: Option<i64>,
+}
+
+impl Display for PatchSource {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.bundle_path.as_str())
+    }
 }
 
 impl PatchSource {

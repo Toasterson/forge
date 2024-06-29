@@ -1,8 +1,8 @@
 use std::ops::Add;
 
-use axum::{Json, Router};
 use axum::extract::{Host, State};
 use axum::routing::post;
+use axum::{Json, Router};
 use chrono::TimeDelta;
 use octorust::auth::Credentials;
 use pasetors::claims::Claims;
@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use tracing::log::debug;
 use utoipa::ToSchema;
 
-use crate::{AppState, Error, prisma, Result};
 use crate::prisma::KeyType;
+use crate::{prisma, AppState, Error, Result};
 
 const SSH_RSA: &str = "ssh-rsa";
 const SSH_ED25519: &str = "ssh-ed25519";
@@ -78,14 +78,14 @@ pub async fn actor_connect(
             ssh_keys,
         } => {
             debug!("Connecting actor {} to GitHub Account", handle);
-            let host = if let Some((host,_)) = host.split_once(":") {
+            let host = if let Some((host, _)) = host.split_once(":") {
                 host.to_string()
             } else {
                 host
             };
-            
+
             let db_conn = state.prisma.lock().await;
-            
+
             let gh_client =
                 octorust::Client::new(format!("package forge {host}"), Credentials::Token(token))?;
 
@@ -97,7 +97,7 @@ pub async fn actor_connect(
                 .exec()
                 .await?
                 .ok_or(Error::NoDomainFound)?;
-            
+
             let paseto_secret_key =
                 AsymmetricSecretKey::<V4>::try_from(domain_data.private_key.as_str())?;
 
@@ -105,7 +105,7 @@ pub async fn actor_connect(
                 .users()
                 .list_all_public_ssh_keys_for_authenticated()
                 .await?;
-            
+
             let user_details = gh_client.users().get_authenticated_private_user().await?;
 
             // Try to find the user by the handle and domain
@@ -194,11 +194,7 @@ pub async fn actor_connect(
                         })
                         .map(|k| prisma::key::id::equals(k.id.clone()))
                         .collect::<Vec<prisma::key::WhereParam>>();
-                    db_conn
-                        .key()
-                        .delete_many(delete_list)
-                        .exec()
-                        .await?;
+                    db_conn.key().delete_many(delete_list).exec().await?;
 
                     let create_list = db_keys
                         .into_iter()
@@ -216,17 +212,9 @@ pub async fn actor_connect(
                                 == 0
                         })
                         .collect::<Vec<(String, String, String, Vec<prisma::key::SetParam>)>>();
-                    db_conn
-                        .key()
-                        .create_many(create_list)
-                        .exec()
-                        .await?;
+                    db_conn.key().create_many(create_list).exec().await?;
                 } else {
-                    db_conn
-                        .key()
-                        .create_many(db_keys)
-                        .exec()
-                        .await?;
+                    db_conn.key().create_many(db_keys).exec().await?;
                 }
 
                 Ok(Json(ActorConnectResponse {
@@ -244,11 +232,9 @@ pub async fn actor_connect(
                         prisma::domain::UniqueWhereParam::DnsNameEquals(
                             domain_data.dns_name.clone(),
                         ),
-                        vec![
-                            prisma::actor::SetParam::SetRemoteHandles(vec![
-                                user_details.body.name,
-                            ]),
-                        ],
+                        vec![prisma::actor::SetParam::SetRemoteHandles(vec![
+                            user_details.body.name,
+                        ])],
                     )
                     .exec()
                     .await?;
@@ -295,11 +281,7 @@ pub async fn actor_connect(
                     }
                 }
 
-                db_conn
-                    .key()
-                    .create_many(db_keys)
-                    .exec()
-                    .await?;
+                db_conn.key().create_many(db_keys).exec().await?;
 
                 let (access_token, refresh_token) = make_login_token(
                     &actor.handle,

@@ -1,18 +1,16 @@
 use std::future::IntoFuture;
 use std::sync::Arc;
 
-use axum::{async_trait, Json, Router};
-use axum::extract::{FromRef, FromRequestParts, State};
 use axum::extract::multipart::MultipartError;
+use axum::extract::{FromRef, FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum::{async_trait, Json, Router};
 use clap::{Parser, Subcommand};
 use config::Environment;
-use deadpool_lapin::lapin::options::{
-    BasicAckOptions, BasicConsumeOptions, BasicNackOptions, QueueDeclareOptions,
-};
+use deadpool_lapin::lapin::options::{BasicAckOptions, BasicConsumeOptions, BasicNackOptions, QueueBindOptions, QueueDeclareOptions};
 use deadpool_lapin::lapin::types::FieldTable;
 use deadpool_lapin::Pool;
 use futures::{join, StreamExt};
@@ -26,8 +24,8 @@ use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
-use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme, ToSchema};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder};
+use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi, ToSchema};
 use utoipa_rapidoc::RapiDoc;
 use utoipa_redoc::{Redoc, Servable};
 use utoipa_swagger_ui::SwaggerUi;
@@ -164,7 +162,9 @@ pub enum Error {
     #[error(transparent)]
     Fmt(#[from] std::fmt::Error),
 
-    #[error("change request with id {0} cannot be found in the database cannot save result of job")]
+    #[error(
+    "change request with id {0} cannot be found in the database cannot save result of job"
+    )]
     JobSaveErrorNoChangeRequest(String),
 }
 
@@ -494,27 +494,40 @@ pub async fn listen(cfg: Config) -> Result<()> {
     let channel = conn.create_channel().await?;
 
     debug!(
-        "Defining JOB inbox: {} queue from channel id {}",
+        "Defining JOB inbox: {} exchange from channel id {}",
         job_inbox,
         channel.id()
     );
     channel
-        .queue_declare(
-            job_inbox.as_str(),
-            QueueDeclareOptions::default(),
+        .exchange_declare(
+            &job_inbox,
+            deadpool_lapin::lapin::ExchangeKind::Direct,
+            deadpool_lapin::lapin::options::ExchangeDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
             FieldTable::default(),
         )
         .await?;
 
     debug!(
         "Defining inbox: {} queue from channel id {}",
-        inbox,
+        format!("{inbox}.forged.jobreport"),
         channel.id()
     );
     channel
         .queue_declare(
-            inbox.as_str(),
+            format!("{inbox}.forged.jobreport").as_str(),
             QueueDeclareOptions::default(),
+            FieldTable::default(),
+        )
+        .await?;
+    channel
+        .queue_bind(
+            format!("{inbox}.forged.jobreport").as_str(),
+            inbox.as_str(),
+            "forged.jobreport",
+            QueueBindOptions::default(),
             FieldTable::default(),
         )
         .await?;
@@ -529,7 +542,6 @@ pub async fn listen(cfg: Config) -> Result<()> {
         .with_state(state);
 
     info!("Listening on {0}", &cfg.listen);
-    // run it with hyper on localhost:3100
     let listener = TcpListener::bind(&cfg.listen).await?;
     let _ = join!(
         rabbitmq_listen(

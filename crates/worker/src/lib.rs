@@ -1,6 +1,6 @@
 use axum::{response::IntoResponse, routing::get, Json, Router};
 use clap::Parser;
-use component::Component;
+use component::{Component, SourceNode, SourceSection};
 use component::Recipe;
 use config::{Environment, File};
 use deadpool_lapin::lapin::message::Delivery;
@@ -11,7 +11,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{types::FieldTable, Channel};
-use forge::{build_public_id, ComponentChange, ComponentChangeKind, Event, IdKind, Job};
+use forge::{build_public_id, ComponentChange, ComponentChangeKind, Event, IdKind, Job, JobReport, JobReportData, PatchFile};
 use forge::{ActivityEnvelope, CommitRef, Scheme};
 use futures::{join, StreamExt};
 use github::GitHubError;
@@ -21,14 +21,16 @@ use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, remove_dir_all};
 use std::future::IntoFuture;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use base64::Engine;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tracing::trace;
 use tracing::{debug, error, event, info, instrument, Level};
 use url::Url;
+use uuid::Uuid;
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum Error {
@@ -268,7 +270,6 @@ async fn handle_rabbitmq(state: AppState) -> Result<()> {
                     delivery,
                     &channel,
                     &state.inbox,
-                    &state.base_url,
                     &state.worker_dir,
                 )
                 .await
@@ -295,15 +296,12 @@ async fn handle_message(
     delivery: Delivery,
     channel: &Channel,
     inbox_name: &str,
-    base_url: &Url,
     worker_dir: &str,
 ) -> Result<()> {
     let body = delivery.data;
-    let envelope: Job = serde_json::from_slice(&body)?;
-    let worker_actor: Url = build_public_id(IdKind::Actor, base_url, "", "github")?;
-    let forge_actor: Url = build_public_id(IdKind::Actor, base_url, "", "forge")?;
-    match envelope {
-        Job::GetRecipes { cr_id, cr } => {
+    let job: Job = serde_json::from_slice(&body)?;
+    let job_report: JobReport = match job {
+        Job::GetRecipes { cr_id, gate_id, cr } => {
             info!("getting recipes for change_request {}", cr.id);
             let build_dir = get_repo_path(worker_dir, &cr.git_url, &cr.head.sha);
             debug!("cleaning workspace {}", &build_dir.display());
@@ -314,7 +312,7 @@ async fn handle_message(
             let changed_files = get_changed_files(&build_dir, &cr.base)?;
             let changed_components = get_changed_components(component_list, changed_files);
             create_gen_meatdata_script(&build_dir, &manifest)?;
-            let mut recipes: Vec<(String, Recipe)> = vec![];
+            let mut recipes: Vec<(String, Recipe, Vec<PatchFile>)> = vec![];
             for component in changed_components {
                 let recipe = get_component_metadata(
                     &build_dir,
@@ -322,44 +320,33 @@ async fn handle_message(
                     manifest.change_to_component_dir,
                     &manifest.component_metadata_filename,
                 )?;
-                recipes.push((component, recipe));
+                let patches = get_component_patches(&build_dir, &component, &recipe)?;
+                recipes.push((component, recipe, patches));
             }
+            debug!("Fetched recipes successfully");
 
-            let mut updated_cr = cr.clone();
-            for (component_ref, recipe) in recipes {
-                let change_definition = ComponentChange {
-                    kind: ComponentChangeKind::Processing,
-                    component_ref,
-                    recipe,
-                    recipe_diff: None,
-                };
-                updated_cr.changes.push(change_definition);
-            }
-
-            let envelope = Event::Update(ActivityEnvelope {
-                id: cr_id,
-                actor: worker_actor,
-                to: vec![forge_actor],
-                cc: vec![],
-                object: forge::ActivityObject::ChangeRequest(updated_cr),
-            });
-
-            event!(Level::INFO, cr = ?envelope, "Sending detected recipes to forge");
-
-            let msg = serde_json::to_vec(&envelope)?;
-
-            channel
-                .basic_publish(
-                    inbox_name,
-                    "",
-                    BasicPublishOptions::default(),
-                    &msg,
-                    AMQPProperties::default(),
-                )
-                .await?;
-            event!(Level::INFO, "Event Sent");
+            JobReport::Success(JobReportData::GetRecipes {
+                gate_id,
+                change_request_id: cr_id.to_string(),
+                recipes,
+            })
         }
-    }
+    };
+
+    event!(Level::DEBUG, report = ?job_report, "Sent this Report to forged");
+
+    let msg = serde_json::to_vec(&job_report)?;
+
+    channel
+        .basic_publish(
+            inbox_name,
+            "forged.jobreport",
+            BasicPublishOptions::default(),
+            &msg,
+            AMQPProperties::default(),
+        )
+        .await?;
+    event!(Level::INFO, "Job finished");
     Ok(())
 }
 
@@ -441,6 +428,46 @@ fn create_gen_meatdata_script<P: AsRef<Path> + std::fmt::Debug>(
     let mut list_script = std::fs::File::create(&list_script_path)?;
     list_script.write_all(manifest.component_metadata_gen_script.join("\n").as_bytes())?;
     Ok(())
+}
+
+#[instrument]
+fn get_component_patches<P: AsRef<Path> + std::fmt::Debug>(
+    ws: P,
+    component: &str,
+    recipe: &Recipe,
+) -> Result<Vec<PatchFile>> {
+    let patch_base_path = ws
+        .as_ref()
+        .join("components")
+        .join(component)
+        .join("patches");
+    let mut files = vec![];
+    for src in recipe.sources {
+        for s in src.sources {
+            match s {
+                SourceNode::Patch(patch) => {
+                    let patch_path = patch.get_bundle_path(&patch_base_path);
+                    let Ok(mut f) = std::fs::File::open(patch_path) else {
+                        error!("Open file error in patch {patch} skipping");
+                        continue;
+                    };
+                    let mut buf = vec![];
+                    if f.read_to_end(&mut buf).is_err() {
+                        error!("Read error in patch {patch} skipping");
+                        continue;
+                    }
+                    let pf = PatchFile {
+                        name: patch.to_string(),
+                        content: base64::engine::general_purpose::STANDARD.encode(buf),
+                    };
+                    files.push(pf);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(files)
 }
 
 #[instrument]

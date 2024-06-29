@@ -81,7 +81,7 @@ model Component {
   project_url     String
   gate            Gate              @relation(fields: [gateId], references: [id])
   recipe          Json              @db.JsonB
-  patches         String[]
+  patches         Json              @db.JsonB
   scripts         String[]
   archives        String[]
   packages        Json              @db.JsonB
@@ -101,7 +101,7 @@ model ComponentChange {
   version           String
   revision          String
   gate              Gate?               @relation(fields: [gateId], references: [id])
-  patches           String[]
+  patches           Json                @db.JsonB
   scripts           String[]
   archives          String[]
   change_request    ChangeRequest       @relation(fields: [changeRequestId], references: [id])

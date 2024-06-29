@@ -24,33 +24,18 @@ pub async fn handle_message(
                         change_request_id,
                         recipes,
                     } => {
-                        let cr_obj = db
-                            .change_request()
-                            .find_unique(prisma::change_request::UniqueWhereParam::IdEquals(
-                                change_request_id.clone(),
-                            ))
-                            .with(prisma::change_request::component_changes::fetch(vec![]))
-                            .exec()
-                            .await?;
-
-                        let Some(cr_obj) = cr_obj else {
-                            return Err(Error::JobSaveErrorNoChangeRequest(change_request_id));
-                        };
-
-                        for (component_ref, recipe) in recipes {
+                        for (_, recipe, patches) in recipes {
                             let name = recipe.name.clone();
-                            let version = recipe.version.clone().ok_or(Error::NoVersionFoundInRecipe(recipe.name.clone()))?;
+                            let version = recipe
+                                .version
+                                .clone()
+                                .ok_or(Error::NoVersionFoundInRecipe(recipe.name.clone()))?;
                             let revision = recipe.revision.clone().unwrap_or("0".to_string());
                             let mut set_params = vec![];
                             let component =
                                 db.component()
                                     .find_unique(
-                                        prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
-                                            name,
-                                            gate_id.to_string(),
-                                            version.clone(),
-                                            revision.clone(),
-                                        ),
+                                        prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(name, gate_id.to_string(), version.clone(), revision.clone()),
                                     ).exec().await?;
 
                             let change_kind = if component.is_some() {
@@ -61,9 +46,11 @@ pub async fn handle_message(
 
                             let recipe_value = serde_json::to_value(&recipe)?;
 
-                            if let Some(component) = component {
+                            let recipe_diff = if let Some(component) = component {
                                 set_params.push(prisma::component_change::SetParam::ConnectGate(
-                                    prisma::gate::UniqueWhereParam::IdEquals(component.gate_id.clone()),
+                                    prisma::gate::UniqueWhereParam::IdEquals(
+                                        component.gate_id.clone(),
+                                    ),
                                 ));
                                 set_params.push(prisma::component_change::SetParam::ConnectComponent(
                                     prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
@@ -73,19 +60,31 @@ pub async fn handle_message(
                                         component.revision,
                                     ),
                                 ));
-                            }
+                                let existing_recipe: Recipe =
+                                    serde_json::from_value(component.recipe)?;
+                                let recipe_diff = existing_recipe.diff(&recipe);
+                                serde_json::to_value(&recipe_diff)?
+                            } else {
+                                serde_json::Value::Null
+                            };
 
-                            db.component_change().create(
-                                change_kind,
-                                serde_json::Value::Null,
-                                recipe_value,
-                                version,
-                                revision,
-                                prisma::change_request::UniqueWhereParam::IdEquals(
-                                    change_request_id.clone(),
-                                ),
-                                set_params,
-                            ).exec().await?;
+                            let patch_value = serde_json::to_value(&patches)?;
+
+                            db.component_change()
+                                .create(
+                                    change_kind,
+                                    recipe_diff,
+                                    recipe_value,
+                                    version,
+                                    revision,
+                                    patch_value,
+                                    prisma::change_request::UniqueWhereParam::IdEquals(
+                                        change_request_id.clone(),
+                                    ),
+                                    set_params,
+                                )
+                                .exec()
+                                .await?;
                         }
 
                         Ok(())
@@ -95,7 +94,11 @@ pub async fn handle_message(
                     error,
                     object,
                     kind,
-                } => {}
+                } => {
+                    error!("Job reported an error {error} while processing {kind} for {object}");
+
+                    Ok(())
+                }
             }
         }
         "forged.event" => {
@@ -139,6 +142,7 @@ pub async fn handle_message(
                                     )?,
                                     prisma::gate::UniqueWhereParam::IdEquals(gate),
                                     serde_json::to_value(&component.recipe)?,
+                                    serde_json::Value::Null, //TODO Find solution to transport patches over the wire
                                     serde_json::to_value(&component.package_meta)?,
                                     vec![],
                                 )
@@ -220,6 +224,7 @@ pub async fn handle_message(
                                         serde_json::to_value(&component_change.recipe).unwrap_or(serde_json::Value::Null),
                                         component_change.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component_change.component_ref.clone()))?,
                                         component_change.recipe.revision.unwrap_or(String::from("0")),
+                                        serde_json::Value::Null,
                                         prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone()),
                                         vec![
                                             prisma::component_change::SetParam::ConnectComponent(prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
@@ -243,6 +248,7 @@ pub async fn handle_message(
                                         serde_json::to_value(&component_change.recipe).unwrap_or(serde_json::Value::Null),
                                         component_change.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component_change.component_ref.clone()))?,
                                         component_change.recipe.revision.unwrap_or(String::from("0")),
+                                        serde_json::Value::Null,
                                         prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone()),
                                         vec![
                                             prisma::component_change::SetParam::ConnectChangeRequest(prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone())),
@@ -267,6 +273,7 @@ pub async fn handle_message(
                                     serde_json::to_value(&component_change.recipe).unwrap_or(serde_json::Value::Null),
                                     component_change.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component_change.component_ref.clone()))?,
                                     component_change.recipe.revision.unwrap_or(String::from("0")),
+                                    serde_json::Value::Null,
                                     prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone()),
                                     vec![
                                         prisma::component_change::SetParam::ConnectChangeRequest(prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone())),
@@ -362,6 +369,7 @@ pub async fn handle_message(
         }
         &unknown => {
             error!("unknown routing key {unknown}");
+            Ok(())
         }
     }
 }

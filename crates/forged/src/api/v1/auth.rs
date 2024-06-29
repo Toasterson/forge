@@ -1,11 +1,11 @@
-use axum::{Json, Router};
 use axum::extract::{Host, State};
 use axum::routing::get;
+use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use tracing::log::debug;
 use utoipa::ToSchema;
 
-use crate::{Error, prisma};
+use crate::{prisma, Error};
 use crate::{AppState, Result};
 
 pub fn get_router() -> Router<AppState> {
@@ -38,12 +38,12 @@ pub async fn login_info(
     Host(host): Host,
 ) -> Result<Json<AuthConfig>> {
     debug!("Looking up login details for {}", &host);
-    let host = if let Some((host,_)) = host.split_once(":") {
+    let host = if let Some((host, _)) = host.split_once(":") {
         host.to_string()
     } else {
         host
     };
-    
+
     let domain = state
         .prisma
         .lock()

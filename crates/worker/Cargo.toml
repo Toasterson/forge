@@ -25,3 +25,5 @@ futures.workspace = true
 integration.workspace = true
 component.workspace = true
 itertools = "0.12.1"
+uuid = { version = "1.9.1", features = ["v4"] }
+base64.workspace = true

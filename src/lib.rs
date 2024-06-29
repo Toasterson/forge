@@ -229,6 +229,11 @@ pub enum ComponentChangeKind {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PatchFile {
+    pub name: String,
+    pub content: String,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobReport {
     Success(
         JobReportData,
@@ -252,9 +257,29 @@ pub enum JobObject {
     }
 }
 
+impl Display for JobObject {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobObject::ChangeRequest { cr_id, gate_id } => {
+                write!(f, "ChangeRequest {cr_id} for gate {gate_id}")
+            }
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobKind {
     GetRecipes,
+}
+
+impl Display for JobKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobKind::GetRecipes => {
+                write!(f, "GetRecipes")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -262,7 +287,7 @@ pub enum JobReportData {
     GetRecipes {
         gate_id: Uuid,
         change_request_id: String,
-        recipes: Vec<(String, Recipe)>,
+        recipes: Vec<(String, Recipe, Vec<PatchFile>)>,
     },
 }
 

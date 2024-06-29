@@ -22,6 +22,7 @@ use forge::{
     build_public_id, ChangeRequest, ChangeRequestState, CommitRef, IdKind, Label, Milestone, Scheme,
 };
 use github::{GitHubError, GitHubEvent, GitHubWebhookRequest, PullRequestPayloadSharedFields};
+use uuid::Uuid;
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum Error {
@@ -79,6 +80,7 @@ pub struct Config {
     inbox: String,
     domain: String,
     scheme: String,
+    gate_id: Uuid,
 }
 
 #[derive(Parser)]
@@ -111,6 +113,7 @@ struct AppState {
     inbox: String,
     job_inbox: String,
     base_url: Url,
+    gate_id: Uuid,
 }
 
 pub async fn listen(cfg: Config) -> Result<()> {
@@ -122,6 +125,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
         inbox: cfg.inbox,
         job_inbox: cfg.job_inbox,
         base_url: format!("{}://{}", Scheme::from(cfg.scheme), cfg.domain).parse()?,
+        gate_id: cfg.gate_id,
     };
     let conn = state.amqp.get().await?;
     debug!(
@@ -244,6 +248,7 @@ fn build_change_request(
 #[instrument(level = "trace", skip_all)]
 async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest) -> Result<()> {
     debug!("Received Webhook: {}", req.get_kind());
+    let gate_id = state.gate_id.clone();
     match req.get_event()? {
         GitHubEvent::PullRequest(event) => {
             let span = span!(Level::DEBUG, "PullRequest match arm");
@@ -284,6 +289,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -306,6 +312,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -328,6 +335,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -350,6 +358,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -372,6 +381,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -398,6 +408,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -420,6 +431,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -442,6 +454,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
@@ -464,6 +477,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
+                            gate_id: gate_id.clone(),
                         }),
                     )
                 }
