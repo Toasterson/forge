@@ -80,7 +80,7 @@ pub struct Config {
     inbox: String,
     domain: String,
     scheme: String,
-    gate_id: Uuid,
+    gateid: Uuid,
 }
 
 #[derive(Parser)]
@@ -125,7 +125,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
         inbox: cfg.inbox,
         job_inbox: cfg.job_inbox,
         base_url: format!("{}://{}", Scheme::from(cfg.scheme), cfg.domain).parse()?,
-        gate_id: cfg.gate_id,
+        gate_id: cfg.gateid,
     };
     let conn = state.amqp.get().await?;
     debug!(

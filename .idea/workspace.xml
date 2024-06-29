@@ -7,26 +7,17 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Rewrite Job Logic on forge side">
-      <change afterPath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240629073549_cpatch/migration.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b/storage_v2/_src_/database/forge.Z4vRBQ/schema/public.abK9xQ.meta" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b/storage_v2/_src_/database/forge.Z4vRBQ/schema/public.abK9xQ.meta" afterDir="false" />
+    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Implement Changerequest tracking">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/component/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/prisma/schema.prisma" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/actor.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/actor.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/auth.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/auth.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/prisma.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/prisma.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/ghwhrecv/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ghwhrecv/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/worker/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/worker/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/worker/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/worker/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/forged.toml" beforeDir="false" afterPath="$PROJECT_DIR$/forged.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -77,45 +68,46 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;Cargo.Build `Run forged`.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Build `Run github`.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run forged.executor&quot;: &quot;Debug&quot;,
-    &quot;Cargo.Run github.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run pkgdev.executor&quot;: &quot;Debug&quot;,
-    &quot;Docker.docker-compose.dev.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.yml.minio: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;JavaScript Debug.localhost:5173.executor&quot;: &quot;Run&quot;,
-    &quot;Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;JavaScript: code vision performance watcher&quot;,
-    &quot;Notification.DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/export/home/toast/workspace/illumos/aurora/opencloud&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
-    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
-    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
-    &quot;org.rust.first.attach.projects.stats&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Cargo.Build `Run forged`.executor": "Run",
+    "Cargo.Build `Run github`.executor": "Run",
+    "Cargo.Run forged.executor": "Run",
+    "Cargo.Run ghwhrecv.executor": "Run",
+    "Cargo.Run github.executor": "Run",
+    "Cargo.Run pkgdev.executor": "Debug",
+    "Docker.docker-compose.dev.yml: Compose Deployment.executor": "Run",
+    "Docker.docker-compose.yml.minio: Compose Deployment.executor": "Run",
+    "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
+    "JavaScript Debug.localhost:5173.executor": "Run",
+    "Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance": "JavaScript: code vision performance watcher",
+    "Notification.DoNotAsk-JavaScript: Code Vision Performance": "true",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.rust.reset.selective.auto.import": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/export/home/toast/workspace/illumos/aurora/opencloud",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "npm.dev.executor": "Run",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
+    "org.rust.first.attach.projects": "true",
+    "org.rust.first.attach.projects.stats": "true",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "ts.external.directory.path": "/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;DatabaseDriversLRU&quot;: [
-      &quot;postgresql&quot;
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "postgresql"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/web/prisma" />
@@ -127,11 +119,14 @@
       <recent name="$PROJECT_DIR$/web/src/routes" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run pkgdev">
-    <configuration name="Run github" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="run --package pkgdev --example github" />
+  <component name="RunManager" selected="Cargo.Run forged">
+    <configuration name="Run ghwhrecv" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="command" value="run --package ghwhrecv" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <envs />
+      <envs>
+        <env name="WEBHOOK__GATEID" value="a1a6a18e-61bf-4d13-b00b-ff543c91e890" />
+        <env name="WEBHOOK__DOMAIN" value="forge.openindiana.org" />
+      </envs>
       <option name="emulateTerminal" value="true" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -178,7 +173,7 @@
     <list>
       <item itemvalue="Cargo.Run pkgdev" />
       <item itemvalue="Cargo.Run forged" />
-      <item itemvalue="Cargo.Run github" />
+      <item itemvalue="Cargo.Run ghwhrecv" />
       <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
       <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
       <item itemvalue="JavaScript Debug.localhost:5173" />
@@ -187,7 +182,6 @@
     <recent_temporary>
       <list>
         <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
-        <item itemvalue="Cargo.Run github" />
         <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
         <item itemvalue="JavaScript Debug.localhost:5173" />
       </list>
@@ -229,7 +223,7 @@
       <workItem from="1714546270642" duration="23075000" />
       <workItem from="1719615085403" duration="9244000" />
       <workItem from="1719626782315" duration="8710000" />
-      <workItem from="1719646251291" duration="5254000" />
+      <workItem from="1719646251291" duration="12206000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />
@@ -255,7 +249,15 @@
       <option name="project" value="LOCAL" />
       <updated>1719628649901</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Implement Changerequest tracking">
+      <option name="closed" value="true" />
+      <created>1719652148923</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1719652148923</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -277,7 +279,8 @@
     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
     <MESSAGE value="Set prisma schema to relative path" />
     <MESSAGE value="Rewrite Job Logic on forge side" />
-    <option name="LAST_COMMIT_MESSAGE" value="Rewrite Job Logic on forge side" />
+    <MESSAGE value="Implement Changerequest tracking" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implement Changerequest tracking" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
   </component>
 </project>

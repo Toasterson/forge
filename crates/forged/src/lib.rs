@@ -268,8 +268,6 @@ pub fn load_config(args: &Args) -> Result<Config> {
         .set_default("opendal.endpoint", "http://localhost:9000")?
         .set_default("opendal.bucket", "forge")?
         .set_default("opendal.service", "s3")?
-        .set_default("opendal.key_id", "")?
-        .set_default("opendal.secret_key", "")?
         .set_default(
             "connection_string",
             "postgres://forge:forge@localhost/forge",
@@ -494,13 +492,13 @@ pub async fn listen(cfg: Config) -> Result<()> {
     let channel = conn.create_channel().await?;
 
     debug!(
-        "Defining JOB inbox: {} exchange from channel id {}",
-        job_inbox,
+        "Defining inbox: {} exchange from channel id {}",
+        inbox,
         channel.id()
     );
     channel
         .exchange_declare(
-            &job_inbox,
+            &inbox,
             deadpool_lapin::lapin::ExchangeKind::Direct,
             deadpool_lapin::lapin::options::ExchangeDeclareOptions {
                 durable: true,
@@ -543,11 +541,12 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     info!("Listening on {0}", &cfg.listen);
     let listener = TcpListener::bind(&cfg.listen).await?;
+    let inbox_queue = format!("{inbox}.forged.jobreport");
     let _ = join!(
         rabbitmq_listen(
             amqp_consume_pool,
             cfg.connection_string.clone(),
-            inbox.as_str(),
+            inbox_queue.as_str(),
             job_inbox.as_str()
         ),
         axum::serve(listener, app.into_make_service()).into_future(),
@@ -599,8 +598,8 @@ async fn handle_rabbitmq(
         match delivery {
             Ok(delivery) => {
                 let tag = delivery.delivery_tag;
-                let routing_key = delivery.routing_key.as_str();
-                match handle_message(delivery, database, &channel).await {
+                let routing_key = delivery.routing_key.clone();
+                match handle_message(delivery, routing_key.as_str(), database, &channel).await {
                     Ok(_) => {
                         debug!("handled message");
                         channel.basic_ack(tag, BasicAckOptions::default()).await?;

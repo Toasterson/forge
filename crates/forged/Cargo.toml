@@ -46,3 +46,4 @@ utoipa-swagger-ui = { version = "6.0.0", features = ["axum"] }
 pkcs8 = { version = "0.10.2", features = ["std", "pem"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
 base64.workspace = true
+diff-struct.workspace = true

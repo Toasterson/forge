@@ -13,7 +13,7 @@ url.workspace = true
 derive_builder = "0.20.0"
 kdl = "4.6.0"
 knuffel = { version = "3.2.0", features = ["minicbor"] }
-diff-struct = "0.5.3"
 schemars = { version = "0.8.16", features = ["semver", "chrono", "url", "uuid1", "derive_json_schema"] }
 serde_json.workspace = true
 utoipa.workspace = true
+diff-struct.workspace = true

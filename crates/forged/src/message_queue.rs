@@ -5,6 +5,7 @@ use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::Channel;
 use forge::{ActivityObject, ComponentChangeKind, Event, JobReport, JobReportData};
 use tracing::{debug, error, instrument};
+use diff::Diff;
 
 #[instrument(skip_all)]
 pub async fn handle_message(
@@ -367,7 +368,7 @@ pub async fn handle_message(
                 }
             }
         }
-        &unknown => {
+        unknown => {
             error!("unknown routing key {unknown}");
             Ok(())
         }

@@ -201,6 +201,7 @@ async fn create_component(
                 ))?,
             prisma::gate::UniqueWhereParam::IdEquals(request.gate),
             encoded_recipe,
+            serde_json::Value::Null,
             encoded_package_meta,
             vec![],
         )
@@ -290,6 +291,7 @@ async fn import_component(
                 project_url,
                 prisma::gate::UniqueWhereParam::IdEquals(gate_id),
                 encoded_recipe,
+                serde_json::Value::Null,
                 encoded_package_meta,
                 optional_params.clone(),
             ),

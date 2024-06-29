@@ -1,6 +1,6 @@
 use axum::{response::IntoResponse, routing::get, Json, Router};
 use clap::Parser;
-use component::{Component, SourceNode, SourceSection};
+use component::{Component, SourceNode};
 use component::Recipe;
 use config::{Environment, File};
 use deadpool_lapin::lapin::message::Delivery;
@@ -11,8 +11,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{types::FieldTable, Channel};
-use forge::{build_public_id, ComponentChange, ComponentChangeKind, Event, IdKind, Job, JobReport, JobReportData, PatchFile};
-use forge::{ActivityEnvelope, CommitRef, Scheme};
+use forge::{CommitRef, Scheme, Job, JobReport, JobReportData, PatchFile};
 use futures::{join, StreamExt};
 use github::GitHubError;
 use integration::{read_forge_manifest, ForgeIntegrationManifest};
@@ -30,7 +29,6 @@ use tokio::net::TcpListener;
 use tracing::trace;
 use tracing::{debug, error, event, info, instrument, Level};
 use url::Url;
-use uuid::Uuid;
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum Error {
@@ -172,13 +170,13 @@ pub async fn listen(cfg: Config) -> Result<()> {
     let channel = conn.create_channel().await?;
 
     debug!(
-        "Defining inbox: {} queue from channel id {}",
-        &state.inbox,
+        "Defining JOB inbox: {} queue from channel id {}",
+        &state.job_inbox,
         channel.id()
     );
     channel
         .exchange_declare(
-            &state.inbox,
+            &state.job_inbox,
             deadpool_lapin::lapin::ExchangeKind::Direct,
             deadpool_lapin::lapin::options::ExchangeDeclareOptions {
                 durable: true,
@@ -442,8 +440,8 @@ fn get_component_patches<P: AsRef<Path> + std::fmt::Debug>(
         .join(component)
         .join("patches");
     let mut files = vec![];
-    for src in recipe.sources {
-        for s in src.sources {
+    for src in &recipe.sources {
+        for s in &src.sources {
             match s {
                 SourceNode::Patch(patch) => {
                     let patch_path = patch.get_bundle_path(&patch_base_path);
