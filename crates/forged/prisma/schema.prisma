@@ -109,7 +109,7 @@ model ComponentChange {
   componentVersion  String?
   componentRevision String?
   gateId            String?             @db.Uuid
-  changeRequestId   String              @db.Uuid
+  changeRequestId   String
 }
 
 enum ComponentChangeKind {
@@ -119,11 +119,11 @@ enum ComponentChangeKind {
 }
 
 model ChangeRequest {
-  id                 String            @id @default(uuid()) @db.Uuid
+  id                 String            @id
   processing         Boolean           @default(false)
   component_changes  ComponentChange[]
   waitForRequest     ChangeRequest?    @relation("waitForRequest", fields: [waitForRequestId], references: [id])
-  waitForRequestId   String?           @db.Uuid
+  waitForRequestId   String?
   dependantRequests  ChangeRequest[]   @relation("waitForRequest")
   build_order        String[]
   external_reference String?
@@ -138,5 +138,5 @@ model BuildJob {
   componentVersion  String?
   componentRevision String?
   gateId            String?       @db.Uuid
-  changeRequestId   String        @db.Uuid
+  changeRequestId   String
 }

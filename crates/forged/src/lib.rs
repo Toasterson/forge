@@ -510,21 +510,33 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     debug!(
         "Defining inbox: {} queue from channel id {}",
-        format!("{inbox}.forged.jobreport"),
+        inbox.as_str(),
         channel.id()
     );
     channel
         .queue_declare(
-            format!("{inbox}.forged.jobreport").as_str(),
+            inbox.as_str(),
             QueueDeclareOptions::default(),
             FieldTable::default(),
         )
         .await?;
+
+    :wq
     channel
         .queue_bind(
-            format!("{inbox}.forged.jobreport").as_str(),
+            inbox.as_str(),
             inbox.as_str(),
             "forged.jobreport",
+            QueueBindOptions::default(),
+            FieldTable::default(),
+        )
+        .await?;
+
+    channel
+        .queue_bind(
+            inbox.as_str(),
+            inbox.as_str(),
+            "forged.event",
             QueueBindOptions::default(),
             FieldTable::default(),
         )
@@ -541,12 +553,11 @@ pub async fn listen(cfg: Config) -> Result<()> {
 
     info!("Listening on {0}", &cfg.listen);
     let listener = TcpListener::bind(&cfg.listen).await?;
-    let inbox_queue = format!("{inbox}.forged.jobreport");
     let _ = join!(
         rabbitmq_listen(
             amqp_consume_pool,
             cfg.connection_string.clone(),
-            inbox_queue.as_str(),
+            inbox.as_str(),
             job_inbox.as_str()
         ),
         axum::serve(listener, app.into_make_service()).into_future(),

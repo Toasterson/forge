@@ -491,7 +491,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                 channel
                     .basic_publish(
                         &state.inbox,
-                        "",
+                        "forged.event",
                         BasicPublishOptions::default(),
                         &msg,
                         AMQPProperties::default(),

@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- CreateEnum
-CREATE TYPE "KeyType" AS ENUM ('Ed25519');
+CREATE TYPE "KeyType" AS ENUM ('Ed25519', 'Rsa', 'ECDSA');
 
 -- CreateEnum
 CREATE TYPE "ComponentChangeKind" AS ENUM ('Added', 'Updated', 'Removed');
@@ -11,6 +11,9 @@ CREATE TYPE "ComponentChangeKind" AS ENUM ('Added', 'Updated', 'Removed');
 CREATE TABLE "Domain" (
     "id" UUID NOT NULL,
     "dnsName" TEXT NOT NULL,
+    "authconf"    JSONB NOT NULL,
+    "private_key" TEXT  NOT NULL,
+    "public_key"  TEXT  NOT NULL,
 
     CONSTRAINT "Domain_pkey" PRIMARY KEY ("id")
 );
@@ -21,6 +24,7 @@ CREATE TABLE "Actor" (
     "displayName" TEXT NOT NULL,
     "handle" TEXT NOT NULL,
     "domainId" UUID NOT NULL,
+    "remote_handles" TEXT[],
 
     CONSTRAINT "Actor_pkey" PRIMARY KEY ("id")
 );
@@ -30,7 +34,7 @@ CREATE TABLE "Key" (
     "id" UUID NOT NULL,
     "actorId" UUID NOT NULL,
     "name" TEXT NOT NULL,
-    "private_key" TEXT NOT NULL,
+    "private_key" TEXT,
     "public_key" TEXT NOT NULL,
     "key_type" "KeyType" NOT NULL DEFAULT 'Ed25519',
 
@@ -75,7 +79,7 @@ CREATE TABLE "Component" (
     "repology_id" TEXT,
     "project_url" TEXT NOT NULL,
     "recipe" JSONB NOT NULL,
-    "patches" TEXT[],
+    "patches" JSONB NOT NULL,
     "scripts" TEXT[],
     "archives" TEXT[],
     "packages" JSONB NOT NULL,
@@ -92,23 +96,23 @@ CREATE TABLE "ComponentChange" (
     "recipe" JSONB NOT NULL,
     "version" TEXT NOT NULL,
     "revision" TEXT NOT NULL,
-    "patches" TEXT[],
+    "patches"         JSONB NOT NULL,
     "scripts" TEXT[],
     "archives" TEXT[],
     "componentName" TEXT,
     "componentVersion" TEXT,
     "componentRevision" TEXT,
     "gateId" UUID,
-    "changeRequestId" UUID NOT NULL,
+    "changeRequestId" TEXT  NOT NULL,
 
     CONSTRAINT "ComponentChange_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ChangeRequest" (
-    "id" UUID NOT NULL,
+                                 "id"               TEXT NOT NULL,
     "processing" BOOLEAN NOT NULL DEFAULT false,
-    "waitForRequestId" UUID,
+                                 "waitForRequestId" TEXT,
     "build_order" TEXT[],
     "external_reference" TEXT,
 
@@ -122,7 +126,7 @@ CREATE TABLE "BuildJob" (
     "componentVersion" TEXT,
     "componentRevision" TEXT,
     "gateId" UUID,
-    "changeRequestId" UUID NOT NULL,
+    "changeRequestId" TEXT NOT NULL,
 
     CONSTRAINT "BuildJob_pkey" PRIMARY KEY ("id")
 );

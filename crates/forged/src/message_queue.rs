@@ -25,7 +25,9 @@ pub async fn handle_message(
                         change_request_id,
                         recipes,
                     } => {
-                        for (_, recipe, patches) in recipes {
+                        debug!("Processing Job report from worker");
+                        for (component_ref, recipe, patches) in recipes {
+                            debug!("Processing component {component_ref}");
                             let name = recipe.name.clone();
                             let version = recipe
                                 .version
@@ -40,19 +42,22 @@ pub async fn handle_message(
                                     ).exec().await?;
 
                             let change_kind = if component.is_some() {
+                                debug!("Component has changed");
                                 prisma::ComponentChangeKind::Updated
                             } else {
+                                debug!("new Component was added");
                                 prisma::ComponentChangeKind::Added
                             };
 
                             let recipe_value = serde_json::to_value(&recipe)?;
 
+                            set_params.push(prisma::component_change::SetParam::ConnectGate(
+                                prisma::gate::UniqueWhereParam::IdEquals(
+                                    gate_id.to_string(),
+                                ),
+                            ));
+
                             let recipe_diff = if let Some(component) = component {
-                                set_params.push(prisma::component_change::SetParam::ConnectGate(
-                                    prisma::gate::UniqueWhereParam::IdEquals(
-                                        component.gate_id.clone(),
-                                    ),
-                                ));
                                 set_params.push(prisma::component_change::SetParam::ConnectComponent(
                                     prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
                                         component.name,
@@ -61,9 +66,11 @@ pub async fn handle_message(
                                         component.revision,
                                     ),
                                 ));
+
                                 let existing_recipe: Recipe =
                                     serde_json::from_value(component.recipe)?;
                                 let recipe_diff = existing_recipe.diff(&recipe);
+
                                 serde_json::to_value(&recipe_diff)?
                             } else {
                                 serde_json::Value::Null
@@ -71,6 +78,7 @@ pub async fn handle_message(
 
                             let patch_value = serde_json::to_value(&patches)?;
 
+                            debug!("Writing component change to database");
                             db.component_change()
                                 .create(
                                     change_kind,
@@ -113,8 +121,7 @@ pub async fn handle_message(
                         ActivityObject::ChangeRequest(change_request) => {
                             let db_cr = db
                                 .change_request()
-                                .create(vec![
-                                    //prisma::change_request::SetParam::SetId(uuid::Uuid::new_v4().to_string()),
+                                .create(change_request.id, vec![
                                     prisma::change_request::SetParam::SetProcessing(true),
                                     prisma::change_request::SetParam::SetExternalReference(Some(
                                         change_request.external_ref.to_string(),
