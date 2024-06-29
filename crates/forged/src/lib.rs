@@ -1,10 +1,13 @@
-use axum::extract::multipart::MultipartError;
+use std::future::IntoFuture;
+use std::sync::Arc;
+
+use axum::{async_trait, Json, Router};
 use axum::extract::{FromRef, FromRequestParts, State};
+use axum::extract::multipart::MultipartError;
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get};
-use axum::{async_trait, Json, Router};
+use axum::routing::get;
 use clap::{Parser, Subcommand};
 use config::Environment;
 use deadpool_lapin::lapin::options::{
@@ -12,27 +15,26 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::types::FieldTable;
 use deadpool_lapin::Pool;
-use forge::{AuthConfig, FileKindError, OpenIdConfig};
 use futures::{join, StreamExt};
-use message_queue::handle_message;
 use miette::Diagnostic;
 use opendal::Operator;
 use pasetors::keys::{AsymmetricKeyPair, Generate};
 use pasetors::paserk::FormatAsPaserk;
 use pasetors::version4::V4;
-use prisma::PrismaClient;
 use serde::{Deserialize, Serialize};
-use std::future::IntoFuture;
-use std::sync::Arc;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
+use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme, ToSchema};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder};
-use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi, ToSchema};
 use utoipa_rapidoc::RapiDoc;
 use utoipa_redoc::{Redoc, Servable};
 use utoipa_swagger_ui::SwaggerUi;
+
+use forge::{AuthConfig, FileKindError, OpenIdConfig};
+use message_queue::handle_message;
+use prisma::PrismaClient;
 
 mod api;
 mod message_queue;
@@ -161,6 +163,9 @@ pub enum Error {
 
     #[error(transparent)]
     Fmt(#[from] std::fmt::Error),
+
+    #[error("change request with id {0} cannot be found in the database cannot save result of job")]
+    JobSaveErrorNoChangeRequest(String),
 }
 
 pub type Result<T> = miette::Result<T, Error>;
@@ -582,6 +587,7 @@ async fn handle_rabbitmq(
         match delivery {
             Ok(delivery) => {
                 let tag = delivery.delivery_tag;
+                let routing_key = delivery.routing_key.as_str();
                 match handle_message(delivery, database, &channel).await {
                     Ok(_) => {
                         debug!("handled message");

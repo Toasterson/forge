@@ -8,6 +8,7 @@ use url::{ParseError, Url};
 
 use component::{Component, Recipe, RecipeDiff};
 use gate::Gate;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AuthConfig {
@@ -155,28 +156,6 @@ pub enum ActivityObject {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct JobReport {
-    pub related_object: Url,
-    pub result: JobReportResult,
-    pub data: JobReportData,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum JobReportResult {
-    Sucess,
-    Failure,
-    Warning,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum JobReportData {
-    GetRecipies {
-        change_request_id: String,
-        recipies: Vec<(String, Recipe)>,
-    },
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChangeRequest {
     pub id: String,
     pub title: String,
@@ -250,6 +229,44 @@ pub enum ComponentChangeKind {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JobReport {
+    Success(
+        JobReportData,
+    ),
+    Failure {
+        /// The Object the job was working on when the error occurred
+        object: JobObject,
+        /// The error that occurred while processing the object
+        error: String,
+        /// The Kind of job that ran
+        kind: JobKind,
+    },
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JobObject {
+    ChangeRequest {
+        cr_id: Url,
+        gate_id: Uuid,
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JobKind {
+    GetRecipes,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JobReportData {
+    GetRecipes {
+        gate_id: Uuid,
+        change_request_id: String,
+        recipes: Vec<(String, Recipe)>,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Job {
-    GetRecipies { cr_id: Url, cr: ChangeRequest },
+    GetRecipes { cr_id: Url, gate_id: Uuid, cr: ChangeRequest },
 }

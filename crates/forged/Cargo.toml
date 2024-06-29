@@ -20,7 +20,7 @@ clap.workspace = true
 hyper.workspace = true
 config.workspace = true
 serde_json.workspace = true
-f3-rs = { git = "https://git.batsense.net/ForgeFlux/f3-rs.git", version = "0.1.0" }
+#f3-rs = { git = "https://git.batsense.net/ForgeFlux/f3-rs.git", version = "0.1.0" }
 futures.workspace = true
 uuid = { version = "1.6.1", features = ["v4", "serde"] }
 lazy_static = "1.4.0"

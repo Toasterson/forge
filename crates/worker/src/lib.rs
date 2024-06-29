@@ -303,7 +303,7 @@ async fn handle_message(
     let worker_actor: Url = build_public_id(IdKind::Actor, base_url, "", "github")?;
     let forge_actor: Url = build_public_id(IdKind::Actor, base_url, "", "forge")?;
     match envelope {
-        Job::GetRecipies { cr_id, cr } => {
+        Job::GetRecipes { cr_id, cr } => {
             info!("getting recipes for change_request {}", cr.id);
             let build_dir = get_repo_path(worker_dir, &cr.git_url, &cr.head.sha);
             debug!("cleaning workspace {}", &build_dir.display());

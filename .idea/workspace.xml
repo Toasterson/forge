@@ -8,20 +8,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Set prisma schema to relative path">
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/Run_forged.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/Run_forged.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/Run_pkgdev.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/Run_pkgdev.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/auth.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/auth.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/actor.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/actor.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/auth.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/auth.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/gate.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/gate.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/publisher.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/publisher.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/forge.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/worker/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/worker/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,13 +31,6 @@
       </list>
     </option>
   </component>
-  <component name="FormatOnSaveOptions">
-    <option name="myRunOnSave" value="false" />
-    <option name="myAllFileTypesSelected" value="true" />
-    <option name="mySelectedFileTypes">
-      <set />
-    </option>
-  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
     <option name="ROOT_SYNC" value="DONT_SYNC" />
@@ -57,8 +44,8 @@
 }</component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;git@github.com:Toasterson/forge.git&quot;,
-    &quot;accountId&quot;: &quot;2db6411f-cb3c-43fd-99a2-ea21e94776ef&quot;
+    &quot;url&quot;: &quot;https://github.com/Toasterson/forge.git&quot;,
+    &quot;accountId&quot;: &quot;c5946e5a-a341-4dcc-96c8-0a2249deaa94&quot;
   }
 }</component>
   <component name="MacroExpansionManager">
@@ -79,45 +66,45 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "Cargo.Build `Run forged`.executor": "Run",
-    "Cargo.Build `Run github`.executor": "Run",
-    "Cargo.Run forged.executor": "Debug",
-    "Cargo.Run github.executor": "Run",
-    "Cargo.Run pkgdev.executor": "Debug",
-    "Docker.docker-compose.dev.yml: Compose Deployment.executor": "Run",
-    "Docker.docker-compose.yml.minio: Compose Deployment.executor": "Run",
-    "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
-    "JavaScript Debug.localhost:5173.executor": "Run",
-    "Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance": "JavaScript: code vision performance watcher",
-    "Notification.DoNotAsk-JavaScript: Code Vision Performance": "true",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.rust.reset.selective.auto.import": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "/export/home/toast/workspace/illumos/aurora/opencloud",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "npm.dev.executor": "Run",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
-    "org.rust.first.attach.projects": "true",
-    "org.rust.first.attach.projects.stats": "true",
-    "settings.editor.selected.configurable": "language.rust.cargo.check",
-    "ts.external.directory.path": "/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;Cargo.Build `Run forged`.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Build `Run github`.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run forged.executor&quot;: &quot;Debug&quot;,
+    &quot;Cargo.Run github.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run pkgdev.executor&quot;: &quot;Debug&quot;,
+    &quot;Docker.docker-compose.dev.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
+    &quot;Docker.docker-compose.yml.minio: Compose Deployment.executor&quot;: &quot;Run&quot;,
+    &quot;Docker.docker-compose.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
+    &quot;JavaScript Debug.localhost:5173.executor&quot;: &quot;Run&quot;,
+    &quot;Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;JavaScript: code vision performance watcher&quot;,
+    &quot;Notification.DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/export/home/toast/workspace/illumos/aurora/opencloud&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
+    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
+    &quot;org.rust.first.attach.projects.stats&quot;: &quot;true&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;language.rust.cargo.check&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "postgresql"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;postgresql&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/web/prisma" />
@@ -128,9 +115,6 @@
       <recent name="$PROJECT_DIR$/web/src/routes/[gate]/[...component]" />
       <recent name="$PROJECT_DIR$/web/src/routes" />
     </key>
-  </component>
-  <component name="RsExternalLinterProjectSettings">
-    <option name="runOnTheFly" value="true" />
   </component>
   <component name="RunManager" selected="Cargo.Run pkgdev">
     <configuration name="Run github" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
@@ -199,7 +183,7 @@
     </recent_temporary>
   </component>
   <component name="RustProjectSettings">
-    <option name="toolchainHomeDirectory" value="/usr/bin" />
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
   <component name="RustfmtProjectSettings">
     <option name="useRustfmt" value="true" />
@@ -232,6 +216,8 @@
       <workItem from="1714491307266" duration="3264000" />
       <workItem from="1714494583333" duration="7024000" />
       <workItem from="1714546270642" duration="23075000" />
+      <workItem from="1719615085403" duration="9244000" />
+      <workItem from="1719626782315" duration="857000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />

@@ -1,8 +1,8 @@
 use axum::{
     extract::State,
+    Json,
     response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
+    Router, routing::{get, post},
 };
 use clap::Parser;
 use config::{Environment, File};
@@ -15,13 +15,13 @@ use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::net::TcpListener;
-use tracing::{debug, error, event, info, instrument, span, Level};
+use tracing::{debug, error, event, info, instrument, Level, span};
+use url::Url;
 
 use forge::{
     build_public_id, ChangeRequest, ChangeRequestState, CommitRef, IdKind, Label, Milestone, Scheme,
 };
 use github::{GitHubError, GitHubEvent, GitHubWebhookRequest, PullRequestPayloadSharedFields};
-use url::Url;
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum Error {
@@ -281,7 +281,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -303,7 +303,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -325,7 +325,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -347,7 +347,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -369,7 +369,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -395,7 +395,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -417,7 +417,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -439,7 +439,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),
@@ -461,7 +461,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
                         })),
-                        Some(forge::Job::GetRecipies {
+                        Some(forge::Job::GetRecipes {
                             cr_id: change_request_id.clone(),
                             cr,
                         }),

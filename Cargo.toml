@@ -14,6 +14,7 @@ serde.workspace = true
 url.workspace = true
 component.workspace = true
 gate.workspace = true
+uuid = { version = "1.9.1", features = ["v4"] }
 
 
 [workspace]
