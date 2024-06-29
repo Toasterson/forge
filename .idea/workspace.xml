@@ -7,7 +7,7 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Set prisma schema to relative path">
+    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Rewrite Job Logic on forge side">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/Cargo.toml" afterDir="false" />
@@ -217,7 +217,7 @@
       <workItem from="1714494583333" duration="7024000" />
       <workItem from="1714546270642" duration="23075000" />
       <workItem from="1719615085403" duration="9244000" />
-      <workItem from="1719626782315" duration="857000" />
+      <workItem from="1719626782315" duration="1833000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />
@@ -245,8 +245,11 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
     <MESSAGE value="Set prisma schema to relative path" />
-    <option name="LAST_COMMIT_MESSAGE" value="Set prisma schema to relative path" />
+    <MESSAGE value="Rewrite Job Logic on forge side" />
+    <option name="LAST_COMMIT_MESSAGE" value="Rewrite Job Logic on forge side" />
+    <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
   </component>
 </project>
