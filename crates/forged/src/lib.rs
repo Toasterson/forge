@@ -521,7 +521,7 @@ pub async fn listen(cfg: Config) -> Result<()> {
         )
         .await?;
 
-    :wq
+
     channel
         .queue_bind(
             inbox.as_str(),

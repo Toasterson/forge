@@ -7,17 +7,9 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fixup all daemons">
+    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240318152341_init/migration.sql" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240629135747_init/migration.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240430094410_auth/migration.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240629072748_patches/migration.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240629073549_cpatch/migration.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/prisma/schema.prisma" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/prisma.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/prisma.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -68,46 +60,46 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "Cargo.Build `Run forged`.executor": "Run",
-    "Cargo.Build `Run github`.executor": "Run",
-    "Cargo.Run forged.executor": "Run",
-    "Cargo.Run ghwhrecv.executor": "Run",
-    "Cargo.Run github.executor": "Run",
-    "Cargo.Run pkgdev.executor": "Debug",
-    "Docker.docker-compose.dev.yml: Compose Deployment.executor": "Run",
-    "Docker.docker-compose.yml.minio: Compose Deployment.executor": "Run",
-    "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
-    "JavaScript Debug.localhost:5173.executor": "Run",
-    "Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance": "JavaScript: code vision performance watcher",
-    "Notification.DoNotAsk-JavaScript: Code Vision Performance": "true",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.rust.reset.selective.auto.import": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "/export/home/toast/workspace/illumos/aurora/opencloud",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "npm.dev.executor": "Run",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
-    "org.rust.first.attach.projects": "true",
-    "org.rust.first.attach.projects.stats": "true",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "ts.external.directory.path": "/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;Cargo.Build `Run forged`.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Build `Run github`.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run forged.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run ghwhrecv.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run github.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run pkgdev.executor&quot;: &quot;Debug&quot;,
+    &quot;Docker.docker-compose.dev.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
+    &quot;Docker.docker-compose.yml.minio: Compose Deployment.executor&quot;: &quot;Run&quot;,
+    &quot;Docker.docker-compose.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
+    &quot;JavaScript Debug.localhost:5173.executor&quot;: &quot;Run&quot;,
+    &quot;Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;JavaScript: code vision performance watcher&quot;,
+    &quot;Notification.DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/export/home/toast/workspace/illumos/aurora/opencloud&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
+    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
+    &quot;org.rust.first.attach.projects.stats&quot;: &quot;true&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "postgresql"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;postgresql&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/web/prisma" />
@@ -223,7 +215,8 @@
       <workItem from="1714546270642" duration="23075000" />
       <workItem from="1719615085403" duration="9244000" />
       <workItem from="1719626782315" duration="8710000" />
-      <workItem from="1719646251291" duration="22644000" />
+      <workItem from="1719646251291" duration="22862000" />
+      <workItem from="1719729904478" duration="418000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />
@@ -265,7 +258,15 @@
       <option name="project" value="LOCAL" />
       <updated>1719665192605</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Changeset detection fixups">
+      <option name="closed" value="true" />
+      <created>1719702722993</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1719702722995</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -289,7 +290,9 @@
     <MESSAGE value="Rewrite Job Logic on forge side" />
     <MESSAGE value="Implement Changerequest tracking" />
     <MESSAGE value="Fixup all daemons" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fixup all daemons" />
+    <MESSAGE value="Changeset detection fixups" />
+    <MESSAGE value="Fix accidentally commited VIM exit sequence" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix accidentally commited VIM exit sequence" />
     <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
   </component>
 </project>
