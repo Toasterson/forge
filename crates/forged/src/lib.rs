@@ -458,10 +458,16 @@ pub async fn listen(cfg: Config) -> Result<()> {
     debug!("Setting up Filesystem Operator");
     let mut op_builder = opendal::services::S3::default();
     op_builder.endpoint(&cfg.opendal.endpoint);
-    op_builder.region("default");
+    op_builder.region("auto");
     op_builder.bucket(&cfg.opendal.bucket);
     op_builder.access_key_id(&cfg.opendal.key_id);
     op_builder.secret_access_key(&cfg.opendal.secret_key);
+    op_builder.disable_config_load();
+    op_builder.disable_ec2_metadata();
+    let client_builder = reqwest::ClientBuilder::new().danger_accept_invalid_certs(true);
+    let http_client = opendal::raw::HttpClient::build(client_builder)?;
+    op_builder.http_client(http_client);
+
 
     let fs_operator = Operator::new(op_builder)?
         .layer(opendal::layers::LoggingLayer::default())

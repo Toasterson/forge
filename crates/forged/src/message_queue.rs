@@ -3,9 +3,10 @@ use crate::{Error, Result};
 use component::Recipe;
 use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::Channel;
-use forge::{ActivityObject, ComponentChangeKind, Event, JobReport, JobReportData};
-use tracing::{debug, error, instrument};
+use forge::{ActivityObject, Event, JobReport, JobReportData};
+use tracing::{debug, error, info, instrument};
 use diff::Diff;
+use crate::prisma::read_filters::{StringFilter};
 
 #[instrument(skip_all)]
 pub async fn handle_message(
@@ -34,11 +35,21 @@ pub async fn handle_message(
                                 .clone()
                                 .ok_or(Error::NoVersionFoundInRecipe(recipe.name.clone()))?;
                             let revision = recipe.revision.clone().unwrap_or("0".to_string());
+
+                            // Check first if we have the gate we are trying to record a change for
+                            if !db.gate()
+                                .find_unique(
+                                    prisma::gate::UniqueWhereParam::IdEquals(gate_id.to_string()))
+                                .exec().await.is_ok() {
+                                info!("No gate record found for requested change to component {} skipping", name);
+                                continue;
+                            }
+
                             let mut set_params = vec![];
                             let component =
                                 db.component()
                                     .find_unique(
-                                        prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(name, gate_id.to_string(), version.clone(), revision.clone()),
+                                        prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(name.clone(), gate_id.to_string(), version.clone(), revision.clone()),
                                     ).exec().await?;
 
                             let change_kind = if component.is_some() {
@@ -79,21 +90,63 @@ pub async fn handle_message(
                             let patch_value = serde_json::to_value(&patches)?;
 
                             debug!("Writing component change to database");
-                            db.component_change()
-                                .create(
-                                    change_kind,
-                                    recipe_diff,
-                                    recipe_value,
-                                    version,
-                                    revision,
-                                    patch_value,
-                                    prisma::change_request::UniqueWhereParam::IdEquals(
-                                        change_request_id.clone(),
-                                    ),
-                                    set_params,
-                                )
-                                .exec()
-                                .await?;
+                            // Try to find an existing change for this component inside this CR (under the assumption a previous update already worked.)
+                            let possible_existing_component_change = db.component_change()
+                                .find_first(
+                                    vec![
+                                        prisma::component_change::WhereParam::And(
+                                            vec![
+                                                prisma::component_change::WhereParam::ChangeRequestId(
+                                                    StringFilter::Equals(change_request_id.to_string())),
+                                                prisma::component_change::WhereParam::Name(
+                                                    StringFilter::Equals(name.clone())),
+                                            ],
+                                        )
+                                    ],
+                                ).exec().await?;
+
+                            if let Some(db_component_change) = possible_existing_component_change {
+                                debug!("Found existing change updating it");
+                                set_params.push(prisma::component_change::SetParam::SetKind(change_kind));
+                                set_params.push(prisma::component_change::SetParam::SetDiff(recipe_diff));
+                                set_params.push(prisma::component_change::SetParam::SetRecipe(recipe_value));
+                                set_params.push(prisma::component_change::SetParam::SetVersion(version));
+                                set_params.push(prisma::component_change::SetParam::SetRevision(revision));
+                                set_params.push(prisma::component_change::SetParam::SetPatches(patch_value));
+
+                                db.component_change()
+                                    .update(
+                                        prisma::component_change::UniqueWhereParam::IdEquals(db_component_change.id),
+                                        set_params,
+                                    )
+                                    .exec()
+                                    .await?;
+                            } else {
+                                debug!("Creating new change record");
+                                db.component_change()
+                                    .create(
+                                        change_kind,
+                                        recipe_diff,
+                                        name.clone(),
+                                        recipe_value,
+                                        version,
+                                        revision,
+                                        patch_value,
+                                        prisma::change_request::UniqueWhereParam::IdEquals(
+                                            change_request_id.clone(),
+                                        ),
+                                        set_params,
+                                    )
+                                    .exec()
+                                    .await?;
+                            }
+
+                            db.change_request().update(
+                                prisma::change_request::UniqueWhereParam::IdEquals(change_request_id.clone()),
+                                vec![
+                                    prisma::change_request::SetParam::SetProcessing(false),
+                                ]
+                            ).exec().await?;
                         }
 
                         Ok(())
@@ -180,116 +233,21 @@ pub async fn handle_message(
                         ActivityObject::ChangeRequest(change_request) => {
                             // Take processing Component Changes that are processing and send them to the dedicated handler inbox
                             // Ones that have a defined change kind are to be upserted to the database as they are already processed externally
-                            for component_change in change_request.changes {
-                                // First we find the component this change relates to. May be none thus we assume it as optional
-                                let mut component_where_args =
-                                    vec![prisma::component::name::equals(
-                                        component_change.recipe.name.clone(),
-                                    )];
-                                if let Some(metadata) = &component_change.recipe.metadata {
-                                    for item in &metadata.0 {
-                                        match item.name.as_str() {
-                                            "anitya-id" => {
-                                                component_where_args.push(
-                                                    prisma::component::anitya_id::equals(Some(
-                                                        item.value.clone(),
-                                                    )),
-                                                );
-                                            }
-                                            "repology-id" => {
-                                                component_where_args.push(
-                                                    prisma::component::repology_id::equals(Some(
-                                                        item.value.clone(),
-                                                    )),
-                                                );
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                }
-                                let component = db
-                                    .component()
-                                    .find_first(vec![prisma::component::WhereParam::Or(
-                                        component_where_args,
-                                    )])
-                                    .exec()
-                                    .await?;
-                                match component_change.kind {
-                                    ComponentChangeKind::Processing => {
-                                        // If Processing is set it is assumed we need to check with the database
-                                        // if this component already exists or not
-                                        if let Some(component) = component {
-                                            // Component exists record a modification
-                                            let recipe: Recipe =
-                                                serde_json::from_value(component.recipe)?;
-                                            let _change = db.component_change().create(
-                                        prisma::ComponentChangeKind::Updated,
-                                        if let Some(diff) = &component_change.recipe_diff {
-                                            serde_json::to_value(diff).unwrap_or(serde_json::Value::Null)
-                                        } else {
-                                            serde_json::Value::Null
-                                        },
-                                        serde_json::to_value(&component_change.recipe).unwrap_or(serde_json::Value::Null),
-                                        component_change.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component_change.component_ref.clone()))?,
-                                        component_change.recipe.revision.unwrap_or(String::from("0")),
-                                        serde_json::Value::Null,
-                                        prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone()),
-                                        vec![
-                                            prisma::component_change::SetParam::ConnectComponent(prisma::component::UniqueWhereParam::NameGateIdVersionRevisionEquals(
-                                                recipe.name.clone(),
-                                                component.gate_id,
-                                                recipe.version.ok_or(Error::NoVersionFoundInRecipe(component.name.clone()))?,
-                                                recipe.revision.ok_or(Error::NoRevisionFoundInRecipe(component.name.clone()))?,
-                                            ),),
-                                            prisma::component_change::SetParam::ConnectChangeRequest(prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone())),
-                                        ],
-                                    ).exec().await?;
-                                        } else {
-                                            // record an addition
-                                            let _change = db.component_change().create(
-                                        prisma::ComponentChangeKind::Added,
-                                        if let Some(diff) = &component_change.recipe_diff {
-                                            serde_json::to_value(diff).unwrap_or(serde_json::Value::Null)
-                                        } else {
-                                            serde_json::Value::Null
-                                        },
-                                        serde_json::to_value(&component_change.recipe).unwrap_or(serde_json::Value::Null),
-                                        component_change.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component_change.component_ref.clone()))?,
-                                        component_change.recipe.revision.unwrap_or(String::from("0")),
-                                        serde_json::Value::Null,
-                                        prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone()),
-                                        vec![
-                                            prisma::component_change::SetParam::ConnectChangeRequest(prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone())),
-                                        ],
-                                    ).exec().await?;
-                                        }
-                                    }
-                                    kind => {
-                                        // if kind is known we assume we need to record that change.
-                                        let _change = db.component_change().create(
-                                    match kind {
-                                        ComponentChangeKind::Added => prisma::ComponentChangeKind::Added,
-                                        ComponentChangeKind::Updated => prisma::ComponentChangeKind::Updated,
-                                        ComponentChangeKind::Removed => prisma::ComponentChangeKind::Removed,
-                                        ComponentChangeKind::Processing => panic!("component kind processing should already have been caught. If you see this talk to the person originally designing this as you have broken it"),
-                                    },
-                                    if let Some(diff) = &component_change.recipe_diff {
-                                        serde_json::to_value(diff).unwrap_or(serde_json::Value::Null)
-                                    } else {
-                                        serde_json::Value::Null
-                                    },
-                                    serde_json::to_value(&component_change.recipe).unwrap_or(serde_json::Value::Null),
-                                    component_change.recipe.version.ok_or(Error::NoVersionFoundInRecipe(component_change.component_ref.clone()))?,
-                                    component_change.recipe.revision.unwrap_or(String::from("0")),
-                                    serde_json::Value::Null,
-                                    prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone()),
-                                    vec![
-                                        prisma::component_change::SetParam::ConnectChangeRequest(prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone())),
-                                    ],
-                                ).exec().await?;
-                                    }
-                                }
-                            }
+
+                            let db_change_request = db.change_request().upsert(
+                                prisma::change_request::UniqueWhereParam::IdEquals(change_request.id.clone()),
+                                (change_request.id, vec![
+                                    prisma::change_request::SetParam::SetProcessing(true),
+                                    prisma::change_request::SetParam::SetExternalReference(Some(change_request.external_ref.to_string()))
+                                ]),
+                                vec![],
+                            )
+                                .exec().await?;
+                            debug!(
+                                "created/updated change request with id: {} for reference: {}",
+                                db_change_request.id,
+                                change_request.external_ref.to_string()
+                            );
                             Ok(())
                         }
                         ActivityObject::Component { component, gate } => {

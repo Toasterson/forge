@@ -97,6 +97,7 @@ model ComponentChange {
   kind              ComponentChangeKind
   diff              Json                @db.JsonB
   component         Component?          @relation(fields: [componentName, gateId, componentVersion, componentRevision], references: [name, gateId, version, revision])
+  name              String
   recipe            Json                @db.JsonB
   version           String
   revision          String

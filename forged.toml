@@ -1,3 +1,5 @@
 [opendal]
-key_id = "LzCDn70myUBV9QCGwNiE"
-secret_key = "qQYR1kvXasLSObHRnj4iTxJD6KCMIwtv8lCpywWk"
+endpoint = "https://192.168.1.13"
+bucket = "forge-staging"
+key_id = "forge"
+secret_key = "rhu!xak0HYB7xmn0pxy"

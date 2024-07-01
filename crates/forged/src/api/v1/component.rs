@@ -4,6 +4,7 @@ use axum::body::Bytes;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::routing::post;
 use axum::{Json, Router};
+use futures::AsyncWriteExt;
 use component::{PackageMeta, Recipe};
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
@@ -392,18 +393,21 @@ async fn upload_to_component(
 
         trace!("starting download of {} to {}", &url, &tmp_name);
 
+
         let mut writer = state
             .fs_operator
             .writer_with(&tmp_name)
-            .buffer(8 * 1024 * 1024)
-            .await?;
+            .chunk(8 * 1024 * 1024)
+            .await?
+            .into_futures_async_write();
+
         let response = reqwest::get(url).await?;
         let content = response.bytes().await?;
-        tokio::io::copy(&mut content.to_vec().as_slice(), &mut writer).await?;
+        futures::io::copy(&mut content.to_vec().as_slice(), &mut writer).await?;
         writer.close().await?;
 
         let mut hasher = sha3::Sha3_256::new();
-        hasher.update(state.fs_operator.read(&tmp_name).await?);
+        hasher.update(state.fs_operator.read(&tmp_name).await?.to_vec());
         let result = hex::encode(hasher.finalize());
 
         let final_name = forge::ComponentFile {
@@ -441,14 +445,15 @@ async fn upload_to_component(
         let mut writer = state
             .fs_operator
             .writer_with(&tmp_name)
-            .buffer(8 * 1024 * 1024)
-            .await?;
+            .chunk(8 * 1024 * 1024)
+            .await?
+            .into_futures_async_write();
         let filename = file.0;
-        tokio::io::copy(&mut file.1.to_vec().as_slice(), &mut writer).await?;
+        futures::io::copy(&mut file.1.to_vec().as_slice(), &mut writer).await?;
         writer.close().await?;
 
         let mut hasher = sha3::Sha3_256::new();
-        hasher.update(state.fs_operator.read(&tmp_name).await?);
+        hasher.update(state.fs_operator.read(&tmp_name).await?.to_vec());
         let result = hex::encode(hasher.finalize());
 
         let final_name = forge::ComponentFile {

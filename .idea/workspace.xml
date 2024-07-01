@@ -8,8 +8,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b/storage_v2/_src_/database/forge.Z4vRBQ/schema/public.abK9xQ.meta" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/a8654926-7424-4f49-8b58-a08935907b4b/storage_v2/_src_/database/forge.Z4vRBQ/schema/public.abK9xQ.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/Run_forged.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/Run_forged.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240629135747_init/migration.sql" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/prisma/migrations/20240701191256_init/migration.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/prisma/schema.prisma" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/api/v1/component.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/forged/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/forged/src/prisma.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/prisma.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ghwhrecv/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/forged.toml" beforeDir="false" afterPath="$PROJECT_DIR$/forged.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -60,46 +72,47 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;Cargo.Build `Run forged`.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Build `Run github`.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run forged.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run ghwhrecv.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run github.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run pkgdev.executor&quot;: &quot;Debug&quot;,
-    &quot;Docker.docker-compose.dev.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.yml.minio: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;JavaScript Debug.localhost:5173.executor&quot;: &quot;Run&quot;,
-    &quot;Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;JavaScript: code vision performance watcher&quot;,
-    &quot;Notification.DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/export/home/toast/workspace/illumos/aurora/opencloud&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
-    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
-    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
-    &quot;org.rust.first.attach.projects.stats&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Cargo.Build `Run forged`.executor": "Run",
+    "Cargo.Build `Run ghwhrecv`.executor": "Run",
+    "Cargo.Build `Run github`.executor": "Run",
+    "Cargo.Run forged.executor": "Run",
+    "Cargo.Run ghwhrecv.executor": "Run",
+    "Cargo.Run github.executor": "Run",
+    "Cargo.Run pkgdev.executor": "Run",
+    "Docker.docker-compose.dev.yml: Compose Deployment.executor": "Run",
+    "Docker.docker-compose.yml.minio: Compose Deployment.executor": "Run",
+    "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
+    "JavaScript Debug.localhost:5173.executor": "Run",
+    "Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance": "JavaScript: code vision performance watcher",
+    "Notification.DoNotAsk-JavaScript: Code Vision Performance": "true",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.rust.reset.selective.auto.import": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/export/home/toast/workspace/illumos/aurora/opencloud",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "npm.dev.executor": "Run",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
+    "org.rust.first.attach.projects": "true",
+    "org.rust.first.attach.projects.stats": "true",
+    "settings.editor.selected.configurable": "language.rust",
+    "ts.external.directory.path": "/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;DatabaseDriversLRU&quot;: [
-      &quot;postgresql&quot;
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "postgresql"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/web/prisma" />
@@ -180,7 +193,7 @@
     </recent_temporary>
   </component>
   <component name="RustProjectSettings">
-    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin" />
   </component>
   <component name="RustfmtProjectSettings">
     <option name="useRustfmt" value="true" />
@@ -271,6 +284,9 @@
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.prisma" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">

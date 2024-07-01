@@ -11,9 +11,9 @@ CREATE TYPE "ComponentChangeKind" AS ENUM ('Added', 'Updated', 'Removed');
 CREATE TABLE "Domain" (
     "id" UUID NOT NULL,
     "dnsName" TEXT NOT NULL,
-    "authconf"    JSONB NOT NULL,
-    "private_key" TEXT  NOT NULL,
-    "public_key"  TEXT  NOT NULL,
+    "authconf" JSONB NOT NULL,
+    "private_key" TEXT NOT NULL,
+    "public_key" TEXT NOT NULL,
 
     CONSTRAINT "Domain_pkey" PRIMARY KEY ("id")
 );
@@ -93,26 +93,27 @@ CREATE TABLE "ComponentChange" (
     "id" UUID NOT NULL,
     "kind" "ComponentChangeKind" NOT NULL,
     "diff" JSONB NOT NULL,
+    "name" TEXT NOT NULL,
     "recipe" JSONB NOT NULL,
     "version" TEXT NOT NULL,
     "revision" TEXT NOT NULL,
-    "patches"         JSONB NOT NULL,
+    "patches" JSONB NOT NULL,
     "scripts" TEXT[],
     "archives" TEXT[],
     "componentName" TEXT,
     "componentVersion" TEXT,
     "componentRevision" TEXT,
     "gateId" UUID,
-    "changeRequestId" TEXT  NOT NULL,
+    "changeRequestId" TEXT NOT NULL,
 
     CONSTRAINT "ComponentChange_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ChangeRequest" (
-                                 "id"               TEXT NOT NULL,
+    "id" TEXT NOT NULL,
     "processing" BOOLEAN NOT NULL DEFAULT false,
-                                 "waitForRequestId" TEXT,
+    "waitForRequestId" TEXT,
     "build_order" TEXT[],
     "external_reference" TEXT,
 

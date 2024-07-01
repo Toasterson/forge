@@ -34,10 +34,9 @@ pub fn build_public_id(
     id: &str,
 ) -> Result<Url, ParseError> {
     match kind {
-        IdKind::Actor => format!("{}/actors/{}", base_url, id),
-        IdKind::ChangeRequest => format!("{}/objects/changeRequests/{}/{}", base_url, parent, id),
+        IdKind::Actor => base_url.join(&format!("/actors/{}", id)),
+        IdKind::ChangeRequest => base_url.join(&format!("/objects/changeRequests/{}/{}", parent, id)),
     }
-    .parse()
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -191,7 +190,7 @@ pub struct Milestone {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, Ord, PartialOrd, PartialEq)]
 pub enum ChangeRequestState {
     Open,
     Draft,

@@ -28,14 +28,14 @@ strum.workspace = true
 integration.workspace = true
 prisma-client-rust.workspace = true
 component.workspace = true
-itertools = "0.12.1"
+itertools = "0.13.0"
 forge.workspace = true
-opendal = "0.45.1"
+opendal = { version = "0.47.1", features = [ "services-s3" ]}
 reqwest = { version = "0.12.4", features = ["blocking"] }
 twox-hash = "1.6.3"
 sha3 = "0.10.8"
 hex = "0.4.3"
-octorust = "0.7.0"
+octorust = "0.8.0-rc.1"
 chrono = "0.4.38"
 openssh-keys = "0.6.2"
 utoipa.workspace = true
