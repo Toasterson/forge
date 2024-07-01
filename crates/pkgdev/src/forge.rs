@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use clap::{Subcommand, ValueEnum};
 use miette::Diagnostic;
 use reqwest::header::HeaderMap;
-use schemars::_private::NoSerialize;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -17,7 +16,7 @@ use gate::{Gate, GateError};
 
 use crate::{get_project_dir, openid};
 use crate::forge::api::{Client, types};
-use crate::forge::api::types::{ActorSshKeyFingerprint, ApiError};
+use crate::forge::api::types::ActorSshKeyFingerprint;
 
 mod api {
     include!(concat!(env!("OUT_DIR"), "/forge.codegen.rs"));
