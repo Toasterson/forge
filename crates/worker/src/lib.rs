@@ -1,6 +1,6 @@
 use axum::{response::IntoResponse, routing::get, Json, Router};
 use clap::Parser;
-use component::{Component, SourceNode};
+use component::{Component, PackageMeta, SourceNode};
 use component::Recipe;
 use config::{Environment, File};
 use deadpool_lapin::lapin::message::Delivery;
@@ -310,16 +310,16 @@ async fn handle_message(
             let changed_files = get_changed_files(&build_dir, &cr.base)?;
             let changed_components = get_changed_components(component_list, changed_files);
             create_gen_meatdata_script(&build_dir, &manifest)?;
-            let mut recipes: Vec<(String, Recipe, Vec<PatchFile>)> = vec![];
+            let mut recipes: Vec<(String, Recipe, Option<PackageMeta>, Vec<PatchFile>)> = vec![];
             for component in changed_components {
-                let recipe = get_component_metadata(
+                let (recipe, package_meta) = get_component_metadata(
                     &build_dir,
                     &component,
                     manifest.change_to_component_dir,
                     &manifest.component_metadata_filename,
                 )?;
                 let patches = get_component_patches(&build_dir, &component, &recipe)?;
-                recipes.push((component, recipe, patches));
+                recipes.push((component, recipe, package_meta, patches));
             }
             debug!("Fetched recipes successfully");
 
@@ -474,7 +474,7 @@ fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
     component: &str,
     change_to_component_dir: bool,
     metadata_file_name: &str,
-) -> Result<Recipe> {
+) -> Result<(Recipe, Option<PackageMeta>)> {
     debug!("running create_metadata script");
     let mut script_cmd = Command::new("bash");
     script_cmd.arg("-ex");
@@ -500,7 +500,7 @@ fn get_component_metadata<P: AsRef<Path> + std::fmt::Debug>(
         .join(component)
         .join(metadata_file_name);
     let c = Component::open_local(metadata_file_path)?;
-    Ok(c.recipe)
+    Ok((c.recipe, c.package_meta))
 }
 
 #[instrument]

@@ -99,6 +99,7 @@ model ComponentChange {
   component         Component?          @relation(fields: [componentName, gateId, componentVersion, componentRevision], references: [name, gateId, version, revision])
   name              String
   recipe            Json                @db.JsonB
+  package_meta      Json                @db.JsonB @default("{}")
   version           String
   revision          String
   gate              Gate?               @relation(fields: [gateId], references: [id])
@@ -111,6 +112,7 @@ model ComponentChange {
   componentRevision String?
   gateId            String?             @db.Uuid
   changeRequestId   String
+  applied           Boolean             @default(false)
 }
 
 enum ComponentChangeKind {
@@ -122,6 +124,7 @@ enum ComponentChangeKind {
 model ChangeRequest {
   id                 String            @id
   processing         Boolean           @default(false)
+  state              ChangeRequestState @default(Closed)
   component_changes  ComponentChange[]
   waitForRequest     ChangeRequest?    @relation("waitForRequest", fields: [waitForRequestId], references: [id])
   waitForRequestId   String?
@@ -129,6 +132,13 @@ model ChangeRequest {
   build_order        String[]
   external_reference String?
   Jobs               BuildJob[]
+}
+
+enum ChangeRequestState {
+    Open
+    Draft
+    Closed
+    Applied
 }
 
 model BuildJob {

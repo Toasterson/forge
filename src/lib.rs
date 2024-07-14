@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::{ParseError, Url};
 
-use component::{Component, Recipe, RecipeDiff};
+use component::{Component, PackageMeta, Recipe, RecipeDiff};
 use gate::Gate;
 use uuid::Uuid;
 
@@ -286,7 +286,7 @@ pub enum JobReportData {
     GetRecipes {
         gate_id: Uuid,
         change_request_id: String,
-        recipes: Vec<(String, Recipe, Vec<PatchFile>)>,
+        recipes: Vec<(String, Recipe, Option<PackageMeta>, Vec<PatchFile>)>,
     },
 }
 

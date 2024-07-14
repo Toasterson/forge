@@ -304,6 +304,7 @@ async fn import_component(
     Ok(Json(component_from_database(component)?))
 }
 
+#[allow(dead_code)]
 #[derive(ToSchema, Debug)]
 pub struct Upload {
     pub identifier: ComponentIdentifier,

@@ -12,6 +12,7 @@ use pasetors::Public;
 
 use crate::{prisma, AppState, Error};
 
+#[allow(dead_code)]
 pub struct Authentication {
     pub token: TrustedToken,
 }

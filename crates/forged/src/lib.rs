@@ -38,6 +38,7 @@ mod api;
 mod message_queue;
 #[allow(warnings, unused)]
 mod prisma;
+mod component_helpers;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -109,6 +110,9 @@ pub enum Error {
 
     #[error("no project URL found in component with name: {0}")]
     NoProjectUrlFoundInRecipe(String),
+
+    #[error(transparent)]
+    SemverError(#[from] semver::Error),
 
     #[error(transparent)]
     MultipartError(#[from] MultipartError),
@@ -422,6 +426,7 @@ pub async fn set_domain(cfg: Config, name: String, gh_client_id: Option<String>)
 }
 
 #[derive(Debug, Clone, FromRef)]
+#[allow(dead_code)]
 struct AppState {
     amqp: Pool,
     prisma: Arc<Mutex<PrismaClient>>,

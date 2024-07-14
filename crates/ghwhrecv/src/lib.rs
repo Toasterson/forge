@@ -203,7 +203,7 @@ fn build_change_request(
         body: shared.pull_request.body.unwrap_or(String::new()),
         changes: vec![],
         external_ref: forge::ExternalReference::GitHub {
-            pull_request: shared.pull_request.url,
+            pull_request: format!("{}/{}", &shared.repository.full_name, &shared.number),
         },
         state: if shared.pull_request.draft || is_set_to_draft_event {
             ChangeRequestState::Draft
@@ -286,12 +286,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })),
-                        Some(forge::Job::GetRecipes {
-                            cr_id: change_request_id.clone(),
-                            cr,
-                            gate_id: gate_id.clone(),
-                        }),
+                        })), None,
                     )
                 }
                 github::PullRequestPayload::ConvertedToDraft { shared } => {
@@ -309,12 +304,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })),
-                        Some(forge::Job::GetRecipes {
-                            cr_id: change_request_id.clone(),
-                            cr,
-                            gate_id: gate_id.clone(),
-                        }),
+                        })), None,
                     )
                 }
                 github::PullRequestPayload::ReadyForReview { shared } => {
@@ -332,12 +322,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })),
-                        Some(forge::Job::GetRecipes {
-                            cr_id: change_request_id.clone(),
-                            cr,
-                            gate_id: gate_id.clone(),
-                        }),
+                        })), None,
                     )
                 }
                 github::PullRequestPayload::Demilestoned { shared, .. } => {
@@ -355,12 +340,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })),
-                        Some(forge::Job::GetRecipes {
-                            cr_id: change_request_id.clone(),
-                            cr,
-                            gate_id: gate_id.clone(),
-                        }),
+                        })), None,
                     )
                 }
                 github::PullRequestPayload::Milestoned { shared, .. } => {
@@ -378,12 +358,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })),
-                        Some(forge::Job::GetRecipes {
-                            cr_id: change_request_id.clone(),
-                            cr,
-                            gate_id: gate_id.clone(),
-                        }),
+                        })), None,
                     )
                 }
                 github::PullRequestPayload::Dequeued { .. } => {
