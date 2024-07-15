@@ -9,7 +9,6 @@
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/worker/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/worker/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -113,7 +112,7 @@
       <recent name="$PROJECT_DIR$/web/src/routes" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run forged">
+  <component name="RunManager" selected="Cargo.Run ghwhrecv">
     <configuration name="Run ghwhrecv" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="command" value="run --package ghwhrecv" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -222,7 +221,7 @@
       <workItem from="1720113761050" duration="1751000" />
       <workItem from="1720886629963" duration="8123000" />
       <workItem from="1720940292568" duration="26257000" />
-      <workItem from="1721028575427" duration="2556000" />
+      <workItem from="1721028575427" duration="3543000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />

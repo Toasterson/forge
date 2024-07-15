@@ -140,6 +140,7 @@ pub fn load_config(args: Args) -> Result<Config> {
     Ok(cfg.try_deserialize()?)
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct AppState {
     amqp: deadpool_lapin::Pool,
