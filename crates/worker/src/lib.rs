@@ -379,10 +379,13 @@ fn get_changed_files<P: AsRef<Path> + std::fmt::Debug>(
     target_branch_ref: &CommitRef,
 ) -> Result<Vec<String>> {
     debug!("Detecting changed files");
+    let target_sha = format!("{}..", &target_branch_ref.sha);
+
     let mut diff_cmd = Command::new("git");
-    diff_cmd.arg("diff");
+    diff_cmd.arg("show");
     diff_cmd.arg("--name-only");
-    diff_cmd.arg(target_branch_ref.sha.as_str());
+    diff_cmd.arg("--format=tformat:");
+    diff_cmd.arg(target_sha.as_str());
     diff_cmd.current_dir(ws.as_ref());
     let out = diff_cmd.output()?;
     if !out.status.success() {

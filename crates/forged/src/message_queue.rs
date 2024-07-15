@@ -209,6 +209,22 @@ pub async fn handle_message(
                                         prisma::change_request::SetParam::SetExternalReference(
                                             Some(change_request.external_ref.to_string()),
                                         ),
+                                        prisma::change_request::SetParam::SetState(
+                                            match change_request.state {
+                                                ChangeRequestState::Open => {
+                                                    prisma::ChangeRequestState::Open
+                                                }
+                                                ChangeRequestState::Draft => {
+                                                    prisma::ChangeRequestState::Draft
+                                                }
+                                                ChangeRequestState::Closed => {
+                                                    prisma::ChangeRequestState::Closed
+                                                }
+                                                ChangeRequestState::Applied => {
+                                                    prisma::ChangeRequestState::Applied
+                                                }
+                                            },
+                                        )
                                     ],
                                 )
                                 .exec()
