@@ -1,3 +1,4 @@
+use crate::component_helpers::find_latest_component_in_set;
 use crate::prisma::read_filters::{BoolFilter, StringFilter};
 use crate::prisma::{self, PrismaClient};
 use crate::{Error, Result};
@@ -7,7 +8,6 @@ use deadpool_lapin::lapin::Channel;
 use diff::Diff;
 use forge::{ActivityObject, ChangeRequestState, Event, JobReport, JobReportData};
 use tracing::{debug, error, info, instrument};
-use crate::component_helpers::find_latest_component_in_set;
 
 #[instrument(skip_all)]
 pub async fn handle_message(
@@ -52,14 +52,18 @@ pub async fn handle_message(
                             }
 
                             let mut set_params = vec![];
-                            let components =
-                                db.component()
-                                    .find_many(
-                                        vec![
-                                            prisma::component::WhereParam::Name(StringFilter::Equals(name.clone())),
-                                            prisma::component::WhereParam::GateId(StringFilter::Equals(gate_id.to_string())),
-                                        ]
-                                    ).exec().await?;
+                            let components = db
+                                .component()
+                                .find_many(vec![
+                                    prisma::component::WhereParam::Name(StringFilter::Equals(
+                                        name.clone(),
+                                    )),
+                                    prisma::component::WhereParam::GateId(StringFilter::Equals(
+                                        gate_id.to_string(),
+                                    )),
+                                ])
+                                .exec()
+                                .await?;
 
                             let change_kind = if !components.is_empty() {
                                 debug!("Component has changed");
@@ -97,9 +101,11 @@ pub async fn handle_message(
 
                             if let Some(package_meta) = package_meta {
                                 let package_meta_value = serde_json::to_value(&package_meta)?;
-                                set_params.push(prisma::component_change::SetParam::SetPackageMeta(
-                                    package_meta_value
-                                ));
+                                set_params.push(
+                                    prisma::component_change::SetParam::SetPackageMeta(
+                                        package_meta_value,
+                                    ),
+                                );
                             }
 
                             let patch_value = serde_json::to_value(&patches)?;
@@ -224,7 +230,7 @@ pub async fn handle_message(
                                                     prisma::ChangeRequestState::Applied
                                                 }
                                             },
-                                        )
+                                        ),
                                     ],
                                 )
                                 .exec()
@@ -312,15 +318,33 @@ pub async fn handle_message(
                                             ),
                                         ],
                                     ),
-                                    vec![],
+                                    vec![
+                                        prisma::change_request::SetParam::SetExternalReference(
+                                            Some(change_request.external_ref.to_string()),
+                                        ),
+                                        prisma::change_request::SetParam::SetState(
+                                            match change_request.state {
+                                                ChangeRequestState::Open => {
+                                                    prisma::ChangeRequestState::Open
+                                                }
+                                                ChangeRequestState::Draft => {
+                                                    prisma::ChangeRequestState::Draft
+                                                }
+                                                ChangeRequestState::Closed => {
+                                                    prisma::ChangeRequestState::Closed
+                                                }
+                                                ChangeRequestState::Applied => {
+                                                    prisma::ChangeRequestState::Applied
+                                                }
+                                            },
+                                        ),
+                                    ],
                                 )
-                                .with(
-                                    prisma::change_request::component_changes::fetch(vec![
-                                        prisma::component_change::WhereParam::Applied(
-                                            BoolFilter::Equals(false)
-                                        )
-                                    ])
-                                )
+                                .with(prisma::change_request::component_changes::fetch(vec![
+                                    prisma::component_change::WhereParam::Applied(
+                                        BoolFilter::Equals(false),
+                                    ),
+                                ]))
                                 .exec()
                                 .await?;
                             debug!(
@@ -331,6 +355,7 @@ pub async fn handle_message(
 
                             match db_change_request.state {
                                 prisma::ChangeRequestState::Applied => {
+                                    info!("Change Request {} has been applied Checking if any Changes still need applying", &db_change_request.id);
                                     db._transaction().run::<crate::Error, _, _, _>(|db| async move {
                                         if let Some(changes) = db_change_request.component_changes {
                                             for change in changes {
@@ -360,6 +385,7 @@ pub async fn handle_message(
                                                     }
                                                 }
 
+                                                info!("Applying Component change for {}@{}-{}", &name, &version, &revision);
                                                 db.component_change().update(
                                                     prisma::component_change::UniqueWhereParam::IdEquals(change.id),
                                                     vec![
@@ -384,6 +410,7 @@ pub async fn handle_message(
                                         }
                                         Ok(())
                                     }).await?;
+                                    info!("Merged Changes into Component Database");
                                 }
                                 _ => {}
                             }
