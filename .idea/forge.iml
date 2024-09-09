@@ -25,6 +25,8 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/gate/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/component/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/pkgdev/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/pkgdev/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/config/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/external_crates/seaography/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>

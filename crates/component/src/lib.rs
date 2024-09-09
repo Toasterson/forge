@@ -35,7 +35,7 @@ pub enum ComponentError {
     UnknownBuildType(String),
 
     #[error("build types {0} and {1} are not mergeable")]
-    NonMergableBuildSections(String, String),
+    NonMergeableBuildSections(String, String),
 
     #[error(transparent)]
     UninitializedFieldError(#[from] derive_builder::UninitializedFieldError),

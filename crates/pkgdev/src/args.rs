@@ -5,7 +5,7 @@ use miette::IntoDiagnostic;
 use strum::Display;
 
 use gate::Gate;
-
+use crate::build::{run_build, BuildArgs};
 use crate::create::create_component;
 use crate::forge::{handle_forge_interaction, ForgeArgs};
 use crate::metadata;
@@ -16,9 +16,10 @@ use crate::sources::download_sources;
 pub struct Args {
     #[arg(long, global = true)]
     /// Path to the gate kdl file adding gate wide settings to this all components
-    gate: Option<PathBuf>,
+    pub gate: Option<PathBuf>,
+
     #[clap(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
@@ -60,6 +61,19 @@ pub enum Commands {
         #[clap(subcommand)]
         args: ForgeArgs,
     },
+    #[clap(name = "build")]
+    Build {
+        #[clap(short, long, default_value = ".")]
+        component: Option<PathBuf>,
+
+        /// Allows one to change the workspace for this operation only. Intended for the CI usecase so that
+        /// multiple jobs can be run simultaneously
+        #[arg(long, short)]
+        workspace: Option<PathBuf>,
+
+        #[clap(subcommand)]
+        args: BuildArgs,
+    }
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -111,5 +125,8 @@ pub async fn run(args: Args) -> miette::Result<()> {
         Commands::Create { fmri, args } => create_component(args, fmri),
         Commands::Edit { component, args } => edit_component(component, gate, args),
         Commands::Forge { args } => Ok(handle_forge_interaction(&args).await?),
+        Commands::Build { component, args, workspace } => {
+            run_build()
+        }
     }
 }

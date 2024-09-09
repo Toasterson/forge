@@ -8,14 +8,39 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
+      <change afterPath="$PROJECT_DIR$/crates/config/Cargo.toml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/config/src/lib.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/compile.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/download.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/path.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/script.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/tarball.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/unpack.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/util.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/tests/build_ffmpeg.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/tests/common/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/encumbered/encumbered.kdl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sample_data/components/encumbered/ffmpeg/package.kdl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/forge.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/forge.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/forged/src/message_queue.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/workspace/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/workspace/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/workspace/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/workspace/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:dev" />
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
@@ -164,12 +189,12 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Cargo.Run pkgdev" />
-      <item itemvalue="Cargo.Run forged" />
       <item itemvalue="Cargo.Run ghwhrecv" />
+      <item itemvalue="JavaScript Debug.localhost:5173" />
       <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
       <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
-      <item itemvalue="JavaScript Debug.localhost:5173" />
+      <item itemvalue="Cargo.Run forged" />
+      <item itemvalue="Cargo.Run pkgdev" />
       <item itemvalue="npm.dev" />
     </list>
     <recent_temporary>
@@ -222,6 +247,15 @@
       <workItem from="1720886629963" duration="8123000" />
       <workItem from="1720940292568" duration="26257000" />
       <workItem from="1721028575427" duration="7481000" />
+      <workItem from="1723654587636" duration="280000" />
+      <workItem from="1724839644159" duration="651000" />
+      <workItem from="1724857014016" duration="100000" />
+      <workItem from="1724926910313" duration="698000" />
+      <workItem from="1725274221848" duration="829000" />
+      <workItem from="1725356520946" duration="4492000" />
+      <workItem from="1725387085063" duration="5450000" />
+      <workItem from="1725695017149" duration="8615000" />
+      <workItem from="1725796302959" duration="10284000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />

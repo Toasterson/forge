@@ -9,6 +9,8 @@ pub mod metadata;
 pub mod modify;
 pub mod openid;
 pub mod sources;
+pub mod build;
+
 #[derive(Debug, Error, Diagnostic)]
 pub enum Error {
     #[error("no $HOME directory defined")]

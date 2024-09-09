@@ -14,7 +14,7 @@ component.workspace = true
 integration.workspace = true
 thiserror.workspace = true
 miette = { workspace = true, features = ["fancy"] }
-config.workspace = true
+config = { version = "0.1.0", path = "../config" }
 serde.workspace = true
 serde_json.workspace = true
 url.workspace = true
@@ -22,7 +22,7 @@ clap = { workspace = true, features = ["derive"] }
 strum.workspace = true
 reqwest = { version = "0.11", features = ["rustls-tls", "json", "multipart", "stream"], default-features = false }
 reqwest_12 = { package = "reqwest", version = "0.12", features = ["rustls-tls", "json", "multipart", "stream"], default-features = false }
-workspace = { version = "*", path = "../workspace" }
+workspace = { version = "0.1.0", path = "../workspace" }
 repology.workspace = true
 semver = { version = "1.0.22", features = ["serde"] }
 gate.workspace = true
@@ -39,3 +39,8 @@ futures.workspace = true
 uuid = { version = "1.8.0", features = ["serde", "v4"] }
 regress = "0.9.1"
 schemars = { version = "0.8.17", features = ["uuid", "url"] }
+shellexpand = "3.1.0"
+fs_extra = "1.3.0"
+compress-tools = { version = "0.15.1", features = ["static", "blocking"] }
+microtemplate = "1.0.3"
+curl = "0.4.46"
