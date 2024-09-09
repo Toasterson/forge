@@ -4,22 +4,21 @@ use std::{
     process::Command,
 };
 
-use component::SourceSection;
+use crate::sources::derive_source_name;
+use crate::sources::path::add_extension;
+use component::{Component, SourceSection};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use workspace::Workspace;
-use config::Settings;
-use crate::sources::path::add_extension;
-use crate::sources::derive_source_name;
 
-pub fn unpack_sources<P: AsRef<Path>>(
+pub fn unpack_sources(
+    component: &Component,
     wks: &Workspace,
-    package_name: String,
-    bundle_path: P,
     sources: &[SourceSection],
 ) -> Result<()> {
-    let bundle_path = bundle_path.as_ref();
+
     let build_dir = wks.get_or_create_build_dir()?;
     std::env::set_current_dir(&build_dir).into_diagnostic()?;
+    let package_name = component.recipe.name.clone();
 
     for (source_idx, source) in sources.into_iter().enumerate() {
         let unpack_name = derive_source_name(package_name.clone());
@@ -29,24 +28,18 @@ pub fn unpack_sources<P: AsRef<Path>>(
             match src {
                 component::SourceNode::Archive(archive) => {
                     let src_url: url::Url = archive.src.parse().into_diagnostic()?;
-
                     let local_file = wks.get_file_path(&src_url)?;
-
-                    let file_name = local_file.file_name().ok_or(miette::miette!("Archive must have a file_name. A Folder with / at the end can not be an archive"))?;
-                    let archive_path =
-                        Settings::get_or_create_archives_dir().into_diagnostic()?.join(Path::new(file_name));
-
-                    archive_unpack(&archive_path, &unpack_path, &package_name)?;
+                    archive_unpack(&local_file, &unpack_path, &package_name)?;
                 }
                 component::SourceNode::Git(git_src) => {
                     let file_name = add_extension(git_src.get_repo_prefix(), "tar.gz");
-                    let archive_path = Settings::get_or_create_archives_dir().into_diagnostic()?.join(&file_name);
+                    let archive_download_path = wks.get_or_create_download_dir()?.join(file_name);
                     if node_idx == 0 && source_idx == 0 {
-                        archive_unpack(&archive_path, &unpack_path, &package_name)?;
+                        archive_unpack(&archive_download_path, &unpack_path, &package_name)?;
                     } else {
                         if let Some(unpack_name) = git_src.directory {
                             let unpack_path = build_dir.join(unpack_name);
-                            archive_unpack(&archive_path, &unpack_path, &package_name)?;
+                            archive_unpack(&archive_download_path, &unpack_path, &package_name)?;
                         } else {
                             return Err(miette::miette!(
                                 "directory property is only optional in the first git source"
@@ -55,7 +48,7 @@ pub fn unpack_sources<P: AsRef<Path>>(
                     }
                 }
                 component::SourceNode::File(file) => {
-                    let src_path = file.get_bundle_path(bundle_path);
+                    let src_path = file.get_bundle_path(component.get_path());
                     let final_path = unpack_path.join(file.get_target_path());
 
                     if let Some(final_dir) = final_path.parent() {
@@ -77,7 +70,7 @@ pub fn unpack_sources<P: AsRef<Path>>(
                 }
                 component::SourceNode::Patch(patch) => {
                     let src_path = patch
-                        .get_bundle_path(bundle_path)
+                        .get_bundle_path(component.get_path())
                         .to_string_lossy()
                         .to_string();
                     let unpack_arg = unpack_path.to_string_lossy().to_string();
@@ -91,7 +84,8 @@ pub fn unpack_sources<P: AsRef<Path>>(
                     patch_cmd.arg("-i");
                     patch_cmd.arg(&src_path);
 
-                    let status = patch_cmd.status().into_diagnostic()?;
+                    let status = patch_cmd.status().into_diagnostic()
+                        .wrap_err("could not run gpatch")?;
 
                     if !status.success() {
                         return Err(miette::miette!("failed to patch sources"));
@@ -99,7 +93,7 @@ pub fn unpack_sources<P: AsRef<Path>>(
                 }
                 component::SourceNode::Overlay(overlay) => {
                     println!("Overlaying directory {}", unpack_path.display());
-                    let src_path = overlay.get_bundle_path(bundle_path);
+                    let src_path = overlay.get_bundle_path(component.get_path());
                     let final_path = unpack_path.clone();
                     let mut copy_opts = fs_extra::dir::CopyOptions::new();
                     copy_opts.overwrite = true;
@@ -111,7 +105,7 @@ pub fn unpack_sources<P: AsRef<Path>>(
                         "Copying directory {} into build workspace",
                         directory.get_name()
                     );
-                    let src_path = directory.get_bundle_path(bundle_path);
+                    let src_path = directory.get_bundle_path(component.get_path());
                     let final_path = build_dir.join(directory.get_target_path());
                     println!("{} -> {}", src_path.display(), final_path.display());
                     DirBuilder::new().create(&final_path).into_diagnostic()?;

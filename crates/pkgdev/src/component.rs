@@ -1,8 +1,8 @@
-use crate::Result;
+use miette::IntoDiagnostic;
 use component::Component;
 use gate::Gate;
 
-pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(component_path: P, gate: &Option<Gate>) -> Result<Component> {
+pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(component_path: P, gate: &Option<Gate>) -> miette::Result<Component> {
     let component_path = component_path.as_ref();
     let full_component_path = if let Some(gate) = gate {
         // If we have a gate we look for the component under <gate_path>/components/<component_path>
@@ -11,7 +11,7 @@ pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(component_path: P,
         component_path.to_path_buf()
     };
 
-    let full_component_path = full_component_path.canonicalize()?;
+    let full_component_path = full_component_path.canonicalize().into_diagnostic()?;
 
     Ok(Component::open_local(full_component_path.as_path())?)
 }

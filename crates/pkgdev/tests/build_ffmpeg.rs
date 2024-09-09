@@ -7,7 +7,7 @@ use pkgdev::build::BuildArgs;
 #[test]
 fn test_build_ffmpeg() {
     let run_command = Commands::Build {
-        component: PathBuf::from("sample_data/components/encumbered/ffmpeg"),
+        component: PathBuf::from("../../../sample_data/components/encumbered/components/ffmpeg"),
         args: BuildArgs { workspace: None },
     };
     let run_args = Args {

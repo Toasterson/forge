@@ -1,10 +1,12 @@
+use miette::Diagnostic;
 use std::fs::DirBuilder;
 use std::path::{Path, PathBuf};
+use config::{Value, ValueKind};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use workspace::{Workspace, WorkspaceConfig, WorkspaceError};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Diagnostic)]
 pub enum ConfigError {
     #[error(transparent)]
     ConfigError(#[from] config::ConfigError),
@@ -41,12 +43,23 @@ pub struct Settings {
     pub forges: Vec<ForgeToken>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ForgeToken {
     pub access_token: String,
     pub refresh_token: Option<String>,
     pub scope: Option<Vec<String>>,
     pub expires_in: Option<u64>,
+}
+
+impl Into<ValueKind> for ForgeToken {
+    fn into(self) -> ValueKind {
+        ValueKind::Table(config::Map::from([
+            ("access_token".to_string(), Value::from(self.access_token)),
+            ("refresh_token".to_string(), Value::from(self.refresh_token)),
+            ("scope".to_string(), Value::from(self.scope)),
+            ("expires_in".to_string(), Value::from(self.expires_in)),
+        ]))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,8 +75,7 @@ impl Settings {
     pub fn open() -> Result<Self> {
         let config_dir = Settings::get_or_create_config_dir()?;
         let config = config::Config::builder()
-            .set_default("workspace_config.path", Some(DEFAULT_WORKSPACE_DIR))?
-            .set_default("output", Some(DEFAULT_OUTPUT_DIR_DIR))?
+            .set_default("base_path", ".")?
             .set_default(
                 "search_path",
                 Some(vec![
@@ -73,7 +85,7 @@ impl Settings {
                     "/sbin",
                 ]),
             )?
-            .set_default("forges", vec![])?
+            .set_default("forges", Vec::<ForgeToken>::new())?
             .add_source(config::File::from(config_dir.join("config")).required(false))
             .build()?;
 

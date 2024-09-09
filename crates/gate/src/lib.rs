@@ -157,7 +157,11 @@ impl Gate {
     }
 
     pub fn get_gate_path(&self) -> PathBuf {
-        self.path.clone()
+        if let Some(parent) = self.path.parent() {
+            parent.to_path_buf()
+        } else {
+            PathBuf::from("/")
+        }
     }
 }
 

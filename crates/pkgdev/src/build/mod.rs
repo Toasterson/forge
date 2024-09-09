@@ -101,9 +101,8 @@ pub async fn run_build(component: &Component, gate: &Option<Gate>, wks: &Workspa
     }
 
     unpack::unpack_sources(
+        &component,
         &wks,
-        component.recipe.name.clone(),
-        component.get_path(),
         sources.as_slice(),
     )
         .wrap_err("unpack step failed")?;

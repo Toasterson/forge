@@ -51,6 +51,10 @@ impl Workspace {
     }
 
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if !path.as_ref().exists() {
+            // Canonicalize fails if path itself does not exist
+            create_dir_all(&path)?;
+        }
         let expanded_root_dir = std::fs::canonicalize(path.as_ref())?;
         let ws = Self {
             path: expanded_root_dir.clone(),

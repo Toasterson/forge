@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run pkgdev" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+  <configuration default="false" name="Run pkgdev forge connect" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
     <option name="command" value="run --package pkgdev --bin pkgdev -- forge connect -p github -s http://localhost:3100 toasterson" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs />
