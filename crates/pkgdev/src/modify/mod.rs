@@ -132,6 +132,7 @@ pub fn edit_component(
                             flags: vec![],
                             compiler: None,
                             linker: None,
+                            disable_destdir_configure_option: false,
                         });
                     }
                     BuildKind::Script => {
