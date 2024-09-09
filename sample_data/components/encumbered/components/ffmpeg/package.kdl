@@ -8,10 +8,12 @@ version "7.0.2"
 project-url "https://www.ffmpeg.org"
 source {
     archive "https://www.ffmpeg.org/releases/ffmpeg-7.0.2.tar.xz" sha256="8646515b638a3ad303e23af6a3587734447cb8fc0a0c064ecdb8e95c4fd8b389"
-    patch "03-test-awk.patch"
+    patch "03-test-awk.patch" drop-directories=1
 }
 build {
     configure {
+        disable-destdir-configure-option
+        option "prefix=/usr"
         option "mandir=${MANDIR}"
         option "bindir=${BINDIR}"
         option "libdir=${LIBDIR}"

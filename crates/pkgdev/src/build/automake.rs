@@ -90,7 +90,10 @@ pub fn build_using_automake(
     configure_cmd.env_clear();
     configure_cmd.envs(&env_flags);
     configure_cmd.args(&option_vec);
-    configure_cmd.arg(&destdir_arg);
+    if !build_section.disable_destdir_configure_option {
+        println!("DESTDIR option not injecting into configure script options");
+        configure_cmd.arg(&destdir_arg);
+    }
 
     configure_cmd.stdin(Stdio::null());
     configure_cmd.stdout(Stdio::inherit());

@@ -981,6 +981,8 @@ pub struct ConfigureBuildSection {
     pub compiler: Option<String>,
     #[knuffel(child, unwrap(argument))]
     pub linker: Option<String>,
+    #[knuffel(child, default=false)]
+    pub disable_destdir_configure_option: bool,
 }
 
 impl ConfigureBuildSection {
@@ -1004,6 +1006,11 @@ impl ConfigureBuildSection {
         if let Some(linker) = &self.linker {
             let mut n = kdl::KdlNode::new("linker");
             n.insert(0, linker.clone());
+            doc.nodes_mut().push(n);
+        }
+
+        if self.disable_destdir_configure_option {
+            let n = kdl::KdlNode::new("disable-destdir-option");
             doc.nodes_mut().push(n);
         }
 

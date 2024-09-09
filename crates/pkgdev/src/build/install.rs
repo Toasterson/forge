@@ -60,9 +60,10 @@ pub fn run_install(wks: &Workspace, pkg: &Component, settings: &Settings) -> Res
 
     let mut build_cmd = Command::new(build_tool.to_string());
     build_cmd.env_clear();
+    // According to GNU make defaults https://www.gnu.org/software/automake/manual/html_node/DESTDIR.html
+    build_cmd.arg(&destdir_arg);
     build_cmd.arg("install");
     build_cmd.envs(&env_flags);
-    build_cmd.arg(&destdir_arg);
 
     build_cmd.stdin(Stdio::null());
     build_cmd.stdout(Stdio::inherit());
