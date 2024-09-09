@@ -31,7 +31,7 @@ const DEFAULT_WORKSPACE_DIR: &str = "wks";
 const DEFAULT_OUTPUT_DIR_DIR: &str = "output";
 const DEFAULT_REPO_DIR_DIR: &str = "repo";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Settings {
     workspace_config: Option<WorkspaceConfig>,
     base_path: Option<String>,
@@ -73,6 +73,7 @@ impl Settings {
                     "/sbin",
                 ]),
             )?
+            .set_default("forges", vec![])?
             .add_source(config::File::from(config_dir.join("config")).required(false))
             .build()?;
 

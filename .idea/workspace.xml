@@ -8,22 +8,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/component.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/gate/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/gate/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/compile.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/compile.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/download.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/sources/download.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/path.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/script.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/script.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/unpack.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/sources/unpack.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/sources/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/sources/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/config/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/config/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -250,7 +236,7 @@
       <workItem from="1725387085063" duration="5450000" />
       <workItem from="1725695017149" duration="8615000" />
       <workItem from="1725796302959" duration="10284000" />
-      <workItem from="1725874825123" duration="3710000" />
+      <workItem from="1725874825123" duration="11751000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />
