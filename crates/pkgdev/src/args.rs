@@ -1,22 +1,28 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand, ValueEnum};
-use miette::IntoDiagnostic;
-use strum::Display;
-
-use gate::Gate;
 use crate::build::{run_build, BuildArgs};
+use crate::component::open_component_local;
 use crate::create::create_component;
 use crate::forge::{handle_forge_interaction, ForgeArgs};
 use crate::metadata;
 use crate::modify::{edit_component, EditArgs};
 use crate::sources::download_sources;
+use clap::{Parser, Subcommand, ValueEnum};
+use config::Settings;
+use gate::Gate;
+use miette::IntoDiagnostic;
+use strum::Display;
 
 #[derive(Debug, Parser)]
 pub struct Args {
     #[arg(long, global = true)]
     /// Path to the gate kdl file adding gate wide settings to this all components
     pub gate: Option<PathBuf>,
+
+    /// Allows one to change the workspace for this operation only. Intended for the CI usecase so that
+    /// multiple jobs can be run simultaneously
+    #[arg(long, short)]
+    workspace: Option<PathBuf>,
 
     #[clap(subcommand)]
     pub command: Commands,
@@ -28,8 +34,6 @@ pub enum Commands {
     Download {
         #[clap(short, long, default_value = ".")]
         component: PathBuf,
-        #[clap(default_value = ".")]
-        target_dir: PathBuf,
     },
     #[clap(name = "metadata")]
     Metadata {
@@ -63,15 +67,10 @@ pub enum Commands {
     },
     #[clap(name = "build")]
     Build {
-        #[clap(short, long, default_value = ".")]
-        component: Option<PathBuf>,
+        #[arg(short, long, default_value = ".")]
+        component: PathBuf,
 
-        /// Allows one to change the workspace for this operation only. Intended for the CI usecase so that
-        /// multiple jobs can be run simultaneously
-        #[arg(long, short)]
-        workspace: Option<PathBuf>,
-
-        #[clap(subcommand)]
+        #[command(flatten)]
         args: BuildArgs,
     }
 }
@@ -98,6 +97,14 @@ pub async fn run(args: Args) -> miette::Result<()> {
         None
     };
 
+    let settings = Settings::open().into_diagnostic()?;
+
+    let wks = if let Some(wks_path) = args.workspace {
+        settings.get_workspace_from(wks_path.as_path()).into_diagnostic()?
+    } else {
+        settings.get_current_wks().into_diagnostic()?
+    };
+
     match args.command {
         Commands::Metadata { args, format } => metadata::print_component(args, format),
         Commands::Generate { kind } => match kind {
@@ -120,13 +127,16 @@ pub async fn run(args: Args) -> miette::Result<()> {
         },
         Commands::Download {
             component,
-            target_dir,
-        } => download_sources(component, gate, target_dir).await,
+        } => {
+            let component = open_component_local(&component, &gate)?;
+            download_sources(&component, &wks, true).await
+        },
         Commands::Create { fmri, args } => create_component(args, fmri),
         Commands::Edit { component, args } => edit_component(component, gate, args),
         Commands::Forge { args } => Ok(handle_forge_interaction(&args).await?),
-        Commands::Build { component, args, workspace } => {
-            run_build()
+        Commands::Build { component, args } => {
+            let component = open_component_local(component, &gate)?;
+            run_build(&component, &gate, &wks, &settings, &args).await
         }
     }
 }

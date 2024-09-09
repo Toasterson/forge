@@ -73,6 +73,6 @@ pub fn expand_env(value: &str) -> Result<String> {
             .map(|r| r.to_string())
             .into_diagnostic()
     } else {
-        Ok(value.clone().to_string())
+        Ok(value.to_string())
     }
 }

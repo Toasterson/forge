@@ -8,32 +8,22 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
-      <change afterPath="$PROJECT_DIR$/crates/config/Cargo.toml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/config/src/lib.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/compile.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/download.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/path.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/script.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/tarball.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/unpack.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/util.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/tests/build_ffmpeg.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/pkgdev/tests/common/mod.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sample_data/components/encumbered/encumbered.kdl" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sample_data/components/encumbered/ffmpeg/package.kdl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/forge.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/forge.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/component.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/gate/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/gate/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/args.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/compile.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/compile.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/download.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/sources/download.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/path.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/script.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/script.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/unpack.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/sources/unpack.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/workspace/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/workspace/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/workspace/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/workspace/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/sources/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/sources/mod.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -73,6 +63,9 @@
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 7
 }</component>
@@ -85,59 +78,60 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;Cargo.Build `Run forged`.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Build `Run ghwhrecv`.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Build `Run github`.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run forged.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run ghwhrecv.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run github.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Run pkgdev.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.dev.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.yml.minio: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;JavaScript Debug.localhost:5173.executor&quot;: &quot;Run&quot;,
-    &quot;Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;JavaScript: code vision performance watcher&quot;,
-    &quot;Notification.DoNotAsk-JavaScript: Code Vision Performance&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/export/home/toast/workspace/illumos/aurora/opencloud&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
-    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
-    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
-    &quot;org.rust.first.attach.projects.stats&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;language.rust&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Cargo.Build `Run forged`.executor": "Run",
+    "Cargo.Build `Run ghwhrecv`.executor": "Run",
+    "Cargo.Build `Run github`.executor": "Run",
+    "Cargo.Run forged.executor": "Run",
+    "Cargo.Run ghwhrecv.executor": "Run",
+    "Cargo.Run github.executor": "Run",
+    "Cargo.Run pkgdev.executor": "Run",
+    "Docker.docker-compose.dev.yml: Compose Deployment.executor": "Run",
+    "Docker.docker-compose.yml.minio: Compose Deployment.executor": "Run",
+    "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
+    "JavaScript Debug.localhost:5173.executor": "Run",
+    "Notification.DisplayName-DoNotAsk-JavaScript: Code Vision Performance": "JavaScript: code vision performance watcher",
+    "Notification.DoNotAsk-JavaScript: Code Vision Performance": "true",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.rust.reset.selective.auto.import": "true",
+    "git-widget-placeholder": "develop",
+    "last_opened_file_path": "/export/home/toast/workspace/illumos/aurora/opencloud",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "npm.dev.executor": "Run",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
+    "org.rust.first.attach.projects": "true",
+    "org.rust.first.attach.projects.stats": "true",
+    "settings.editor.selected.configurable": "language.rust",
+    "ts.external.directory.path": "/export/home/toast/workspace/illumos/forge/web/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;DatabaseDriversLRU&quot;: [
-      &quot;postgresql&quot;
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "postgresql"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/web/prisma" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/crates/pkgdev/src/sources" />
       <recent name="$PROJECT_DIR$/crates/forged" />
       <recent name="$PROJECT_DIR$/" />
       <recent name="$PROJECT_DIR$/web/src/routes/[gate]/[...component]" />
       <recent name="$PROJECT_DIR$/web/src/routes" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run forged">
+  <component name="RunManager" selected="Cargo.Run pkgdev">
     <configuration name="Run ghwhrecv" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="command" value="run --package ghwhrecv" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -190,11 +184,11 @@
     </configuration>
     <list>
       <item itemvalue="Cargo.Run ghwhrecv" />
-      <item itemvalue="JavaScript Debug.localhost:5173" />
-      <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
-      <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
       <item itemvalue="Cargo.Run forged" />
       <item itemvalue="Cargo.Run pkgdev" />
+      <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
+      <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
+      <item itemvalue="JavaScript Debug.localhost:5173" />
       <item itemvalue="npm.dev" />
     </list>
     <recent_temporary>
@@ -256,6 +250,7 @@
       <workItem from="1725387085063" duration="5450000" />
       <workItem from="1725695017149" duration="8615000" />
       <workItem from="1725796302959" duration="10284000" />
+      <workItem from="1725874825123" duration="3710000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />

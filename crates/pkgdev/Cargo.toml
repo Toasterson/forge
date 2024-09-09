@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [build-dependencies]
-prettyplease = "0.1.25"
+prettyplease = "0.2.22"
 progenitor = { git = "https://github.com/oxidecomputer/progenitor" }
 serde_json.workspace = true
-syn = "1.0"
+syn = "2.0.77"
 
 [dependencies]
 component.workspace = true
@@ -31,16 +31,15 @@ directories = "5.0.1"
 forge.workspace = true
 octorust = "0.7.0"
 tokio.workspace = true
-octocrab = "0.38.0"
+octocrab = "0.39.0"
 secrecy = { version = "0.8.0", features = ["serde"] }
 either = "1.11.0"
 progenitor-client = { git = "https://github.com/oxidecomputer/progenitor" }
 futures.workspace = true
 uuid = { version = "1.8.0", features = ["serde", "v4"] }
-regress = "0.9.1"
 schemars = { version = "0.8.17", features = ["uuid", "url"] }
 shellexpand = "3.1.0"
 fs_extra = "1.3.0"
-compress-tools = { version = "0.15.1", features = ["static", "blocking"] }
+compress-tools = { version = "0.15.1", features = ["blocking"] }
 microtemplate = "1.0.3"
-curl = "0.4.46"
+file-matcher = "0.7.0"

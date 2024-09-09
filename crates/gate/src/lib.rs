@@ -33,7 +33,7 @@ pub enum GateError {
     Knuffel(#[from] knuffel::Error),
 }
 
-type GateResult<T> = std::result::Result<T, GateError>;
+type GateResult<T> = Result<T, GateError>;
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
 pub struct Gate {
@@ -155,6 +155,10 @@ impl Gate {
         f.write_all(doc.to_string().as_bytes())?;
         Ok(())
     }
+
+    pub fn get_gate_path(&self) -> PathBuf {
+        self.path.clone()
+    }
 }
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
@@ -214,7 +218,7 @@ impl Transform {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
 pub struct Distribution {
     #[knuffel(property(name = "type"), default, str)]
     pub distribution_type: DistributionType,

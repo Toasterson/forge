@@ -10,7 +10,7 @@ use component::{Component, ConfigureBuildSection};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use workspace::Workspace;
 use config::Settings;
-use crate::build::derive_source_name;
+use crate::sources::derive_source_name;
 
 pub fn build_using_automake(
     wks: &Workspace,

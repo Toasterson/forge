@@ -1,17 +1,16 @@
 use std::io::{copy, Cursor};
-use std::path::Path;
 use std::process::Command;
 
 use miette::{Diagnostic, IntoDiagnostic};
 use thiserror::Error;
 
-use component::{ArchiveSource, GitSource, SourceNode};
-use gate::Gate;
+use component::{ArchiveSource, Component, GitSource, SourceNode};
 use workspace::{HasherKind, Workspace};
 
 use crate::sources::path::add_extension;
 
-mod path;
+pub(crate) mod path;
+pub mod unpack;
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("hash mismatch\nexpected:\t{expected}\nactual:\t{actual}")]
@@ -20,20 +19,16 @@ pub struct HashMismatchError {
     actual: String,
 }
 
-pub async fn download_sources<P: AsRef<Path>>(
-    component: P,
-    _gate: Option<Gate>,
-    target_dir: P,
+pub async fn download_sources(
+    component: &Component,
+    wks: &Workspace,
+    archive_clean: bool,
 ) -> miette::Result<()> {
-    let wks = Workspace::new(target_dir)?;
-    let component = component::Component::open_local(component)?;
-    println!("Loaded component recipe: {}", &component.recipe.name);
-    let sources = component.recipe.sources;
-    for source in sources {
-        for src in source.sources {
+    for source in component.recipe.sources.iter() {
+        for src in source.sources.iter() {
             if let SourceNode::Archive(ar) = src {
                 println!("Downloading archive: {}", &ar.src);
-                match download_archive(&wks, &ar).await {
+                match download_archive(&wks, &ar, archive_clean).await {
                     Ok(_) => println!("Download finished"),
                     Err(err) => println!("{}\nwill continue with other downloads", err),
                 }
@@ -46,7 +41,11 @@ pub async fn download_sources<P: AsRef<Path>>(
     Ok(())
 }
 
-async fn download_archive(wks: &Workspace, archive: &ArchiveSource) -> miette::Result<()> {
+async fn download_archive(
+    wks: &Workspace,
+    archive: &ArchiveSource,
+    archive_clean: bool,
+) -> miette::Result<()> {
     let response = reqwest::get(&archive.src).await.into_diagnostic()?;
     let (hash, hasher_kind) = if let Some(sha256) = &archive.sha256 {
         Ok((sha256.clone(), HasherKind::Sha256))
@@ -58,8 +57,12 @@ async fn download_archive(wks: &Workspace, archive: &ArchiveSource) -> miette::R
         ))
     }?;
 
-    let mut dest =
-        wks.open_or_truncate_local_file(&archive.src.parse().into_diagnostic()?, hasher_kind)?;
+    let mut dest =if archive_clean {
+        wks.open_or_truncate_local_file(&archive.src.parse().into_diagnostic()?, hasher_kind)?
+    } else {
+        wks.open_local_file(&archive.src.parse().into_diagnostic()?, hasher_kind)?
+    };
+
     let mut content = Cursor::new(response.bytes().await.into_diagnostic()?);
     copy(&mut content, &mut dest).into_diagnostic()?;
     let computed_hash = dest.get_hash();
@@ -234,4 +237,8 @@ fn git_archive_get(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
             git.repository
         )))
     }
+}
+
+pub fn derive_source_name(package_name: String) -> String {
+    package_name.replace("/", "_")
 }

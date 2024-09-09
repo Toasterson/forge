@@ -6,7 +6,7 @@ use std::{
 
 use config::Settings;
 use workspace::Workspace;
-use crate::build::derive_source_name;
+use crate::sources::derive_source_name;
 use component::{Component, SourceNode};
 use fs_extra::file::write_all;
 use gate::Gate;
@@ -93,7 +93,7 @@ pub fn run_generate_filelist(wks: &Workspace, pkg: &Component) -> Result<()> {
 pub fn run_mogrify(
     wks: &Workspace,
     pkg: &Component,
-    gate: Option<Gate>,
+    gate: &Option<Gate>,
     transform_includes: Option<PathBuf>,
 ) -> Result<()> {
     let vars = StringInterpolationVars {
@@ -150,6 +150,7 @@ pub fn run_mogrify(
         if !gate.default_transforms.is_empty() {
             let mut include_str = gate
                 .default_transforms
+                .clone()
                 .into_iter()
                 .map(|tr| tr.to_string())
                 .collect::<Vec<String>>()

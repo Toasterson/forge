@@ -52,14 +52,16 @@ impl Workspace {
 
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let expanded_root_dir = std::fs::canonicalize(path.as_ref())?;
-        Ok(Self {
+        let ws = Self {
             path: expanded_root_dir.clone(),
             build_dir: Path::new(&expanded_root_dir)
-            .join("build")
-            .join(DEFAULTARCH),
+                .join("build")
+                .join(DEFAULTARCH),
             source_dir: Path::new(&expanded_root_dir).join("sources"),
             proto_dir: Path::new(&expanded_root_dir).join("build").join("proto"),
-        })
+        };
+        init_root(&ws)?;
+        Ok(ws)
     }
 
     pub fn from_config(config: &WorkspaceConfig) -> Result<Self> {

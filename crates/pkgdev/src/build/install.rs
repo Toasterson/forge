@@ -4,7 +4,7 @@ use component::Component;
 use miette::{IntoDiagnostic, Result};
 use config::Settings;
 use workspace::Workspace;
-use crate::build::derive_source_name;
+use crate::sources::derive_source_name;
 use std::process::Command;
 
 enum BuildTool {

@@ -1,14 +1,14 @@
 use std::{
-    collections::HashMap,
     fs::DirBuilder,
-    io::Write,
-    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
-use component::{Component, ConfigureBuildSection, ScriptBuildSection};
-use miette::{IntoDiagnostic, Result, WrapErr};
+use component::{Component, ScriptBuildSection};
+use config::Settings;
+use miette::{IntoDiagnostic, Result};
 use workspace::Workspace;
+use crate::build::util::copy_with_rsync;
+use crate::sources::derive_source_name;
 
 pub fn build_using_scripts(
     wks: &Workspace,
@@ -18,8 +18,7 @@ pub fn build_using_scripts(
 ) -> Result<()> {
     let build_dir = wks.get_or_create_build_dir()?;
     let unpack_name = derive_source_name(
-        pkg.package_document.name.clone(),
-        &pkg.package_document.sources[0],
+        pkg.recipe.name.clone(),
     );
     let unpack_path = build_dir.join(&unpack_name);
     std::env::set_current_dir(&unpack_path).into_diagnostic()?;
@@ -55,14 +54,14 @@ pub fn build_using_scripts(
         if let Some(prototype_dir) = &script.prototype_dir {
             println!(
                 "Copying prototype directory {} to workspace prototype directory",
-                &prototype_dir.display()
+                &prototype_dir
             );
 
             let mut copy_options = fs_extra::dir::CopyOptions::default();
             copy_options.overwrite = true;
             copy_options.content_only = true;
 
-            if let Some(prefix) = &pkg.package_document.prefix {
+            if let Some(prefix) = &pkg.recipe.prefix {
                 let prefix = if prefix.starts_with("/") {
                     &prefix[1..]
                 } else {
@@ -98,7 +97,7 @@ pub fn build_using_scripts(
     }
 
     for install_directive in &build_section.install_directives {
-        let target_path = if let Some(prefix) = &pkg.package_document.prefix {
+        let target_path = if let Some(prefix) = &pkg.recipe.prefix {
             let prefix = if prefix.starts_with("/") {
                 &prefix[1..]
             } else {

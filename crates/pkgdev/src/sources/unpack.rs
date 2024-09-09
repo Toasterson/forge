@@ -8,7 +8,8 @@ use component::SourceSection;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use workspace::Workspace;
 use config::Settings;
-use crate::{build::derive_source_name, build::path::add_extension, };
+use crate::sources::path::add_extension;
+use crate::sources::derive_source_name;
 
 pub fn unpack_sources<P: AsRef<Path>>(
     wks: &Workspace,
