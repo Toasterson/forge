@@ -5,6 +5,7 @@ mod compile;
 mod install;
 mod tarball;
 mod ips;
+mod dependencies;
 
 use clap::{Parser, ValueEnum};
 use workspace::Workspace;

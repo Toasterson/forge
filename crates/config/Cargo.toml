@@ -6,7 +6,6 @@ edition.workspace = true
 [dependencies]
 config.workspace = true
 directories = "5.0.1"
-fs_extra = "1.3.0"
 serde = { version = "1.0.199", features = ["derive"] }
 thiserror.workspace = true
 workspace = { version = "0.1.0", path = "../workspace" }

@@ -48,4 +48,3 @@ utoipa = { version = "4.2.0", features = ["axum_extras", "serde_yaml", "uuid", "
 pasetors = { version = "0.6.8", features = ["serde"] }
 base64 = "0.22.1"
 uuid = { version = "1.9.1", features = ["v4", "serde"] }
-diff-struct = "0.5.3"

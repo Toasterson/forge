@@ -26,20 +26,16 @@ workspace = { version = "0.1.0", path = "../workspace" }
 repology.workspace = true
 semver = { version = "1.0.22", features = ["serde"] }
 gate.workspace = true
-dirs = "5.0.1"
 directories = "5.0.1"
 forge.workspace = true
-octorust = "0.7.0"
 tokio.workspace = true
 octocrab = "0.39.0"
 secrecy = { version = "0.8.0", features = ["serde"] }
 either = "1.11.0"
 progenitor-client = { git = "https://github.com/oxidecomputer/progenitor" }
-futures.workspace = true
-uuid = { version = "1.8.0", features = ["serde", "v4"] }
-schemars = { version = "0.8.17", features = ["uuid", "url"] }
 shellexpand = "3.1.0"
 fs_extra = "1.3.0"
 compress-tools = { version = "0.15.1", features = ["blocking"] }
 microtemplate = "1.0.3"
 file-matcher = "0.7.0"
+uuid = { workspace = true, features = ["serde", "v4"] }

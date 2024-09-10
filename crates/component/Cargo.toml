@@ -16,4 +16,4 @@ knuffel = { version = "3.2.0", features = ["minicbor"] }
 schemars = { version = "0.8.16", features = ["semver", "chrono", "url", "uuid1", "derive_json_schema"] }
 serde_json.workspace = true
 utoipa.workspace = true
-diff-struct.workspace = true
+diff-struct = "0.5.3"

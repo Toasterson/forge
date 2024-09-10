@@ -6,7 +6,6 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-github.workspace = true
 miette = { workspace = true, features = ["fancy"] }
 thiserror.workspace = true
 serde.workspace = true
@@ -23,16 +22,12 @@ serde_json.workspace = true
 #f3-rs = { git = "https://git.batsense.net/ForgeFlux/f3-rs.git", version = "0.1.0" }
 futures.workspace = true
 uuid = { version = "1.6.1", features = ["v4", "serde"] }
-lazy_static = "1.4.0"
-strum.workspace = true
-integration.workspace = true
 prisma-client-rust.workspace = true
 component.workspace = true
 itertools = "0.13.0"
 forge.workspace = true
 opendal = { version = "0.47.1", features = [ "services-s3" ]}
 reqwest = { version = "0.12.4", features = ["blocking"] }
-twox-hash = "1.6.3"
 sha3 = "0.10.8"
 hex = "0.4.3"
 octorust = "0.8.0-rc.1"
@@ -43,8 +38,5 @@ pasetors.workspace = true
 utoipa-rapidoc = { version = "3.0.0", features = ["axum"] }
 utoipa-redoc = { version = "3.0.0", features = ["axum"] }
 utoipa-swagger-ui = { version = "6.0.0", features = ["axum"] }
-pkcs8 = { version = "0.10.2", features = ["std", "pem"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
-base64.workspace = true
-diff-struct.workspace = true
 semver = "1.0.23"

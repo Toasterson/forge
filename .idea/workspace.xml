@@ -8,11 +8,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
+      <change afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/dependencies.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/component/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/component/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/automake.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/install.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sample_data/components/encumbered/components/ffmpeg/package.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/components/encumbered/components/ffmpeg/package.kdl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -258,7 +256,7 @@
       <workItem from="1725387085063" duration="5450000" />
       <workItem from="1725695017149" duration="8615000" />
       <workItem from="1725796302959" duration="10284000" />
-      <workItem from="1725874825123" duration="20467000" />
+      <workItem from="1725874825123" duration="22776000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />
