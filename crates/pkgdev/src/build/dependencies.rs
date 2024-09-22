@@ -16,7 +16,8 @@ fn install_development_dependencies(pkg: &Component) -> Result<()> {
         )
         .collect::<Vec<String>>();
 
-    let pkg_status = Command::new("pkg")
+    let pkg_status = Command::new("pfexec")
+        .arg("pkg")
         .arg("install")
         .args(build_dependencies.iter().map(|d|d.as_str()))
         .status()
