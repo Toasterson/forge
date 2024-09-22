@@ -7,6 +7,7 @@ use workspace::Workspace;
 const INSTALLED_PACKAGES_FILE: &str = "installed_packages.txt";
 
 fn install_development_dependencies(pkg: &Component) -> Result<()> {
+    println!("Installing all development dependencies in one transaction");
     let build_dependencies = pkg.recipe.dependencies
         .iter()
         .filter(|d| d.dev)
@@ -59,6 +60,7 @@ pub fn ensure_packages_are_installed(wks: &Workspace, force_refresh: bool, pkg: 
     for dep in pkg.recipe.dependencies.iter(){
         if dep.dev {
             if !package_list.contains(&dep.name) {
+                println!("Package {} not installed", &dep.name);
                 run_install = true
             }
         }
