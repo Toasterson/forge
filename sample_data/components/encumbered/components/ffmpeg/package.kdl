@@ -14,9 +14,6 @@ build {
     configure {
         disable-destdir-configure-option
         option "prefix=/usr"
-        option "mandir=${MANDIR}"
-        option "bindir=${BINDIR}"
-        option "libdir=${LIBDIR}"
         option "cc=/usr/bin/gcc"
         option "enable-runtime-cpudetect"
         option "enable-mmx"
