@@ -44,6 +44,7 @@ use config::Settings;
 use gate::Gate;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use script::build_using_scripts;
+use crate::build::dependencies::ensure_packages_are_installed;
 
 pub fn build_package_sources(wks: &Workspace, pkg: &Component, settings: &Settings) -> Result<()> {
     for section in pkg.recipe.build_sections.iter() {
@@ -89,6 +90,8 @@ pub async fn run_build(component: &Component, gate: &Option<Gate>, wks: &Workspa
             .into_diagnostic()
             .wrap_err("could not clean the manifest directory")?;
     }
+
+    ensure_packages_are_installed(wks, false, &component)?;
 
     let sources: Vec<SourceSection> = component.recipe.sources.clone();
 

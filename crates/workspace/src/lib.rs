@@ -72,6 +72,10 @@ impl Workspace {
         Self::new(&config.path)
     }
 
+    pub fn get_root_path(&self) -> PathBuf {
+        self.path.clone()
+    }
+
     pub fn get_or_create_download_dir(&self) -> Result<PathBuf> {
         let download_dir = self.path.join("downloads");
         if !download_dir.exists() {
