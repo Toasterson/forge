@@ -47,14 +47,16 @@ fn get_installed_packages_list(wks: &Workspace) -> Result<()> {
 }
 
 pub fn ensure_packages_are_installed(wks: &Workspace, force_refresh: bool, pkg: &Component) -> Result<()> {
-    let stat = std::fs::metadata(wks.get_root_path().join(INSTALLED_PACKAGES_FILE))
-        .into_diagnostic()?;
-
-    let mod_time = stat.modified().into_diagnostic()?;
-    let elapsed = mod_time.elapsed().into_diagnostic()?;
-    if elapsed.as_secs() > 240 || !force_refresh {
+    if let Some(stat) = std::fs::metadata(wks.get_root_path().join(INSTALLED_PACKAGES_FILE)).ok() {
+        let mod_time = stat.modified().into_diagnostic()?;
+        let elapsed = mod_time.elapsed().into_diagnostic()?;
+        if elapsed.as_secs() > 240 || !force_refresh {
+            get_installed_packages_list(wks)?;
+        }
+    } else {
         get_installed_packages_list(wks)?;
     }
+
     let package_list = read_installed_packages_file(wks)?;
     let mut run_install= false;
     for dep in pkg.recipe.dependencies.iter(){
