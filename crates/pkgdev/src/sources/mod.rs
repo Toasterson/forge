@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{copy, Cursor};
 use std::process::Command;
 
@@ -35,6 +36,11 @@ pub async fn download_sources(
             } else if let SourceNode::Git(g) = src {
                 println!("Downloading git repo: {}", &g.repository);
                 download_git(&wks, &g)?;
+            } else if let SourceNode::File(file) = src {
+                println!("Copying file source to build directory");
+                let target_file = wks.get_build_dir().join(file.get_target_path());
+                fs::copy(file.get_bundle_path(component.get_path()), target_file)
+                    .into_diagnostic()?;
             }
         }
     }
