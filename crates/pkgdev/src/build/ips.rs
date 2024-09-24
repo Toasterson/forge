@@ -365,6 +365,8 @@ pub fn publish_package(wks: &Workspace, pkg: &Component, publisher: &str) -> Res
         .arg(&proto_dir.to_string_lossy().to_string())
         .arg("-d")
         .arg(&unpack_path.to_string_lossy().to_string())
+        .arg("-d")
+        .arg(&pkg.get_path())
         .arg("-s")
         .arg(&repo_path.to_string_lossy().to_string())
         .arg(&manifest.to_string_lossy().to_string())
