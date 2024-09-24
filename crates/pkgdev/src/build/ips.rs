@@ -277,10 +277,10 @@ pub fn build_final_manifest(wks: &Workspace) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
     let pkg_mogrify_cmd = Command::new("pkgmogrify")
-        .arg(manifest_path.join("mogrified.mog").to_string_lossy().to_string())
-        .arg(manifest_path.join("generated.dep.res").to_string_lossy().to_string())
         .arg("-O")
         .arg(manifest_path.join("manifest.p5m").to_string_lossy().to_string())
+        .arg(manifest_path.join("mogrified.mog").to_string_lossy().to_string())
+        .arg(manifest_path.join("generated.dep.res").to_string_lossy().to_string())
         .status()
         .into_diagnostic()?;
 
