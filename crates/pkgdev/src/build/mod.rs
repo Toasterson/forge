@@ -163,6 +163,7 @@ fn run_ips_actions(
         .wrap_err("mogrify failed")?;
     ips::run_generate_pkgdepend(wks, pkg).wrap_err("failed to generate dependency entries")?;
     ips::run_resolve_dependencies(wks, pkg).wrap_err("failed to resolve dependencies")?;
+    ips::build_final_manifest(wks).wrap_err("final manifest creation failed")?;
     ips::run_lint(wks, pkg).wrap_err("lint failed")?;
 
     let publisher = gate.clone().unwrap_or_default().publisher;

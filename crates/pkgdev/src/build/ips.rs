@@ -273,13 +273,32 @@ pub fn run_resolve_dependencies(wks: &Workspace, pkg: &Component) -> Result<()> 
     }
 }
 
+pub fn build_final_manifest(wks: &Workspace) -> Result<()> {
+    let manifest_path = wks.get_or_create_manifest_dir()?;
+
+    let pkg_mogrify_cmd = Command::new("pkgmogrify")
+        .arg(manifest_path.join("mogrified.mog").to_string_lossy().to_string())
+        .arg(manifest_path.join("generated.dep.res").to_string_lossy().to_string())
+        .arg("-O")
+        .arg(manifest_path.join("manifest.p5m").to_string_lossy().to_string())
+        .status()
+        .into_diagnostic()?;
+
+    if pkg_mogrify_cmd.success() {
+        println!("Final Manifest created");
+        Ok(())
+    } else {
+        Err(miette::miette!("non zero code returned from pkgmogrify"))
+    }
+}
+
 pub fn run_lint(wks: &Workspace, pkg: &Component) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
     let pkg_lint_cmd = Command::new("pkglint")
         .arg(
             manifest_path
-                .join("generated.dep.res")
+                .join("manifest.p5m")
                 .to_string_lossy()
                 .to_string(),
         )
@@ -339,7 +358,7 @@ pub fn publish_package(wks: &Workspace, pkg: &Component, publisher: &str) -> Res
     );
     let unpack_path = build_dir.join(&unpack_name);
     let repo_path = Settings::get_or_create_repo_dir().into_diagnostic()?;
-    let manifest = wks.get_or_create_manifest_dir()?.join("generated.dep.res");
+    let manifest = wks.get_or_create_manifest_dir()?.join("manifest.p5m");
     let pkgsend_status = Command::new("pkgsend")
         .arg("publish")
         .arg("-d")
@@ -354,7 +373,7 @@ pub fn publish_package(wks: &Workspace, pkg: &Component, publisher: &str) -> Res
         .into_diagnostic()?;
 
     if pkgsend_status.success() {
-        println!("Package {} built and published sucessfully", pkg.get_name());
+        println!("Package {} built and published successfully", pkg.get_name());
         println!(
             "Install with pkg set-publisher {}; pkg install -g {} {}",
             publisher,
