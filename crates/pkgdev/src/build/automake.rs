@@ -20,7 +20,7 @@ fn get_largefile_flag() -> Result<Vec<String>> {
     let flags = String::from_utf8(getconf_out.stdout)
         .into_diagnostic()?;
 
-    Ok(flags.lines().collect::<Vec<String>>())
+    Ok(flags.lines().map(|s| s.to_owned()).collect::<Vec<String>>())
 }
 
 pub fn build_using_automake(

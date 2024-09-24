@@ -133,6 +133,7 @@ pub fn edit_component(
                             compiler: None,
                             linker: None,
                             disable_destdir_configure_option: false,
+                            enable_large_files: false,
                         });
                     }
                     BuildKind::Script => {
