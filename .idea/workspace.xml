@@ -8,9 +8,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sample_data/components/encumbered/components/ffmpeg/package.kdl" beforeDir="false" afterPath="$PROJECT_DIR$/sample_data/components/encumbered/components/ffmpeg/package.kdl" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -259,7 +257,7 @@
       <workItem from="1725796302959" duration="10284000" />
       <workItem from="1725874825123" duration="22776000" />
       <workItem from="1726998812536" duration="9896000" />
-      <workItem from="1727165730967" duration="6844000" />
+      <workItem from="1727165730967" duration="6992000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />
