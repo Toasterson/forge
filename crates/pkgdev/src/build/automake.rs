@@ -12,6 +12,17 @@ use workspace::Workspace;
 use config::Settings;
 use crate::sources::derive_source_name;
 
+fn get_largefile_flag() -> Result<Vec<String>> {
+    let getconf_out = Command::new("getconf")
+        .arg("LFS64_CFLAGS")
+        .output()
+        .into_diagnostic()?;
+    let flags = String::from_utf8(getconf_out.stdout)
+        .into_diagnostic()?;
+
+    Ok(flags.lines().collect::<Vec<String>>())
+}
+
 pub fn build_using_automake(
     wks: &Workspace,
     pkg: &Component,
@@ -65,6 +76,19 @@ pub fn build_using_automake(
                 } else {
                     env_flags.insert(flag_name, flag_value.clone());
                 }
+            }
+        }
+    }
+
+    if build_section.enable_large_files {
+        let flags = get_largefile_flag()?;
+        for flag in flags {
+            if env_flags.contains_key("CFLAGS") {
+                let flag_ref = env_flags.get_mut("CFLAGS").unwrap();
+                flag_ref.push_str(" ");
+                flag_ref.push_str(&flag);
+            } else {
+                env_flags.insert("CFLAGS".to_owned(), flag.clone());
             }
         }
     }

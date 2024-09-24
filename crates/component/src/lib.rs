@@ -983,6 +983,8 @@ pub struct ConfigureBuildSection {
     pub linker: Option<String>,
     #[knuffel(child, default=false)]
     pub disable_destdir_configure_option: bool,
+    #[knuffel(child, default=false)]
+    pub enable_large_files: bool,
 }
 
 impl ConfigureBuildSection {
@@ -1011,6 +1013,11 @@ impl ConfigureBuildSection {
 
         if self.disable_destdir_configure_option {
             let n = kdl::KdlNode::new("disable-destdir-option");
+            doc.nodes_mut().push(n);
+        }
+
+        if self.enable_large_files {
+            let n = kdl::KdlNode::new("enable-large-files");
             doc.nodes_mut().push(n);
         }
 

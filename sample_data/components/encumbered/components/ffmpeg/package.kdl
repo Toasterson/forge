@@ -13,7 +13,12 @@ source {
 build {
     configure {
         disable-destdir-configure-option
+        enable-large-files
+        flag "-I/usr/X11/include" name="CFLAGS"
+        flag "gcc_C99_ENABLE" name="CPPFLAGS"
         option "prefix=/usr"
+        option "libdir=/usr/lib/64"
+        //option "mandir=/usr/share/man"
         option "cc=/usr/bin/gcc"
         option "enable-runtime-cpudetect"
         option "enable-mmx"
