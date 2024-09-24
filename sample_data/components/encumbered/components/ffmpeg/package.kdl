@@ -19,6 +19,7 @@ build {
         option "enable-mmx"
         option "enable-sse"
         option "enable-ssse3"
+        // force additional new CPU instruction enablement
         option "enable-avx"
         option "disable-debug"
         option "enable-nonfree"
@@ -32,22 +33,37 @@ build {
         option "enable-libx265"
         option "enable-libdav1d"
         option "enable-libwebp"
+        // Don't enable it, resulting binary is not
+        // redistributable
+        //option "enable-libfaac"
         option "enable-libtheora"
         option "enable-libmp3lame"
         option "enable-libvorbis"
         option "enable-libvpx"
+        // x11grab has been replaced by the x11xcb options
+        //option "enable-x11grab"
         option "enable-libxcb"
         option "enable-libspeex"
         option "enable-pthreads"
+        // Incompatible with GPLv2
+        //option "enable-libopencore-amrnb"
         option "enable-libass"
         option "enable-openssl"
         option "enable-openal"
+        // don't enable avresample any more, it's long-deprecated.  Use swresample
+        // instead
+        //option "enable-avresample"
         option "enable-swresample"
+        // Incompatible with GPLv2
+        //option "enable-libopencore-amrwb"
+        // libschroedinger support was removed in 3.4.x
+        //option "enable-libschroedinger"
         option "enable-libopenjpeg"
         option "enable-librtmp"
         option "enable-vdpau"
         option "enable-shared"
         option "disable-static"
+        // these tests cause problems, skip them
         option "ignore-tests=source"
     }
 }

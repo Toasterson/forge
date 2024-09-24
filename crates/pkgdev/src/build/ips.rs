@@ -254,7 +254,7 @@ pub fn run_resolve_dependencies(wks: &Workspace, pkg: &Component) -> Result<()> 
 
     let pkg_depend_cmd = Command::new("pkgdepend")
         .arg("resolve")
-        .arg("-m")
+        .arg("-v")
         .arg(
             manifest_path
                 .join("generated.dep")
