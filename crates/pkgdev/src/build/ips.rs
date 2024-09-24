@@ -26,7 +26,7 @@ const DEFAULT_IPS_TEMPLATE: &str = r#"
 #
 
 #
-# Copyright 2023 OpenFlowLabs
+# Copyright 2024 OpenIndiana Maintainers
 #
 
 set name=pkg.fmri value=pkg:/{name}@{version},{build_version}-{branch_version}.{revision}
@@ -38,7 +38,6 @@ set name=info.source-url value="{source_url}"
 license {license_file_name} license='{license_name}'
 
 "#;
-//TODO remove drop dir transform here and put it into standard transforms
 //TODO implement ips component version formatter. build_num (year)
 
 #[derive(Substitutions)]
@@ -252,6 +251,7 @@ pub fn run_generate_pkgdepend(wks: &Workspace, pkg: &Component) -> Result<()> {
 pub fn run_resolve_dependencies(wks: &Workspace, pkg: &Component) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
+    println!("Attempting to resolve runtime dependencies");
     let pkg_depend_cmd = Command::new("pkgdepend")
         .arg("resolve")
         .arg("-v")
