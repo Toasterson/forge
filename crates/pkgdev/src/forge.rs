@@ -14,9 +14,9 @@ use component::{Component, ComponentError};
 use forge::AuthConfig;
 use gate::{Gate, GateError};
 
-use crate::{get_project_dir, openid};
-use crate::forge::api::{Client, types};
 use crate::forge::api::types::ActorSshKeyFingerprint;
+use crate::forge::api::{types, Client};
+use crate::{get_project_dir, openid};
 
 mod api {
     include!(concat!(env!("OUT_DIR"), "/forge.codegen.rs"));
@@ -150,9 +150,7 @@ impl ForgeConnection {
         let mut map = HeaderMap::new();
         map.insert(
             reqwest::header::AUTHORIZATION,
-            format!("Bearer {}", self.access_token)
-                .parse()
-                .unwrap(),
+            format!("Bearer {}", self.access_token).parse().unwrap(),
         );
         map
     }
@@ -355,7 +353,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             handle,
             display_name,
         } => {
-            let target_url: Url = target.parse()?; 
+            let target_url: Url = target.parse()?;
             let host = target_url.host_str();
             if host.is_none() {
                 return Err(Error::MissingParameter(String::from(
@@ -369,7 +367,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
 
             let token = openid::login_to_provider(provider, &login_info).await?;
             let forge_client = Client::new(target);
-            
+
             let resp = forge_client
                 .actor_connect(&types::ActorConnectRequest::GitHub {
                     display_name: display_name.clone(),
@@ -390,9 +388,9 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             );
 
             save_forge_config(&mut forge_config)?;
-            
+
             println!("connected");
-            
+
             Ok(())
         }
         ForgeArgs::ImportComponent { gate, path } => {
@@ -518,9 +516,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
     }
 }
 
-pub async fn get_oauth_login_info(
-    target: &Url,
-) -> Result<AuthConfig, Error> {
+pub async fn get_oauth_login_info(target: &Url) -> Result<AuthConfig, Error> {
     let resp = reqwest::get(target.join("/api/v1/auth/login_info")?).await?;
 
     let login_info: AuthConfig = resp.json().await?;

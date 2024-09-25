@@ -3,6 +3,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use derive_builder::Builder;
 use diff::Diff;
@@ -311,6 +312,10 @@ pub struct Recipe {
     #[knuffel(children(name = "build"))]
     #[builder(default)]
     pub build_sections: Vec<BuildSection>,
+
+    #[knuffel(children(name = "package"))]
+    #[builder(default)]
+    pub package_sections: Vec<PackageSection>,
 }
 
 impl Display for Recipe {
@@ -430,6 +435,11 @@ impl Recipe {
         for dependency in &self.dependencies {
             let dep_node = dependency.to_node();
             doc.nodes_mut().push(dep_node);
+        }
+
+        for package in &self.package_sections {
+            let package_node = package.to_node();
+            doc.nodes_mut().push(package_node);
         }
 
         node
@@ -1182,6 +1192,72 @@ impl BuildOptionNode {
 pub struct FileNode {
     #[knuffel(child, unwrap(argument))]
     pub include: String,
+}
+
+#[derive(Debug, knuffel::Decode, Clone, Serialize, PartialEq, Deserialize, ToSchema, Diff, JsonSchema)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct PackageSection {
+    #[knuffel(argument)]
+    pub name: Option<String>,
+
+    #[knuffel(children(name = "file"))]
+    pub files: Vec<TransformNode>,
+
+    #[knuffel(children(name = "link"))]
+    pub links: Vec<TransformNode>,
+
+    #[knuffel(children(name = "hardlinks"))]
+    pub hardlinks: Vec<TransformNode>,
+}
+
+impl PackageSection {
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("package");
+        if let Some(name) = &self.name {
+            node.insert(0, name.as_str());
+        }
+
+        let doc = node.ensure_children();
+
+        for file in &self.files {
+            doc.nodes_mut().push(file.to_node());
+        }
+
+        for link in &self.links {
+            doc.nodes_mut().push(link.to_node());
+        }
+
+        for hardlink in &self.hardlinks {
+            doc.nodes_mut().push(hardlink.to_node());
+        }
+
+        node
+    }
+}
+
+#[derive(Debug, knuffel::Decode, Clone, Serialize, PartialEq, Deserialize, ToSchema, Diff, JsonSchema)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct TransformNode {
+    #[knuffel(node_name)]
+    pub action: String,
+    #[knuffel(properties)]
+    pub selectors: HashMap<String, String>,
+}
+
+impl TransformNode {
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new(self.action.as_str());
+
+        for selector in &self.selectors {
+            node.insert(selector.0.as_str(), selector.1.as_str());
+        }
+
+        node
+    }
 }
 
 #[cfg(test)]

@@ -1,11 +1,11 @@
 use std::{collections::HashMap, process::Stdio};
 
-use component::Component;
-use miette::{IntoDiagnostic, Result};
-use config::Settings;
-use workspace::Workspace;
 use crate::sources::derive_source_name;
+use component::Component;
+use config::Settings;
+use miette::{IntoDiagnostic, Result};
 use std::process::Command;
+use workspace::Workspace;
 
 enum BuildTool {
     Make,
@@ -23,9 +23,7 @@ impl ToString for BuildTool {
 
 pub fn run_compile(wks: &Workspace, pkg: &Component, settings: &Settings) -> Result<()> {
     let build_dir = wks.get_or_create_build_dir()?;
-    let unpack_name = derive_source_name(
-        pkg.recipe.name.clone(),
-    );
+    let unpack_name = derive_source_name(pkg.recipe.name.clone());
 
     let unpack_path = build_dir.join(&unpack_name);
     if pkg.recipe.seperate_build_dir {

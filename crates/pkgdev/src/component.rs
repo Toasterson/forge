@@ -1,8 +1,11 @@
-use miette::IntoDiagnostic;
 use component::Component;
 use gate::Gate;
+use miette::IntoDiagnostic;
 
-pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(component_path: P, gate: &Option<Gate>) -> miette::Result<Component> {
+pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(
+    component_path: P,
+    gate: &Option<Gate>,
+) -> miette::Result<Component> {
     let component_path = component_path.as_ref();
     let full_component_path = if let Some(gate) = gate {
         // If we have a gate we look for the component under <gate_path>/components/<component_path>

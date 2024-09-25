@@ -1,11 +1,11 @@
-mod script;
-mod util;
 mod automake;
 mod compile;
-mod install;
-mod tarball;
-mod ips;
 mod dependencies;
+mod install;
+mod ips;
+mod script;
+mod tarball;
+mod util;
 
 use clap::{Parser, ValueEnum};
 use workspace::Workspace;
@@ -32,10 +32,9 @@ pub struct BuildArgs {
     transform_include_dir: Option<PathBuf>,
 }
 
-use std::{
-    path::PathBuf
-};
+use std::path::PathBuf;
 
+use crate::build::dependencies::ensure_packages_are_installed;
 use crate::sources::{download_sources, unpack};
 use automake::build_using_automake;
 use component::Component;
@@ -44,7 +43,6 @@ use config::Settings;
 use gate::Gate;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use script::build_using_scripts;
-use crate::build::dependencies::ensure_packages_are_installed;
 
 pub fn build_package_sources(wks: &Workspace, pkg: &Component, settings: &Settings) -> Result<()> {
     for section in pkg.recipe.build_sections.iter() {
@@ -62,19 +60,27 @@ pub fn build_package_sources(wks: &Workspace, pkg: &Component, settings: &Settin
     Ok(())
 }
 
-pub async fn run_build(component: &Component, gate: &Option<Gate>, wks: &Workspace, settings: &Settings, args: &BuildArgs) -> Result<()> {
-
-    let transform_include_dir = args.transform_include_dir.clone().map(|p| match p.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            println!(
-                "could not canonicalize {} due to {} continuing ignoring and continuing",
-                p.display(),
-                e
-            );
-            p
-        }
-    });
+pub async fn run_build(
+    component: &Component,
+    gate: &Option<Gate>,
+    wks: &Workspace,
+    settings: &Settings,
+    args: &BuildArgs,
+) -> Result<()> {
+    let transform_include_dir =
+        args.transform_include_dir
+            .clone()
+            .map(|p| match p.canonicalize() {
+                Ok(p) => p,
+                Err(e) => {
+                    println!(
+                        "could not canonicalize {} due to {} continuing ignoring and continuing",
+                        p.display(),
+                        e
+                    );
+                    p
+                }
+            });
 
     if !args.no_clean {
         std::fs::remove_dir_all(wks.get_or_create_download_dir()?)
@@ -95,7 +101,8 @@ pub async fn run_build(component: &Component, gate: &Option<Gate>, wks: &Workspa
 
     let sources: Vec<SourceSection> = component.recipe.sources.clone();
 
-    download_sources(component, wks, args.archive_clean).await
+    download_sources(component, wks, args.archive_clean)
+        .await
         .wrap_err("download and verify failed")?;
 
     if let Some(stop_on_step) = &args.stop_on_step {
@@ -104,12 +111,7 @@ pub async fn run_build(component: &Component, gate: &Option<Gate>, wks: &Workspa
         }
     }
 
-    unpack::unpack_sources(
-        &component,
-        &wks,
-        sources.as_slice(),
-    )
-        .wrap_err("unpack step failed")?;
+    unpack::unpack_sources(&component, &wks, sources.as_slice()).wrap_err("unpack step failed")?;
 
     if let Some(stop_on_step) = &args.stop_on_step {
         if stop_on_step == &BuildSteps::Unpack {
@@ -117,8 +119,7 @@ pub async fn run_build(component: &Component, gate: &Option<Gate>, wks: &Workspa
         }
     }
 
-    build_package_sources(&wks, &component, &settings)
-        .wrap_err("configure step failed")?;
+    build_package_sources(&wks, &component, &settings).wrap_err("configure step failed")?;
 
     if let Some(stop_on_step) = &args.stop_on_step {
         if stop_on_step == &BuildSteps::Build {
@@ -132,20 +133,15 @@ pub async fn run_build(component: &Component, gate: &Option<Gate>, wks: &Workspa
         .distribution
         .clone()
         .unwrap_or_default()
-        .distribution_type.clone();
-
+        .distribution_type
+        .clone();
 
     match distribution_type {
         gate::DistributionType::Tarbball => {
             tarball::make_release_tarball(&wks, &component)?;
         }
         gate::DistributionType::IPS => {
-            run_ips_actions(
-                &wks,
-                &component,
-                gate,
-                transform_include_dir,
-            )?;
+            run_ips_actions(&wks, &component, gate, transform_include_dir)?;
         }
     }
 
@@ -159,16 +155,26 @@ fn run_ips_actions(
     transform_include_dir: Option<PathBuf>,
 ) -> Result<()> {
     ips::run_generate_filelist(wks, pkg).wrap_err("generating file list failed")?;
-    ips::run_mogrify(wks, pkg, gate, transform_include_dir)
+
+    let manifests = ips::generate_manifest_files(wks, pkg, gate, transform_include_dir)
         .wrap_err("mogrify failed")?;
-    ips::run_generate_pkgdepend(wks, pkg).wrap_err("failed to generate dependency entries")?;
-    ips::run_resolve_dependencies(wks, pkg).wrap_err("failed to resolve dependencies")?;
-    ips::build_final_manifest(wks).wrap_err("final manifest creation failed")?;
-    ips::run_lint(wks, pkg).wrap_err("lint failed")?;
+
+    ips::run_generate_pkgdepend(wks, manifests.as_slice())
+        .wrap_err("failed to generate dependency entries")?;
+
+    ips::run_resolve_dependencies(wks, manifests.as_slice())
+        .wrap_err("failed to resolve dependencies")?;
+
+    ips::build_final_manifest(wks, manifests.as_slice())
+        .wrap_err("final manifest creation failed")?;
+
+    ips::run_lint(wks, manifests.as_slice()).wrap_err("lint failed")?;
 
     let publisher = gate.clone().unwrap_or_default().publisher;
     ips::ensure_repo_with_publisher_exists(&publisher)
         .wrap_err("failed to ensure repository exists")?;
-    ips::publish_package(wks, pkg, &publisher).wrap_err("package publish failed")?;
+
+    ips::publish(wks, pkg, &publisher, manifests.as_slice()).wrap_err("package publish failed")?;
+
     Ok(())
 }

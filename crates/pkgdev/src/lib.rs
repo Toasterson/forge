@@ -4,14 +4,14 @@ use miette::Diagnostic;
 use thiserror::Error;
 
 pub mod args;
+pub mod build;
+mod component;
 pub mod create;
 pub mod forge;
 pub mod metadata;
 pub mod modify;
 pub mod openid;
 pub mod sources;
-pub mod build;
-mod component;
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum Error {

@@ -1,8 +1,8 @@
 use std::process::{Command, Stdio};
 
-use workspace::Workspace;
 use component::Component;
 use miette::IntoDiagnostic;
+use workspace::Workspace;
 
 fn derive_output_name(pkg: &Component) -> String {
     if let Some(version) = &pkg.recipe.version {

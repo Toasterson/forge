@@ -57,7 +57,7 @@ async fn download_archive(
         ))
     }?;
 
-    let mut dest =if archive_clean {
+    let mut dest = if archive_clean {
         wks.open_or_truncate_local_file(&archive.src.parse().into_diagnostic()?, hasher_kind)?
     } else {
         wks.open_local_file(&archive.src.parse().into_diagnostic()?, hasher_kind)?

@@ -1,8 +1,8 @@
 mod common;
 
-use std::path::PathBuf;
 use pkgdev::args::*;
 use pkgdev::build::BuildArgs;
+use std::path::PathBuf;
 
 #[test]
 fn test_build_ffmpeg() {

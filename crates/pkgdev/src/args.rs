@@ -72,7 +72,7 @@ pub enum Commands {
 
         #[command(flatten)]
         args: BuildArgs,
-    }
+    },
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -97,14 +97,15 @@ pub async fn run(args: Args) -> miette::Result<()> {
         None
     };
 
-    let settings = Settings::open()
-        .wrap_err("unable to open app settings")?;
+    let settings = Settings::open().wrap_err("unable to open app settings")?;
 
     let wks = if let Some(wks_path) = args.workspace {
-        settings.get_workspace_from(wks_path.as_path())
+        settings
+            .get_workspace_from(wks_path.as_path())
             .wrap_err("unable to open workspace path provided")?
     } else {
-        settings.get_current_wks()
+        settings
+            .get_current_wks()
             .wrap_err("unable to open current workspace path")?
     };
 
@@ -128,20 +129,20 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 Ok(())
             }
         },
-        Commands::Download {
-            component,
-        } => {
+        Commands::Download { component } => {
             let component = open_component_local(&component, &gate)?;
-            download_sources(&component, &wks, true).await
+            download_sources(&component, &wks, true)
+                .await
                 .wrap_err("download failed")
-        },
+        }
         Commands::Create { fmri, args } => create_component(args, fmri),
         Commands::Edit { component, args } => edit_component(component, gate, args),
         Commands::Forge { args } => Ok(handle_forge_interaction(&args).await?),
         Commands::Build { component, args } => {
-            let component = open_component_local(component, &gate)
-                .wrap_err("cannot open component")?;
-            run_build(&component, &gate, &wks, &settings, &args).await
+            let component =
+                open_component_local(component, &gate).wrap_err("cannot open component")?;
+            run_build(&component, &gate, &wks, &settings, &args)
+                .await
                 .wrap_err("build failed")
         }
     }

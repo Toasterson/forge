@@ -1,17 +1,17 @@
+use crate::sources::derive_source_name;
+use component::{Component, SourceNode, TransformNode};
+use config::Settings;
+use fs_extra::file::write_all;
+use gate::Gate;
+use microtemplate::{render, Substitutions};
+use miette::{IntoDiagnostic, Result};
+use std::fmt::{Display, Formatter};
 use std::{
     fs::File,
     path::PathBuf,
     process::{Command, Stdio},
 };
-
-use config::Settings;
 use workspace::Workspace;
-use crate::sources::derive_source_name;
-use component::{Component, SourceNode};
-use fs_extra::file::write_all;
-use gate::Gate;
-use microtemplate::{render, Substitutions};
-use miette::{IntoDiagnostic, Result};
 
 const DEFAULT_IPS_TEMPLATE: &str = r#"
 #
@@ -63,6 +63,50 @@ fn get_source_url<'a>(src: &'a SourceNode) -> &'a str {
     }
 }
 
+pub struct ManifestCollection {
+    pkg_name: String,
+    name: String,
+}
+
+impl Display for ManifestCollection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.name)
+    }
+}
+
+impl ManifestCollection {
+    pub fn new(name: &str) -> Self {
+        ManifestCollection {
+            pkg_name: name.to_string(),
+            name: name.replace("/", "-"),
+        }
+    }
+
+    pub fn get_pkg_name(&self) -> String {
+        self.pkg_name.clone()
+    }
+
+    pub fn get_base_manifest_name(&self) -> String {
+        format!("{}-generated.p5m", self.name)
+    }
+
+    pub fn get_mogrified_name(&self) -> String {
+        format!("{}.mogrified.p5m", self.name)
+    }
+
+    pub fn get_depend_name(&self) -> String {
+        format!("{}.dep", self.name)
+    }
+
+    pub fn get_resolved_name(&self) -> String {
+        format!("{}.dep.res", self.name)
+    }
+
+    pub fn get_final_name(&self) -> String {
+        format!("{}.manifest.p5m", self.name)
+    }
+}
+
 pub fn run_generate_filelist(wks: &Workspace, pkg: &Component) -> Result<()> {
     let proto_path = wks.get_or_create_prototype_dir()?;
     let manifest_path = wks.get_or_create_manifest_dir()?;
@@ -89,61 +133,117 @@ pub fn run_generate_filelist(wks: &Workspace, pkg: &Component) -> Result<()> {
         Err(miette::miette!("non zero code returned from pkgfmt"))
     }
 }
-pub fn run_mogrify(
+
+pub fn generate_manifest_files(
     wks: &Workspace,
     pkg: &Component,
     gate: &Option<Gate>,
     transform_includes: Option<PathBuf>,
-) -> Result<()> {
-    let vars = StringInterpolationVars {
-        name: &pkg.get_name(),
-        version: &pkg
-            .recipe
-            .version
-            .clone()
-            .unwrap_or(String::from("0.5.11")), //TODO take this default version from the gate
-        build_version: &gate.clone().unwrap_or(Gate::default()).version,
-        branch_version: &gate.clone().unwrap_or(Gate::default()).branch,
-        revision: &pkg
-            .recipe
-            .revision
-            .clone()
-            .unwrap_or(String::from("1")),
-        summary: &pkg
-            .recipe
-            .summary
-            .clone()
-            .ok_or(miette::miette!("no summary specified"))?,
-        classification: &pkg
-            .recipe
-            .classification
-            .clone()
-            .ok_or(miette::miette!("no classification specified"))?,
-        project_url: &pkg
-            .recipe
-            .project_url
-            .clone()
-            .ok_or(miette::miette!("no project_url specified"))?,
-        source_url: get_source_url(&pkg.recipe.sources[0].sources[0]),
-        license_file_name: &pkg
-            .recipe
-            .license_file
-            .clone()
-            .ok_or(miette::miette!("no license_file specified"))?,
-        license_name: &pkg
-            .recipe
-            .license
-            .clone()
-            .ok_or(miette::miette!("no license specified"))?,
-    };
-
+) -> Result<Vec<ManifestCollection>> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
-    let manifest = render(DEFAULT_IPS_TEMPLATE, vars);
+    let manifests = if pkg.recipe.package_sections.is_empty() {
+        let name = pkg.get_name();
+        let vars = StringInterpolationVars {
+            name: &name,
+            version: &pkg.recipe.version.clone().unwrap_or(String::from("0.5.11")), //TODO take this default version from the gate
+            build_version: &gate.clone().unwrap_or(Gate::default()).version,
+            branch_version: &gate.clone().unwrap_or(Gate::default()).branch,
+            revision: &pkg.recipe.revision.clone().unwrap_or(String::from("1")),
+            summary: &pkg
+                .recipe
+                .summary
+                .clone()
+                .ok_or(miette::miette!("no summary specified"))?,
+            classification: &pkg
+                .recipe
+                .classification
+                .clone()
+                .ok_or(miette::miette!("no classification specified"))?,
+            project_url: &pkg
+                .recipe
+                .project_url
+                .clone()
+                .ok_or(miette::miette!("no project_url specified"))?,
+            source_url: get_source_url(&pkg.recipe.sources[0].sources[0]),
+            license_file_name: &pkg
+                .recipe
+                .license_file
+                .clone()
+                .ok_or(miette::miette!("no license_file specified"))?,
+            license_name: &pkg
+                .recipe
+                .license
+                .clone()
+                .ok_or(miette::miette!("no license specified"))?,
+        };
+        let manifest = render(DEFAULT_IPS_TEMPLATE, vars);
+        let manifest_collection = ManifestCollection::new(&pkg.get_name());
 
-    let mogrified_manifest = File::create(manifest_path.join("mogrified.mog")).into_diagnostic()?;
+        write_all(
+            manifest_path.join(&manifest_collection.get_base_manifest_name()),
+            &manifest,
+        )
+        .into_diagnostic()?;
+        vec![manifest_collection]
+    } else {
+        let mut manifests = vec![];
+        for p in pkg.recipe.package_sections.iter() {
+            let name = p.clone().name.unwrap_or(pkg.get_name());
+            let vars = StringInterpolationVars {
+                name: &name,
+                version: &pkg.recipe.version.clone().unwrap_or(String::from("0.5.11")), //TODO take this default version from the gate
+                build_version: &gate.clone().unwrap_or(Gate::default()).version,
+                branch_version: &gate.clone().unwrap_or(Gate::default()).branch,
+                revision: &pkg.recipe.revision.clone().unwrap_or(String::from("1")),
+                summary: &pkg
+                    .recipe
+                    .summary
+                    .clone()
+                    .ok_or(miette::miette!("no summary specified"))?,
+                classification: &pkg
+                    .recipe
+                    .classification
+                    .clone()
+                    .ok_or(miette::miette!("no classification specified"))?,
+                project_url: &pkg
+                    .recipe
+                    .project_url
+                    .clone()
+                    .ok_or(miette::miette!("no project_url specified"))?,
+                source_url: get_source_url(&pkg.recipe.sources[0].sources[0]),
+                license_file_name: &pkg
+                    .recipe
+                    .license_file
+                    .clone()
+                    .ok_or(miette::miette!("no license_file specified"))?,
+                license_name: &pkg
+                    .recipe
+                    .license
+                    .clone()
+                    .ok_or(miette::miette!("no license specified"))?,
+            };
+            let mut manifest = render(DEFAULT_IPS_TEMPLATE, vars);
 
-    write_all(manifest_path.join("generated.p5m"), &manifest).into_diagnostic()?;
+            generate_transform_lines(&mut manifest, &p.files);
+            generate_transform_lines(&mut manifest, &p.links);
+            generate_transform_lines(&mut manifest, &p.hardlinks);
+            let drop_actions_line = "\n<transform file link hardlink keep=(?!true) -> drop>";
+            manifest.push_str(drop_actions_line);
+
+            let cleanup_line = "\n<transform file link hardlink keep=true -> delete keep true>";
+            manifest.push_str(cleanup_line);
+
+            let manifest_collection = ManifestCollection::new(&name);
+            write_all(
+                manifest_path.join(manifest_collection.get_base_manifest_name()),
+                &manifest,
+            )
+            .into_diagnostic()?;
+            manifests.push(manifest_collection);
+        }
+        manifests
+    };
 
     let include_path = if let Some(gate) = gate {
         if !gate.default_transforms.is_empty() {
@@ -168,150 +268,203 @@ pub fn run_mogrify(
         None
     };
 
-    let mut pkg_mogrify_cmd = Command::new("pkgmogrify");
+    for manifest in manifests.iter() {
+        let mogrified_manifest =
+            File::create(manifest_path.join(manifest.get_mogrified_name())).into_diagnostic()?;
+        let mut pkg_mogrify_cmd = Command::new("pkgmogrify");
 
-    if let Some(includes_path) = transform_includes {
-        pkg_mogrify_cmd.arg("-I").arg(&includes_path);
+        if let Some(includes_path) = transform_includes.clone() {
+            pkg_mogrify_cmd.arg("-I").arg(&includes_path);
+        }
+        pkg_mogrify_cmd
+            .current_dir("..")
+            .arg(
+                manifest_path
+                    .join(manifest.get_base_manifest_name())
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .arg(
+                manifest_path
+                    .join("filelist.fmt")
+                    .to_string_lossy()
+                    .to_string(),
+            );
+
+        if let Some(includes) = include_path.clone() {
+            pkg_mogrify_cmd.arg(&includes);
+        }
+
+        if let Some(mog_file_path) = pkg.get_mogrify_manifest() {
+            pkg_mogrify_cmd.arg(&mog_file_path.to_string_lossy().to_string());
+        }
+
+        pkg_mogrify_cmd.stdout(Stdio::piped());
+        let pkg_mogrify_status = pkg_mogrify_cmd.spawn().into_diagnostic()?;
+
+        let pkg_fmt_cmd_status = Command::new("pkgfmt")
+            .stdin(pkg_mogrify_status.stdout.unwrap())
+            .stdout(mogrified_manifest)
+            .status()
+            .into_diagnostic()?;
+
+        if pkg_fmt_cmd_status.success() {
+            println!(
+                "Finished manifest transformations for manifest {}",
+                &manifest
+            );
+        } else {
+            return Err(miette::miette!("non zero code returned from pkgfmt"));
+        }
     }
-    pkg_mogrify_cmd
-        .current_dir("..")
-        .arg(
-            manifest_path
-                .join("generated.p5m")
-                .to_string_lossy()
-                .to_string(),
-        )
-        .arg(
-            manifest_path
-                .join("filelist.fmt")
-                .to_string_lossy()
-                .to_string(),
-        );
 
-    if let Some(includes) = include_path {
-        pkg_mogrify_cmd.arg(&includes);
-    }
+    Ok(manifests)
+}
 
-    if let Some(mog_file_path) = pkg.get_mogrify_manifest() {
-        pkg_mogrify_cmd.arg(&mog_file_path.to_string_lossy().to_string());
-    }
-
-    pkg_mogrify_cmd.stdout(Stdio::piped());
-    let pkg_mogrify_status = pkg_mogrify_cmd.spawn().into_diagnostic()?;
-
-    let pkg_fmt_cmd_status = Command::new("pkgfmt")
-        .stdin(pkg_mogrify_status.stdout.unwrap())
-        .stdout(mogrified_manifest)
-        .status()
-        .into_diagnostic()?;
-
-    if pkg_fmt_cmd_status.success() {
-        println!("Mogrified manifests for {}", pkg.get_name());
-        Ok(())
-    } else {
-        Err(miette::miette!("non zero code returned from pkgfmt"))
+fn generate_transform_lines(manifest: &mut String, nodes: &Vec<TransformNode>) {
+    for node in nodes {
+        for (attribute, selector) in node.selectors.iter() {
+            let tranforms_string = format!(
+                "\n<transform {} {}={} -> default keep true>",
+                &node.action, &attribute, &selector
+            );
+            manifest.push_str(&tranforms_string);
+        }
     }
 }
 
-pub fn run_generate_pkgdepend(wks: &Workspace, pkg: &Component) -> Result<()> {
+pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
     let prototype_path = wks.get_or_create_prototype_dir()?;
 
-    let depend_manifest = File::create(manifest_path.join("generated.dep")).into_diagnostic()?;
+    for manifest in manifests {
+        let depend_manifest =
+            File::create(manifest_path.join(manifest.get_depend_name())).into_diagnostic()?;
 
-    let pkg_depend_cmd = Command::new("pkgdepend")
-        .arg("generate")
-        .arg("-m")
-        .arg("-d")
-        .arg(prototype_path.to_string_lossy().to_string())
-        .arg(
-            manifest_path
-                .join("mogrified.mog")
-                .to_string_lossy()
-                .to_string(),
-        )
-        .stdout(Stdio::piped())
-        .spawn()
-        .into_diagnostic()?;
+        let pkg_depend_cmd = Command::new("pkgdepend")
+            .arg("generate")
+            .arg("-m")
+            .arg("-d")
+            .arg(prototype_path.to_string_lossy().to_string())
+            .arg(
+                manifest_path
+                    .join(manifest.get_mogrified_name())
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .stdout(Stdio::piped())
+            .spawn()
+            .into_diagnostic()?;
 
-    let pkg_fmt_cmd_status = Command::new("pkgfmt")
-        .stdin(pkg_depend_cmd.stdout.unwrap())
-        .stdout(depend_manifest)
-        .status()
-        .into_diagnostic()?;
+        let pkg_fmt_cmd_status = Command::new("pkgfmt")
+            .stdin(pkg_depend_cmd.stdout.unwrap())
+            .stdout(depend_manifest)
+            .status()
+            .into_diagnostic()?;
 
-    if pkg_fmt_cmd_status.success() {
-        println!("Generated dependency entries for {}", pkg.get_name());
-        Ok(())
-    } else {
-        Err(miette::miette!("non zero code returned from pkgfmt"))
+        if pkg_fmt_cmd_status.success() {
+            println!("Generated dependency entries for manifest {}", manifest);
+        } else {
+            return Err(miette::miette!(
+                "dependency generation failed for manifest {}",
+                manifest
+            ));
+        }
     }
+    Ok(())
 }
 
-pub fn run_resolve_dependencies(wks: &Workspace, pkg: &Component) -> Result<()> {
+pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
-    println!("Attempting to resolve runtime dependencies");
-    let pkg_depend_cmd = Command::new("pkgdepend")
-        .arg("resolve")
-        .arg("-v")
-        .arg(
-            manifest_path
-                .join("generated.dep")
-                .to_string_lossy()
-                .to_string(),
-        )
-        .stdout(Stdio::inherit())
-        .status()
-        .into_diagnostic()?;
+    for manifest in manifests {
+        println!("Attempting to resolve runtime dependencies");
+        let pkg_depend_cmd = Command::new("pkgdepend")
+            .arg("resolve")
+            .arg("-v")
+            .arg(
+                manifest_path
+                    .join(manifest.get_depend_name())
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .stdout(Stdio::inherit())
+            .status()
+            .into_diagnostic()?;
 
-    if pkg_depend_cmd.success() {
-        println!("Resolved dependencies for {}", pkg.get_name());
-        Ok(())
-    } else {
-        Err(miette::miette!("non zero code returned from pkgfmt"))
+        if pkg_depend_cmd.success() {
+            println!("Resolved dependencies for manifest {}", manifest);
+        } else {
+            return Err(miette::miette!(
+                "failed to resolve dependencies for manifest {}",
+                manifest
+            ));
+        }
     }
+    Ok(())
 }
 
-pub fn build_final_manifest(wks: &Workspace) -> Result<()> {
+pub fn build_final_manifest(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
-    let pkg_mogrify_cmd = Command::new("pkgmogrify")
-        .arg("-O")
-        .arg(manifest_path.join("manifest.p5m").to_string_lossy().to_string())
-        .arg(manifest_path.join("mogrified.mog").to_string_lossy().to_string())
-        .arg(manifest_path.join("generated.dep.res").to_string_lossy().to_string())
-        .status()
-        .into_diagnostic()?;
+    for manifest in manifests {
+        let pkg_mogrify_cmd = Command::new("pkgmogrify")
+            .arg("-O")
+            .arg(
+                manifest_path
+                    .join(manifest.get_final_name())
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .arg(
+                manifest_path
+                    .join(manifest.get_mogrified_name())
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .arg(
+                manifest_path
+                    .join(manifest.get_resolved_name())
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .status()
+            .into_diagnostic()?;
 
-    if pkg_mogrify_cmd.success() {
-        println!("Final Manifest created");
-        Ok(())
-    } else {
-        Err(miette::miette!("non zero code returned from pkgmogrify"))
+        if pkg_mogrify_cmd.success() {
+            println!("Final Manifest for {} created", manifest);
+        } else {
+            return Err(miette::miette!(
+                "Final Manifest creation for {} failed",
+                manifest
+            ));
+        }
     }
+    Ok(())
 }
 
-pub fn run_lint(wks: &Workspace, pkg: &Component) -> Result<()> {
+pub fn run_lint(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
-    let pkg_lint_cmd = Command::new("pkglint")
-        .arg(
-            manifest_path
-                .join("manifest.p5m")
-                .to_string_lossy()
-                .to_string(),
-        )
-        .stdout(Stdio::inherit())
-        .status()
-        .into_diagnostic()?;
+    for manifest in manifests {
+        let pkg_lint_cmd = Command::new("pkglint")
+            .arg(
+                manifest_path
+                    .join(manifest.get_final_name())
+                    .to_string_lossy()
+                    .to_string(),
+            )
+            .stdout(Stdio::inherit())
+            .status()
+            .into_diagnostic()?;
 
-    if pkg_lint_cmd.success() {
-        println!("Lint success for {}", pkg.get_name());
-        Ok(())
-    } else {
-        Err(miette::miette!("non zero code returned from pkglint"))
+        if pkg_lint_cmd.success() {
+            println!("Lint success for manifest {}", manifest);
+        } else {
+            return Err(miette::miette!("Lint failed for manifest {}", manifest));
+        }
     }
+    Ok(())
 }
 
 pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
@@ -350,42 +503,49 @@ pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn publish_package(wks: &Workspace, pkg: &Component, publisher: &str) -> Result<()> {
+pub fn publish(
+    wks: &Workspace,
+    pkg: &Component,
+    publisher: &str,
+    manifests: &[ManifestCollection],
+) -> Result<()> {
     let proto_dir = wks.get_or_create_prototype_dir()?;
     let build_dir = wks.get_or_create_build_dir()?;
-    let unpack_name = derive_source_name(
-        pkg.recipe.name.clone()
-    );
+    let unpack_name = derive_source_name(pkg.recipe.name.clone());
     let unpack_path = build_dir.join(&unpack_name);
     let repo_path = Settings::get_or_create_repo_dir().into_diagnostic()?;
-    let manifest = wks.get_or_create_manifest_dir()?.join("manifest.p5m");
-    let pkgsend_status = Command::new("pkgsend")
-        .arg("publish")
-        .arg("-d")
-        .arg(&proto_dir.to_string_lossy().to_string())
-        .arg("-d")
-        .arg(&unpack_path.to_string_lossy().to_string())
-        .arg("-d")
-        .arg(&pkg.get_path())
-        .arg("-s")
-        .arg(&repo_path.to_string_lossy().to_string())
-        .arg(&manifest.to_string_lossy().to_string())
-        .stdout(Stdio::inherit())
-        .status()
-        .into_diagnostic()?;
 
-    if pkgsend_status.success() {
-        println!("Package {} built and published successfully", pkg.get_name());
-        println!(
-            "Install with pkg set-publisher {}; pkg install -g {} {}",
-            publisher,
-            repo_path.display(),
-            pkg.get_name()
-        );
-        Ok(())
-    } else {
-        Err(miette::miette!(
-            "non zero code returned from pkgsend publish"
-        ))
+    for manifest in manifests {
+        let manifest_path = wks
+            .get_or_create_manifest_dir()?
+            .join(manifest.get_final_name());
+
+        let pkgsend_status = Command::new("pkgsend")
+            .arg("publish")
+            .arg("-d")
+            .arg(&proto_dir.to_string_lossy().to_string())
+            .arg("-d")
+            .arg(&unpack_path.to_string_lossy().to_string())
+            .arg("-d")
+            .arg(&pkg.get_path())
+            .arg("-s")
+            .arg(&repo_path.to_string_lossy().to_string())
+            .arg(&manifest_path.to_string_lossy().to_string())
+            .stdout(Stdio::inherit())
+            .status()
+            .into_diagnostic()?;
+
+        if pkgsend_status.success() {
+            println!("Published manifest {}", manifest);
+            println!(
+                "Install with pkg set-publisher {}; pkg install -g {} {}",
+                publisher,
+                repo_path.display(),
+                manifest.get_pkg_name()
+            );
+        } else {
+            return Err(miette::miette!("publish failed for {}", manifest));
+        }
     }
+    Ok(())
 }

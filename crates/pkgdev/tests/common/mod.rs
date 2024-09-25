@@ -1,6 +1,5 @@
 use workspace::Workspace;
 
-
 const PKG_TEST_WORKSPACE: &str = "sample_data/ws";
 
 pub fn setup() {

@@ -73,6 +73,23 @@ build {
         option "ignore-tests=source"
     }
 }
+package {
+    file path="usr/bin.*"
+    file path="usr/share/doc.*"
+    file path="usr/share/ffmpeg/libvpx.*"
+    file path="usr/share/ffmpeg/ffprobe.xsd"
+    file path="usr/share/man/man1.*"
+}
+package "library/ffmpeg-7" {
+    file path="usr/lib/64.*\.so"
+    link path="usr/lib/64.*\.so"
+}
+package "developer/ffmpeg-7" {
+    file path="usr/include.*"
+    file path=".*\.pc$"
+    file path="usr/share/ffmpeg/examples.*"
+    file path="usr/share/man/man3.*"
+}
 dependency "library/security/openssl-31" dev=true kind="require"
 dependency "audio/lame" dev=true kind="require"
 dependency "codec/dav1d" dev=true kind="require"

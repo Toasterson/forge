@@ -3,12 +3,12 @@ use std::{
     process::{Command, Stdio},
 };
 
+use crate::build::util::copy_with_rsync;
+use crate::sources::derive_source_name;
 use component::{Component, ScriptBuildSection};
 use config::Settings;
 use miette::{IntoDiagnostic, Result};
 use workspace::Workspace;
-use crate::build::util::copy_with_rsync;
-use crate::sources::derive_source_name;
 
 pub fn build_using_scripts(
     wks: &Workspace,
@@ -17,9 +17,7 @@ pub fn build_using_scripts(
     settings: &Settings,
 ) -> Result<()> {
     let build_dir = wks.get_or_create_build_dir()?;
-    let unpack_name = derive_source_name(
-        pkg.recipe.name.clone(),
-    );
+    let unpack_name = derive_source_name(pkg.recipe.name.clone());
     let unpack_path = build_dir.join(&unpack_name);
     std::env::set_current_dir(&unpack_path).into_diagnostic()?;
 
@@ -91,7 +89,7 @@ pub fn build_using_scripts(
                     wks.get_or_create_prototype_dir()?,
                     &copy_options,
                 )
-                    .into_diagnostic()?;
+                .into_diagnostic()?;
             }
         }
     }

@@ -15,7 +15,6 @@ pub fn unpack_sources(
     wks: &Workspace,
     sources: &[SourceSection],
 ) -> Result<()> {
-
     let build_dir = wks.get_or_create_build_dir()?;
     std::env::set_current_dir(&build_dir).into_diagnostic()?;
     let package_name = component.recipe.name.clone();
@@ -84,7 +83,9 @@ pub fn unpack_sources(
                     patch_cmd.arg("-i");
                     patch_cmd.arg(&src_path);
 
-                    let status = patch_cmd.status().into_diagnostic()
+                    let status = patch_cmd
+                        .status()
+                        .into_diagnostic()
                         .wrap_err("could not run gpatch")?;
 
                     if !status.success() {

@@ -1,24 +1,21 @@
 use std::{
     collections::HashMap,
-    fs::DirBuilder
-
-    ,
+    fs::DirBuilder,
     process::{Command, Stdio},
 };
 
+use crate::sources::derive_source_name;
 use component::{Component, ConfigureBuildSection};
+use config::Settings;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use workspace::Workspace;
-use config::Settings;
-use crate::sources::derive_source_name;
 
 fn get_largefile_flag() -> Result<Vec<String>> {
     let getconf_out = Command::new("getconf")
         .arg("LFS64_CFLAGS")
         .output()
         .into_diagnostic()?;
-    let flags = String::from_utf8(getconf_out.stdout)
-        .into_diagnostic()?;
+    let flags = String::from_utf8(getconf_out.stdout).into_diagnostic()?;
 
     Ok(flags.lines().map(|s| s.to_owned()).collect::<Vec<String>>())
 }
@@ -30,9 +27,7 @@ pub fn build_using_automake(
     settings: &Settings,
 ) -> Result<()> {
     let build_dir = wks.get_or_create_build_dir()?;
-    let unpack_name = derive_source_name(
-        pkg.recipe.name.clone(),
-    );
+    let unpack_name = derive_source_name(pkg.recipe.name.clone());
     let unpack_path = build_dir.join(&unpack_name);
     if pkg.recipe.seperate_build_dir {
         let out_dir = build_dir.join("out");
