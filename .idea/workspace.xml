@@ -7,7 +7,10 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence" />
+    <list default="true" id="9e1f836f-bd27-4801-9022-315951e0efef" name="Changes" comment="Fix accidentally commited VIM exit sequence">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/pkgdev/src/build/ips.rs" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -186,12 +189,12 @@
     </configuration>
     <list>
       <item itemvalue="Cargo.Run ghwhrecv" />
-      <item itemvalue="Cargo.Run pkgdev build ffmpeg" />
-      <item itemvalue="JavaScript Debug.localhost:5173" />
-      <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
-      <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
       <item itemvalue="Cargo.Run forged" />
       <item itemvalue="Cargo.Run pkgdev forge connect" />
+      <item itemvalue="Cargo.Run pkgdev build ffmpeg" />
+      <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
+      <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
+      <item itemvalue="JavaScript Debug.localhost:5173" />
       <item itemvalue="npm.dev" />
     </list>
     <recent_temporary>
@@ -257,6 +260,7 @@
       <workItem from="1726998812536" duration="9896000" />
       <workItem from="1727165730967" duration="12643000" />
       <workItem from="1727282451896" duration="14723000" />
+      <workItem from="1727371738038" duration="3068000" />
     </task>
     <task id="LOCAL-00001" summary="Set prisma schema to relative path">
       <option name="closed" value="true" />

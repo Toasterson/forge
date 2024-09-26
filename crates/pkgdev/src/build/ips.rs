@@ -177,7 +177,11 @@ pub fn generate_manifest_files(
                 .clone()
                 .ok_or(miette::miette!("no license specified"))?,
         };
-        let manifest = render(DEFAULT_IPS_TEMPLATE, vars);
+        let mut manifest = render(DEFAULT_IPS_TEMPLATE, vars);
+
+        let drop_dir_line = "\n<transform dir path=.* -> drop>";
+        manifest.push_str(drop_dir_line);
+
         let manifest_collection = ManifestCollection::new(&pkg.get_name());
 
         write_all(
@@ -224,15 +228,20 @@ pub fn generate_manifest_files(
                     .ok_or(miette::miette!("no license specified"))?,
             };
             let mut manifest = render(DEFAULT_IPS_TEMPLATE, vars);
+            let default_action_keep_line = "\n<transform file link hardlink path=.* -> default keep false>";
+            manifest.push_str(default_action_keep_line);
 
             generate_transform_lines(&mut manifest, &p.files);
             generate_transform_lines(&mut manifest, &p.links);
             generate_transform_lines(&mut manifest, &p.hardlinks);
-            let drop_actions_line = "\n<transform file link hardlink keep=(?!true) -> drop>";
+            let drop_actions_line = "\n<transform file link hardlink keep=false -> drop>";
             manifest.push_str(drop_actions_line);
 
             let cleanup_line = "\n<transform file link hardlink keep=true -> delete keep true>";
             manifest.push_str(cleanup_line);
+
+            let drop_dir_line = "\n<transform dir path=.* -> drop>";
+            manifest.push_str(drop_dir_line);
 
             let manifest_collection = ManifestCollection::new(&name);
             write_all(
@@ -325,7 +334,7 @@ fn generate_transform_lines(manifest: &mut String, nodes: &Vec<TransformNode>) {
     for node in nodes {
         for (attribute, selector) in node.selectors.iter() {
             let tranforms_string = format!(
-                "\n<transform {} {}={} -> default keep true>",
+                "\n<transform {} {}={} -> set keep true>",
                 &node.action, &attribute, &selector
             );
             manifest.push_str(&tranforms_string);
