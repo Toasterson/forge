@@ -86,7 +86,7 @@ package "library/ffmpeg-7" {
 }
 package "developer/ffmpeg-7" {
     file path="usr/include.*"
-    file path=".*\.pc$"
+    file path=".*\\.pc$"
     file path="usr/share/ffmpeg/examples.*"
     file path="usr/share/man/man3.*"
 }

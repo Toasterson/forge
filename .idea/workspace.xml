@@ -186,12 +186,12 @@
     </configuration>
     <list>
       <item itemvalue="Cargo.Run ghwhrecv" />
-      <item itemvalue="Cargo.Run forged" />
-      <item itemvalue="Cargo.Run pkgdev forge connect" />
       <item itemvalue="Cargo.Run pkgdev build ffmpeg" />
+      <item itemvalue="JavaScript Debug.localhost:5173" />
       <item itemvalue="Docker.docker-compose.dev.yml: Compose Deployment" />
       <item itemvalue="Docker.docker-compose.dev.yml.minio: Compose Deployment" />
-      <item itemvalue="JavaScript Debug.localhost:5173" />
+      <item itemvalue="Cargo.Run forged" />
+      <item itemvalue="Cargo.Run pkgdev forge connect" />
       <item itemvalue="npm.dev" />
     </list>
     <recent_temporary>
