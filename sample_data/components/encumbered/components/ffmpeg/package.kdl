@@ -81,8 +81,8 @@ package {
     file path="usr/share/man/man1.*"
 }
 package "library/ffmpeg-7" {
-    file path="usr/lib/64.*\.so"
-    link path="usr/lib/64.*\.so"
+    file path="usr/lib/64.*\\.so"
+    link path="usr/lib/64.*\\.so"
 }
 package "developer/ffmpeg-7" {
     file path="usr/include.*"
