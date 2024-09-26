@@ -386,29 +386,24 @@ pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &[ManifestCollection])
 pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
-    for manifest in manifests {
-        println!("Attempting to resolve runtime dependencies");
-        let pkg_depend_cmd = Command::new("pkgdepend")
-            .arg("resolve")
-            .arg("-v")
-            .arg(
-                manifest_path
-                    .join(manifest.get_depend_name())
-                    .to_string_lossy()
-                    .to_string(),
-            )
-            .stdout(Stdio::inherit())
-            .status()
-            .into_diagnostic()?;
+    println!("Attempting to resolve runtime dependencies");
+    let pkg_depend_cmd = Command::new("pkgdepend")
+        .arg("resolve")
+        .arg("-v")
+        .args(manifests.iter().map(|manifest| manifest_path
+            .join(manifest.get_depend_name())
+            .to_string_lossy()
+            .to_string()).collect::<Vec<_>>())
+        .stdout(Stdio::inherit())
+        .status()
+        .into_diagnostic()?;
 
-        if pkg_depend_cmd.success() {
-            println!("Resolved dependencies for manifest {}", manifest);
-        } else {
-            return Err(miette::miette!(
-                "failed to resolve dependencies for manifest {}",
-                manifest
+    if pkg_depend_cmd.success() {
+        println!("Resolved dependencies");
+    } else {
+        return Err(miette::miette!(
+                "failed to resolve dependencies",
             ));
-        }
     }
     Ok(())
 }
