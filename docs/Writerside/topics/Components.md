@@ -1,74 +1,18 @@
 # Components
 
-> If you need more information about how to fill in this template, read the accompanying [guide](./guide-concept.md).
+A Component is used to define a Software that can be installed onto a System. In Forge
+this means that a Component encompasses the Definition how to Build the Sources 
+any patches required or desired by the Maintainers and any files not provided by the upstream Source.
 
-> This template includes writing instructions and boilerplate text that you can customize, use as-is, or completely replace with your own text. This text is indicated in {(curly brackets)}. Make sure you replace the placeholders with your own text.
-
-A summary paragraph introducing a concept, explaining its importance or
-relevance, and providing an overview of the content that will be covered
-in the document (scope).
-
-Typical wording to use is:
-- This article explains the basics of {(concept)} and how it works in {(the tool or context)}.
-
-{(Then include a paragraph with a definition of the concept you are explaining. 
-If more definitions are needed, include those definitions here as a bulleted list.)}
-
-{(This section usually doesn't have a separate heading that explicitly says
-Definition; it can precede all the rest.)}
-
-Typical wordings to use are:
-
--   {(X)} is;
-
--   {(X)} represents
-
--   {(X)} is connected to
-
--   {(X)} are organized {(describe the way how)}
-
--   {(X)} is similar to
-
--   {(X)} addresses the common pain points of ...
-
--   {(X)} solves the challenge of ...
-
--   By implementing {(X)}, users can ...
-
--   By using {(X)}, {(specify users/target audience)} gain ...
-
--   To use {(X)}, you create {(Y)}
-
-{(Add visual aid to complement your explanations visually.)}
-
-{(Image goes here.)}
-
-(Optional) Image/Figure: {(Image title, which concisely explains the image or
-figure. It can be represented by annotations on the image.)}
-
-## (Optional) Background
-
-{(Use this section to provide a reader with a context, prehistory, or background information.)}
-
-Typical wordings to use are:
-
--   The reason {(X)} is designed that way is because historically, ...
-
--   The idea of {(X)} originated from the growing demand for ...
-
--   Recent advancements in {(X)} and {(Y)} have opened up new possibilities
-    for ...
-
--   With the rise of {(X)}, the need for things such as {(Y)} has become
-    paramount.
-
--   Over the past decade, {(advancements in technology)} have transformed
-    the way ...
+In the Context of Forge the definition on what defines a source and which packages are built out of it is
+not a fixed definition. This allows flexibility when needed to deliver one component in separate packages or 
+deliver one package from two sources that could technically be independent components. The later case should be
+used sparingly though as there is usually a good reason Software developers split their Software into multiple
+components. Delivering multiple packages is more frequent, as the sources often contain multiple components
+for ease of delivery to the Distributor
 
 ## Use cases
 
-{(Use this section to provide use cases and explain how a reader can
-benefit from a concept.)}
 
 ## (Optional) Comparison of {(thing being compared)}
 
