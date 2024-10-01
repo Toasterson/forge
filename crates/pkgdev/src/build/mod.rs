@@ -165,9 +165,6 @@ fn run_ips_actions(
     ips::run_resolve_dependencies(wks, manifests.as_slice())
         .wrap_err("failed to resolve dependencies")?;
 
-    ips::build_final_manifest(wks, manifests.as_slice())
-        .wrap_err("final manifest creation failed")?;
-
     ips::run_lint(wks, manifests.as_slice()).wrap_err("lint failed")?;
 
     let publisher = gate.clone().unwrap_or_default().publisher;

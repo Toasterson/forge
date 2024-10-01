@@ -389,6 +389,7 @@ pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection
     println!("Attempting to resolve runtime dependencies");
     let pkg_depend_cmd = Command::new("pkgdepend")
         .arg("resolve")
+        .arg("-m")
         .arg("-v")
         .args(manifests.iter().map(|manifest| manifest_path
             .join(manifest.get_depend_name())
@@ -408,45 +409,6 @@ pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection
     Ok(())
 }
 
-pub fn build_final_manifest(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
-    let manifest_path = wks.get_or_create_manifest_dir()?;
-
-    for manifest in manifests {
-        let pkg_mogrify_cmd = Command::new("pkgmogrify")
-            .arg("-O")
-            .arg(
-                manifest_path
-                    .join(manifest.get_final_name())
-                    .to_string_lossy()
-                    .to_string(),
-            )
-            .arg(
-                manifest_path
-                    .join(manifest.get_mogrified_name())
-                    .to_string_lossy()
-                    .to_string(),
-            )
-            .arg(
-                manifest_path
-                    .join(manifest.get_resolved_name())
-                    .to_string_lossy()
-                    .to_string(),
-            )
-            .status()
-            .into_diagnostic()?;
-
-        if pkg_mogrify_cmd.success() {
-            println!("Final Manifest for {} created", manifest);
-        } else {
-            return Err(miette::miette!(
-                "Final Manifest creation for {} failed",
-                manifest
-            ));
-        }
-    }
-    Ok(())
-}
-
 pub fn run_lint(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
@@ -454,7 +416,7 @@ pub fn run_lint(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()>
         let pkg_lint_cmd = Command::new("pkglint")
             .arg(
                 manifest_path
-                    .join(manifest.get_final_name())
+                    .join(manifest.get_resolved_name())
                     .to_string_lossy()
                     .to_string(),
             )
@@ -522,7 +484,7 @@ pub fn publish(
     for manifest in manifests {
         let manifest_path = wks
             .get_or_create_manifest_dir()?
-            .join(manifest.get_final_name());
+            .join(manifest.get_resolved_name());
 
         let pkgsend_status = Command::new("pkgsend")
             .arg("publish")

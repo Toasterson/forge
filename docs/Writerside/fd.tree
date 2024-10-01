@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE instance-profile
+        SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
+
+<instance-profile id="fd"
+                 name="Forge Docs"
+                 start-page="starter-topic.md">
+
+    <toc-element topic="Forge-Concepts.md">
+        <toc-element topic="Distributions.md"/>
+        <toc-element topic="Manifests.md"/>
+        <toc-element topic="Declarative-Packages.md"/>
+        <toc-element topic="Components.md"/>
+        <toc-element topic="Gates.md"/>
+    </toc-element>
+    <toc-element topic="Contributing-Packages-to-OpenIndiana-Userland.md"/>
+    <toc-element topic="Package-Contribution-guide.md">
+        <toc-element topic="Packaging-Rust-based-Software.md"/>
+        <toc-element topic="Packaging-Perl-Software.md"/>
+        <toc-element topic="Packaging-Python-Packages.md"/>
+        <toc-element topic="Packaging-CMake-Software.md"/>
+        <toc-element topic="Packaging-Buildscript-Software.md"/>
+        <toc-element topic="Packaging-Automake-Software.md"/>
+    </toc-element>
+    <toc-element topic="Packaging-with-IPS.md">
+        <toc-element topic="On-package-splitting.md"/>
+        <toc-element topic="Multiple-Library-versions-and-SONAME.md"/>
+        <toc-element topic="Facets-and-Package-splitting.md"/>
+    </toc-element>
+    <toc-element topic="starter-topic.md"/>
+</instance-profile>
