@@ -37,7 +37,4 @@ enum Gates {
     Version,
     Branch,
     Transforms,
-    
 }
-
-

@@ -1,8 +1,8 @@
-use insta::{assert_debug_snapshot, with_settings};
 use forged::app::App;
+use forged::models::_entities::gates;
+use insta::{assert_debug_snapshot, with_settings};
 use loco_rs::testing;
 use serial_test::serial;
-use forged::models::_entities::gates;
 
 // TODO: see how to dedup / extract this to app-local test utils
 // not to framework, because that would require a runtime dep on insta
@@ -37,5 +37,5 @@ async fn can_add() {
             assert_debug_snapshot!(saved_gate);
         });
     })
-        .await;
+    .await;
 }

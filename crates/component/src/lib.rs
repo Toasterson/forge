@@ -1,10 +1,3 @@
-use std::{
-    fs::{read_to_string, File},
-    io::Write,
-    path::{Path, PathBuf},
-};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use derive_builder::Builder;
 use diff::Diff;
 use kdl::KdlValue;
@@ -12,6 +5,13 @@ use miette::{Diagnostic, IntoDiagnostic, WrapErr};
 use schemars::schema::RootSchema;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::{
+    fs::{read_to_string, File},
+    io::Write,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 use utoipa::ToSchema;
 
@@ -320,7 +320,13 @@ pub struct Recipe {
 
 impl Display for Recipe {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}@{}-{}", self.name, self.version.clone().unwrap_or("0.1.0".to_string()), self.revision.clone().unwrap_or("0".to_string()))
+        write!(
+            f,
+            "{}@{}-{}",
+            self.name,
+            self.version.clone().unwrap_or("0.1.0".to_string()),
+            self.revision.clone().unwrap_or("0".to_string())
+        )
     }
 }
 
@@ -991,9 +997,9 @@ pub struct ConfigureBuildSection {
     pub compiler: Option<String>,
     #[knuffel(child, unwrap(argument))]
     pub linker: Option<String>,
-    #[knuffel(child, default=false)]
+    #[knuffel(child, default = false)]
     pub disable_destdir_configure_option: bool,
-    #[knuffel(child, default=false)]
+    #[knuffel(child, default = false)]
     pub enable_large_files: bool,
 }
 
@@ -1194,7 +1200,9 @@ pub struct FileNode {
     pub include: String,
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, PartialEq, Deserialize, ToSchema, Diff, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, PartialEq, Deserialize, ToSchema, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
@@ -1237,7 +1245,9 @@ impl PackageSection {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, PartialEq, Deserialize, ToSchema, Diff, JsonSchema)]
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, PartialEq, Deserialize, ToSchema, Diff, JsonSchema,
+)]
 #[diff(attr(
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]

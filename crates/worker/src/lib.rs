@@ -1,7 +1,8 @@
 use axum::{response::IntoResponse, routing::get, Json, Router};
+use base64::Engine;
 use clap::Parser;
-use component::{Component, PackageMeta, SourceNode};
 use component::Recipe;
+use component::{Component, PackageMeta, SourceNode};
 use config::{Environment, File};
 use deadpool_lapin::lapin::message::Delivery;
 use deadpool_lapin::lapin::options::QueueBindOptions;
@@ -11,7 +12,7 @@ use deadpool_lapin::lapin::options::{
 };
 use deadpool_lapin::lapin::protocol::basic::AMQPProperties;
 use deadpool_lapin::lapin::{types::FieldTable, Channel};
-use forge::{CommitRef, Scheme, Job, JobReport, JobReportData, PatchFile};
+use forge::{CommitRef, Job, JobReport, JobReportData, PatchFile, Scheme};
 use futures::{join, StreamExt};
 use github::GitHubError;
 use integration::{read_forge_manifest, ForgeIntegrationManifest};
@@ -23,7 +24,6 @@ use std::future::IntoFuture;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use base64::Engine;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tracing::trace;
@@ -265,14 +265,7 @@ async fn handle_rabbitmq(state: AppState) -> Result<()> {
         match delivery {
             Ok(delivery) => {
                 let tag = delivery.delivery_tag;
-                match handle_message(
-                    delivery,
-                    &channel,
-                    &state.inbox,
-                    &state.worker_dir,
-                )
-                .await
-                {
+                match handle_message(delivery, &channel, &state.inbox, &state.worker_dir).await {
                     Ok(_) => {
                         debug!("handled message");
                         channel.basic_ack(tag, BasicAckOptions::default()).await?;

@@ -35,7 +35,9 @@ pub fn build_public_id(
 ) -> Result<Url, ParseError> {
     match kind {
         IdKind::Actor => base_url.join(&format!("/actors/{}", id)),
-        IdKind::ChangeRequest => base_url.join(&format!("/objects/changeRequests/{}/{}", parent, id)),
+        IdKind::ChangeRequest => {
+            base_url.join(&format!("/objects/changeRequests/{}/{}", parent, id))
+        }
     }
 }
 
@@ -234,9 +236,7 @@ pub struct PatchFile {
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobReport {
-    Success(
-        JobReportData,
-    ),
+    Success(JobReportData),
     Failure {
         /// The Object the job was working on when the error occurred
         object: JobObject,
@@ -247,13 +247,9 @@ pub enum JobReport {
     },
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobObject {
-    ChangeRequest {
-        cr_id: Url,
-        gate_id: Uuid,
-    }
+    ChangeRequest { cr_id: Url, gate_id: Uuid },
 }
 
 impl Display for JobObject {
@@ -292,5 +288,9 @@ pub enum JobReportData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Job {
-    GetRecipes { cr_id: Url, gate_id: Uuid, cr: ChangeRequest },
+    GetRecipes {
+        cr_id: Url,
+        gate_id: Uuid,
+        cr: ChangeRequest,
+    },
 }

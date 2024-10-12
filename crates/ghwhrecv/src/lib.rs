@@ -1,8 +1,8 @@
 use axum::{
     extract::State,
-    Json,
     response::IntoResponse,
-    Router, routing::{get, post},
+    routing::{get, post},
+    Json, Router,
 };
 use clap::Parser;
 use config::{Environment, File};
@@ -15,7 +15,7 @@ use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::net::TcpListener;
-use tracing::{debug, error, event, info, instrument, Level, span};
+use tracing::{debug, error, event, info, instrument, span, Level};
 use url::Url;
 
 use forge::{
@@ -278,7 +278,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -286,7 +287,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })), None,
+                        })),
+                        None,
                     )
                 }
                 github::PullRequestPayload::ConvertedToDraft { shared } => {
@@ -296,7 +298,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, true)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, true)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -304,7 +307,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })), None,
+                        })),
+                        None,
                     )
                 }
                 github::PullRequestPayload::ReadyForReview { shared } => {
@@ -314,7 +318,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -322,7 +327,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })), None,
+                        })),
+                        None,
                     )
                 }
                 github::PullRequestPayload::Demilestoned { shared, .. } => {
@@ -332,7 +338,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -340,7 +347,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })), None,
+                        })),
+                        None,
                     )
                 }
                 github::PullRequestPayload::Milestoned { shared, .. } => {
@@ -350,7 +358,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -358,7 +367,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                             to: vec![to_actor.clone()],
                             cc: vec![],
                             object: forge::ActivityObject::ChangeRequest(cr.clone()),
-                        })), None,
+                        })),
+                        None,
                     )
                 }
                 github::PullRequestPayload::Dequeued { .. } => {
@@ -372,7 +382,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -395,7 +406,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Create(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -418,7 +430,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
@@ -441,7 +454,8 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
                         &shared.repository.full_name,
                         &shared.number.to_string(),
                     )?;
-                    let cr = build_change_request(change_request_id.to_string(), shared, false, false)?;
+                    let cr =
+                        build_change_request(change_request_id.to_string(), shared, false, false)?;
                     (
                         Some(forge::Event::Update(forge::ActivityEnvelope {
                             id: change_request_id.clone(),
