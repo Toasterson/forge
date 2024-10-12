@@ -261,7 +261,7 @@ pub fn generate_manifest_files(
                 .default_transforms
                 .clone()
                 .into_iter()
-                .map(|tr| tr.to_string())
+                .map(|tr| tr.to_transform_line())
                 .collect::<Vec<String>>()
                 .join("\n");
             include_str.push_str("\n");

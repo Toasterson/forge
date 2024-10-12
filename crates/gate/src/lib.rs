@@ -1,12 +1,12 @@
+use miette::Diagnostic;
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::{
     fs::{read_to_string, File},
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
-
-use miette::Diagnostic;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug, Diagnostic)]
@@ -73,17 +73,24 @@ impl Default for Gate {
 }
 
 impl Gate {
-    pub fn empty<P: AsRef<Path>>(path: P) -> GateResult<Self> {
-        Ok(Self {
+    /// Create an empty gate
+    pub fn empty<P: AsRef<Path>>(path: P) -> Self {
+        Self {
             path: path.as_ref().to_path_buf(),
             ..Default::default()
-        })
+        }
     }
-    pub fn new<P: AsRef<Path>>(path: P) -> GateResult<Self> {
-        let path = if !path.as_ref().is_absolute() {
-            path.as_ref().canonicalize()?
-        } else {
+
+    /// Read file at path and return the Gate object
+    ///
+    /// # Errors
+    ///
+    /// Fails if reading the file fails or parsing the Gate content
+    pub fn load<P: AsRef<Path>>(path: P) -> GateResult<Self> {
+        let path = if path.as_ref().is_absolute() {
             path.as_ref().to_path_buf()
+        } else {
+            path.as_ref().canonicalize()?
         };
 
         let gate_document_contents = read_to_string(&path)?;
@@ -95,16 +102,18 @@ impl Gate {
             .to_string_lossy()
             .to_string();
 
-        let mut gate = knuffel::parse::<Gate>(&name, &gate_document_contents)?;
+        let mut gate = knuffel::parse::<Self>(&name, &gate_document_contents)?;
         gate.path = path;
         Ok(gate)
     }
 
+    #[must_use]
     pub fn to_document(&self) -> kdl::KdlDocument {
         let node = self.to_node();
         node.children().unwrap_or(&kdl::KdlDocument::new()).clone()
     }
 
+    #[must_use]
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("gate");
         let doc = node.ensure_children();
@@ -149,6 +158,11 @@ impl Gate {
         node
     }
 
+    /// Save the current Gate back to the Filesystem
+    ///
+    /// # Errors
+    ///
+    /// Can error while serializing or saving to disk
     pub fn save(&self) -> GateResult<()> {
         let doc = self.to_document();
         let mut f = File::create(&self.path)?;
@@ -156,12 +170,11 @@ impl Gate {
         Ok(())
     }
 
+    #[must_use]
     pub fn get_gate_path(&self) -> PathBuf {
-        if let Some(parent) = self.path.parent() {
-            parent.to_path_buf()
-        } else {
-            PathBuf::from("/")
-        }
+        self.path
+            .parent()
+            .map_or_else(|| PathBuf::from("/"), Path::to_path_buf)
     }
 }
 
@@ -176,6 +189,7 @@ pub struct MetadataTransform {
 }
 
 impl MetadataTransform {
+    #[must_use]
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("metadata-transform");
         let matcher_prop = kdl::KdlEntry::new_prop("matcher", self.matcher.as_str());
@@ -199,15 +213,17 @@ pub struct Transform {
 }
 
 impl Transform {
-    pub fn to_string(&self) -> String {
+    #[must_use]
+    pub fn to_transform_line(&self) -> String {
         let mut lines = self.actions.clone();
         if let Some(include_prop) = &self.include {
-            lines.push(format!("<include {}>", include_prop));
+            lines.push(format!("<include {include_prop}>"));
         }
 
         lines.join("\n")
     }
 
+    #[must_use]
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("transform");
         for (idx, action) in self.actions.iter().enumerate() {
@@ -229,6 +245,7 @@ pub struct Distribution {
 }
 
 impl Distribution {
+    #[must_use]
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("distribution");
         let doc = node.ensure_children();
@@ -263,11 +280,11 @@ impl FromStr for DistributionType {
     }
 }
 
-impl ToString for DistributionType {
-    fn to_string(&self) -> String {
+impl Display for DistributionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DistributionType::Tarbball => String::from("tarball"),
-            DistributionType::IPS => String::from("ips"),
+            Self::Tarbball => write!(f, "tarball"),
+            Self::IPS => write!(f, "ips"),
         }
     }
 }
