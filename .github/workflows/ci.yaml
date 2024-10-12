@@ -97,7 +97,7 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
       - name: Install libarchive
-        run: sudo apt update && sudo apt install -y libarchive
+        run: sudo apt update && sudo apt install -y libarchive-dev libarchive-tools
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
