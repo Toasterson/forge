@@ -2,7 +2,7 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - develop
       - main
   pull_request:
 
@@ -95,7 +95,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features --all
+          args: --all-features --all --package forged
         env:
           REDIS_URL: redis://localhost:${{job.services.redis.ports[6379]}}
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres_test
