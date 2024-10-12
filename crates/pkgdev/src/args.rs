@@ -91,7 +91,7 @@ pub enum GenerateSchemaKind {
 
 pub async fn run(args: Args) -> miette::Result<()> {
     let gate = if let Some(gate_path) = args.gate {
-        let gate = Gate::new(gate_path)?;
+        let gate = Gate::load(gate_path)?;
         Some(gate)
     } else {
         None

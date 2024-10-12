@@ -1,9 +1,9 @@
-use miette::Diagnostic;
-use std::fs::DirBuilder;
-use std::path::{Path, PathBuf};
 use config::{Value, ValueKind};
 use directories::ProjectDirs;
+use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
+use std::fs::DirBuilder;
+use std::path::{Path, PathBuf};
 use workspace::{Workspace, WorkspaceConfig, WorkspaceError};
 
 #[derive(Debug, thiserror::Error, Diagnostic)]
@@ -78,12 +78,7 @@ impl Settings {
             .set_default("base_path", ".")?
             .set_default(
                 "search_path",
-                Some(vec![
-                    "/usr/gnu/bin",
-                    "/usr/bin",
-                    "/usr/sbin",
-                    "/sbin",
-                ]),
+                Some(vec!["/usr/gnu/bin", "/usr/bin", "/usr/sbin", "/sbin"]),
             )?
             .set_default("forges", Vec::<ForgeToken>::new())?
             .add_source(config::File::from(config_dir.join("config")).required(false))
@@ -93,7 +88,8 @@ impl Settings {
     }
 
     fn get_or_create_config_dir() -> Result<PathBuf> {
-        let proj_dir = ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
+        let proj_dir =
+            ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
         let config_dir = proj_dir.config_dir();
         if !config_dir.exists() {
             DirBuilder::new().recursive(true).create(config_dir)?;
@@ -109,7 +105,8 @@ impl Settings {
     }
 
     fn get_or_create_data_dir() -> Result<PathBuf> {
-        let proj_dir = ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
+        let proj_dir =
+            ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
         let data_dir = proj_dir.data_dir();
         if !data_dir.exists() {
             DirBuilder::new().recursive(true).create(data_dir)?;
@@ -118,7 +115,8 @@ impl Settings {
     }
 
     pub fn get_or_create_archives_dir() -> Result<PathBuf> {
-        let proj_dir = ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
+        let proj_dir =
+            ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
         let archive_dir = proj_dir.cache_dir().join("archives");
         if !archive_dir.exists() {
             DirBuilder::new().recursive(true).create(&archive_dir)?;
@@ -127,7 +125,8 @@ impl Settings {
     }
 
     pub fn get_or_create_output_dir() -> Result<PathBuf> {
-        let proj_dir = ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
+        let proj_dir =
+            ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
         let output_dir = proj_dir.data_dir().join(DEFAULT_OUTPUT_DIR_DIR);
         if !output_dir.exists() {
             DirBuilder::new().recursive(true).create(&output_dir)?;
@@ -136,7 +135,8 @@ impl Settings {
     }
 
     pub fn get_or_create_repo_dir() -> Result<PathBuf> {
-        let proj_dir = ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
+        let proj_dir =
+            ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
         let repo_dir = proj_dir.data_dir().join(DEFAULT_REPO_DIR_DIR);
         if !repo_dir.exists() {
             DirBuilder::new().recursive(true).create(&repo_dir)?;
@@ -202,7 +202,7 @@ impl Settings {
             };
 
             WorkspaceConfig {
-                path: PathBuf::from(base_path).join(DEFAULT_WORKSPACE_DIR)
+                path: PathBuf::from(base_path).join(DEFAULT_WORKSPACE_DIR),
             }
         };
 
@@ -231,7 +231,8 @@ impl Settings {
 
     #[allow(dead_code)]
     pub fn get_or_create_cache_dir() -> Result<PathBuf> {
-        let proj_dir = ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
+        let proj_dir =
+            ProjectDirs::from(QUALIFIER, ORG, APP_NAME).ok_or(ConfigError::NoProjectDir)?;
         let cache_dir = proj_dir.cache_dir();
         if !cache_dir.exists() {
             DirBuilder::new().recursive(true).create(cache_dir)?;
@@ -239,15 +240,17 @@ impl Settings {
         Ok(cache_dir.to_path_buf())
     }
 
-    pub fn change_current_workspace<P: AsRef<Path>>(&mut self, base_path: P, name: Option<String>) -> Result<Workspace> {
+    pub fn change_current_workspace<P: AsRef<Path>>(
+        &mut self,
+        base_path: P,
+        name: Option<String>,
+    ) -> Result<Workspace> {
         let wks_path = base_path.as_ref().join(name.unwrap_or_default());
         if !wks_path.exists() {
             DirBuilder::new().recursive(true).create(&wks_path)?;
         }
 
-        let wks = WorkspaceConfig{
-            path: wks_path,
-        };
+        let wks = WorkspaceConfig { path: wks_path };
         self.workspace_config = Some(wks.clone());
         self.save()?;
 

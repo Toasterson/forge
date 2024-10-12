@@ -38,13 +38,10 @@ strum = { version = "0.26.1", features = ["derive"] }
 forge = { version = "*", path = "." }
 url = { version = "2.4.1", features = ["serde"] }
 futures = "0.3.17"
-prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", tag = "0.6.11", default-features = false, features = ["postgresql", "sqlite", "mysql", "mssql"] }
-prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", tag = "0.6.11" }
 component = { version = "*", path = "crates/component" }
 integration = { version = "0.1.0", path = "crates/integration" }
 repology = { version = "*", path = "crates/repology" }
 gate = { version = "*", path = "crates/gate" }
 utoipa = { version = "4.2.0", features = ["axum_extras", "serde_yaml", "uuid", "chrono", "url"] }
-pasetors = { version = "0.6.8", features = ["serde"] }
 base64 = "0.22.1"
 uuid = { version = "1.9.1", features = ["v4", "serde"] }

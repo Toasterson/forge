@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use either::Either;
 use octocrab::auth::{Continue, OAuth};
-use reqwest_12::header::ACCEPT;
+use reqwest::header::ACCEPT;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 

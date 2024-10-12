@@ -1,4 +1,4 @@
-use miette::Diagnostic;
+use miette::{miette, Diagnostic};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
@@ -23,10 +23,17 @@ pub struct OpenIdConfig {
     pub client_id: String,
 }
 
+#[derive(Clone, Copy)]
 pub enum IdKind {
     Actor,
     ChangeRequest,
 }
+
+/// Build a Activitypub ID
+///
+/// # Errors
+///
+/// Can fail if we end up with a invalid url but unlikely
 pub fn build_public_id(
     kind: IdKind,
     base_url: &Url,
@@ -34,8 +41,8 @@ pub fn build_public_id(
     id: &str,
 ) -> Result<Url, ParseError> {
     match kind {
-        IdKind::Actor => base_url.join(&format!("/actors/{}", id)),
-        IdKind::ChangeRequest => base_url.join(&format!("/objects/changeRequests/{}/{}", parent, id)),
+        IdKind::Actor => base_url.join(&format!("/actors/{id}")),
+        IdKind::ChangeRequest => base_url.join(&format!("/objects/changeRequests/{parent}/{id}")),
     }
 }
 
@@ -66,9 +73,9 @@ impl FromStr for ComponentFileKind {
 impl Display for ComponentFileKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name = match self {
-            ComponentFileKind::Archive => "archive",
-            ComponentFileKind::Patch => "patch",
-            ComponentFileKind::Script => "script",
+            Self::Archive => "archive",
+            Self::Patch => "patch",
+            Self::Script => "script",
         };
         write!(f, "{name}")
     }
@@ -93,8 +100,8 @@ impl Display for ComponentFile {
             f,
             "{}:{}:{}:{}",
             kind_str,
-            self.component.replace("/", "_"),
-            self.name.replace("/", "_"),
+            self.component.replace('/', "_"),
+            self.name.replace('/', "_"),
             self.hash
         )
     }
@@ -106,12 +113,14 @@ pub enum Scheme {
     HTTPS,
 }
 
-impl From<String> for Scheme {
-    fn from(s: String) -> Self {
-        match s.as_str() {
-            "http" => Scheme::HTTP,
-            "https" => Scheme::HTTPS,
-            _ => panic!("Invalid scheme"),
+impl TryFrom<String> for Scheme {
+    type Error = miette::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "http" => Ok(Self::HTTP),
+            "https" => Ok(Self::HTTPS),
+            _ => Err(miette!("Invalid scheme")),
         }
     }
 }
@@ -119,8 +128,8 @@ impl From<String> for Scheme {
 impl Display for Scheme {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Scheme::HTTP => write!(f, "http"),
-            Scheme::HTTPS => write!(f, "https"),
+            Self::HTTP => write!(f, "http"),
+            Self::HTTPS => write!(f, "https"),
         }
     }
 }
@@ -206,7 +215,7 @@ pub enum ExternalReference {
 impl Display for ExternalReference {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::GitHub { pull_request } => write!(f, "github:pr:{}", pull_request),
+            Self::GitHub { pull_request } => write!(f, "github:pr:{pull_request}"),
         }
     }
 }
@@ -234,9 +243,7 @@ pub struct PatchFile {
 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobReport {
-    Success(
-        JobReportData,
-    ),
+    Success(JobReportData),
     Failure {
         /// The Object the job was working on when the error occurred
         object: JobObject,
@@ -247,19 +254,15 @@ pub enum JobReport {
     },
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum JobObject {
-    ChangeRequest {
-        cr_id: Url,
-        gate_id: Uuid,
-    }
+    ChangeRequest { cr_id: Url, gate_id: Uuid },
 }
 
 impl Display for JobObject {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            JobObject::ChangeRequest { cr_id, gate_id } => {
+            Self::ChangeRequest { cr_id, gate_id } => {
                 write!(f, "ChangeRequest {cr_id} for gate {gate_id}")
             }
         }
@@ -274,7 +277,7 @@ pub enum JobKind {
 impl Display for JobKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            JobKind::GetRecipes => {
+            Self::GetRecipes => {
                 write!(f, "GetRecipes")
             }
         }
@@ -292,5 +295,9 @@ pub enum JobReportData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Job {
-    GetRecipes { cr_id: Url, gate_id: Uuid, cr: ChangeRequest },
+    GetRecipes {
+        cr_id: Url,
+        gate_id: Uuid,
+        cr: ChangeRequest,
+    },
 }

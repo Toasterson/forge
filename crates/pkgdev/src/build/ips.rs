@@ -102,6 +102,7 @@ impl ManifestCollection {
         format!("{}.dep.res", self.name)
     }
 
+    #[allow(dead_code)]
     pub fn get_final_name(&self) -> String {
         format!("{}.manifest.p5m", self.name)
     }
@@ -228,7 +229,8 @@ pub fn generate_manifest_files(
                     .ok_or(miette::miette!("no license specified"))?,
             };
             let mut manifest = render(DEFAULT_IPS_TEMPLATE, vars);
-            let default_action_keep_line = "\n<transform file link hardlink path=.* -> default keep false>";
+            let default_action_keep_line =
+                "\n<transform file link hardlink path=.* -> default keep false>";
             manifest.push_str(default_action_keep_line);
 
             generate_transform_lines(&mut manifest, &p.files);
@@ -260,7 +262,7 @@ pub fn generate_manifest_files(
                 .default_transforms
                 .clone()
                 .into_iter()
-                .map(|tr| tr.to_string())
+                .map(|tr| tr.to_transform_line())
                 .collect::<Vec<String>>()
                 .join("\n");
             include_str.push_str("\n");
@@ -391,10 +393,17 @@ pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection
         .arg("resolve")
         .arg("-m")
         .arg("-v")
-        .args(manifests.iter().map(|manifest| manifest_path
-            .join(manifest.get_depend_name())
-            .to_string_lossy()
-            .to_string()).collect::<Vec<_>>())
+        .args(
+            manifests
+                .iter()
+                .map(|manifest| {
+                    manifest_path
+                        .join(manifest.get_depend_name())
+                        .to_string_lossy()
+                        .to_string()
+                })
+                .collect::<Vec<_>>(),
+        )
         .stdout(Stdio::inherit())
         .status()
         .into_diagnostic()?;
@@ -402,9 +411,7 @@ pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection
     if pkg_depend_cmd.success() {
         println!("Resolved dependencies");
     } else {
-        return Err(miette::miette!(
-                "failed to resolve dependencies",
-            ));
+        return Err(miette::miette!("failed to resolve dependencies",));
     }
     Ok(())
 }
