@@ -51,6 +51,11 @@ jobs:
         with:
           command: clippy
           args: --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery -W rust-2018-idioms
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --package forged --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery -W rust-2018-idioms
 
   test:
     name: Run Tests
@@ -91,6 +96,8 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install libarchive
+        run: apt update && apt install -y libarchive
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:

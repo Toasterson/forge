@@ -11,12 +11,12 @@ impl Model {
     /// # Errors
     ///
     /// When could not find gate by the given name or DB query error
-    pub async fn find_by_name<S: AsRef<str>>(
+    pub async fn find_by_name(
         db: &DatabaseConnection,
-        name: S,
+        name: &str,
     ) -> ModelResult<Self> {
         let gate = Entity::find()
-            .filter(query::condition().eq(Column::Name, name.as_ref()).build())
+            .filter(query::condition().eq(Column::Name, name).build())
             .one(db)
             .await?;
         gate.ok_or_else(|| ModelError::EntityNotFound)
