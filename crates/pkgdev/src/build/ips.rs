@@ -102,6 +102,7 @@ impl ManifestCollection {
         format!("{}.dep.res", self.name)
     }
 
+    #[allow(dead_code)]
     pub fn get_final_name(&self) -> String {
         format!("{}.manifest.p5m", self.name)
     }

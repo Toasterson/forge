@@ -89,6 +89,9 @@ pub enum Error {
 
     #[error("no .forge/manifest.toml,yaml,json file found")]
     NoForgeManifest,
+
+    #[error("unknown HTTP Scheme")]
+    UnknownScheme,
 }
 
 impl IntoResponse for Error {
@@ -158,7 +161,12 @@ pub async fn listen(cfg: Config) -> Result<()> {
             .create_pool(Some(deadpool_lapin::Runtime::Tokio1))?,
         inbox: cfg.inbox,
         job_inbox: cfg.job_inbox,
-        base_url: format!("{}://{}", Scheme::from(cfg.scheme), cfg.domain).parse()?,
+        base_url: format!(
+            "{}://{}",
+            Scheme::try_from(cfg.scheme).map_err(|_| Error::UnknownScheme)?,
+            cfg.domain
+        )
+        .parse()?,
         worker_dir: cfg.directory,
     };
     let conn = state.amqp.get().await?;

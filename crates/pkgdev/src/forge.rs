@@ -299,7 +299,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 if file.exists() {
                     Some(Gate::load(file)?)
                 } else {
-                    Some(Gate::empty(file)?)
+                    Some(Gate::empty(file))
                 }
             } else {
                 None
