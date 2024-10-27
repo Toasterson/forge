@@ -346,11 +346,8 @@ impl Display for Recipe {
 impl Recipe {
     #[must_use]
     pub fn to_document(&self) -> kdl::KdlDocument {
-        let pkg_node = self.to_node();
-        pkg_node
-            .children()
-            .unwrap_or(&kdl::KdlDocument::new())
-            .clone()
+        let mut pkg_node = self.to_node();
+        pkg_node.ensure_children().clone()
     }
 
     pub fn insert_metadata(&mut self, key: &str, value: &str) {

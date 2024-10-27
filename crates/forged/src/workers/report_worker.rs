@@ -1,19 +1,19 @@
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
-pub struct ReportWorkerWorker {
+pub struct Worker {
     pub ctx: AppContext,
 }
 
 #[derive(Deserialize, Debug, Serialize)]
-pub struct ReportWorkerWorkerArgs {}
+pub struct WorkerArgs {}
 
 #[async_trait]
-impl BackgroundWorker<ReportWorkerWorkerArgs> for ReportWorkerWorker {
+impl BackgroundWorker<WorkerArgs> for Worker {
     fn build(ctx: &AppContext) -> Self {
         Self { ctx: ctx.clone() }
     }
-    async fn perform(&self, _args: ReportWorkerWorkerArgs) -> Result<()> {
+    async fn perform(&self, _args: WorkerArgs) -> Result<()> {
         println!("=================ReportWorker=======================");
         // TODO: Some actual work goes here...
         Ok(())

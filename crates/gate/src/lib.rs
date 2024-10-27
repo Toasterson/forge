@@ -109,8 +109,8 @@ impl Gate {
 
     #[must_use]
     pub fn to_document(&self) -> kdl::KdlDocument {
-        let node = self.to_node();
-        node.children().unwrap_or(&kdl::KdlDocument::new()).clone()
+        let mut node = self.to_node();
+        node.ensure_children().clone()
     }
 
     #[must_use]
