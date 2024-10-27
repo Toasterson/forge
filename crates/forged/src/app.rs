@@ -52,9 +52,7 @@ impl Hooks for App {
 
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue
-            .register(crate::workers::report_worker::Worker::build(
-                ctx,
-            ))
+            .register(crate::workers::report_worker::Worker::build(ctx))
             .await?;
         Ok(())
     }
