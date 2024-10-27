@@ -2,7 +2,7 @@ use std::{collections::HashMap, process::Stdio};
 
 use crate::sources::derive_source_name;
 use component::Component;
-use config::Settings;
+use forge_config::Settings;
 use miette::{IntoDiagnostic, Result};
 use std::process::Command;
 use workspace::Workspace;

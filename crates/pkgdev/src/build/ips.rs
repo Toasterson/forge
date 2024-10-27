@@ -1,6 +1,6 @@
 use crate::sources::derive_source_name;
 use component::{Component, SourceNode, TransformNode};
-use config::Settings;
+use forge_config::Settings;
 use fs_extra::file::write_all;
 use gate::Gate;
 use microtemplate::{render, Substitutions};

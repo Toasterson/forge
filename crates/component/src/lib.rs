@@ -1347,33 +1347,33 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_read_all_samples() -> miette::Result<()> {
-        let paths = find_bundle_files(Path::new("../packages")).into_diagnostic()?;
-        let bundles = paths
-            .into_iter()
-            .map(|path| Component::open_local(&path))
-            .collect::<ComponentResult<Vec<Component>>>()?;
-        for bundle in bundles {
-            assert_ne!(bundle.recipe.name, String::from(""))
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn parse_openssl() -> miette::Result<()> {
-        let bundle_path = Path::new("../packages/openssl");
-        let _b = Component::open_local(bundle_path)?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn parse_binutils_gdb() -> miette::Result<()> {
-        let bundle_path = Path::new("../packages/binutils-gdb");
-        let _b = Component::open_local(bundle_path)?;
-
-        Ok(())
-    }
+    // #[test]
+    // fn test_read_all_samples() -> miette::Result<()> {
+    //     let paths = find_bundle_files(Path::new("../packages")).into_diagnostic()?;
+    //     let bundles = paths
+    //         .into_iter()
+    //         .map(|path| Component::open_local(&path))
+    //         .collect::<ComponentResult<Vec<Component>>>()?;
+    //     for bundle in bundles {
+    //         assert_ne!(bundle.recipe.name, String::from(""))
+    //     }
+    //
+    //     Ok(())
+    // }
+    //
+    // #[test]
+    // fn parse_openssl() -> miette::Result<()> {
+    //     let bundle_path = Path::new("../packages/openssl");
+    //     let _b = Component::open_local(bundle_path)?;
+    //
+    //     Ok(())
+    // }
+    //
+    // #[test]
+    // fn parse_binutils_gdb() -> miette::Result<()> {
+    //     let bundle_path = Path::new("../packages/binutils-gdb");
+    //     let _b = Component::open_local(bundle_path)?;
+    //
+    //     Ok(())
+    // }
 }

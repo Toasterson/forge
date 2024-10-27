@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use async_trait::async_trait;
+use loco_rs::prelude::*;
 use loco_rs::{
     app::{AppContext, Hooks},
     boot::{create_app, BootResult, StartMode},
@@ -8,7 +9,6 @@ use loco_rs::{
     db::{self, truncate_table},
     environment::Environment,
     task::Tasks,
-    worker::{AppWorker, Processor},
     Result,
 };
 use migration::Migrator;
@@ -18,7 +18,6 @@ use crate::{
     controllers,
     models::_entities::{notes, users},
     tasks,
-    workers::downloader::DownloadWorker,
 };
 
 pub struct App;
@@ -51,8 +50,13 @@ impl Hooks for App {
             .add_route(controllers::user::routes())
     }
 
-    fn connect_workers<'a>(p: &'a mut Processor, ctx: &'a AppContext) {
-        p.register(DownloadWorker::build(ctx));
+    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
+        queue
+            .register(crate::workers::report_worker::ReportWorkerWorker::build(
+                ctx,
+            ))
+            .await?;
+        Ok(())
     }
 
     fn register_tasks(tasks: &mut Tasks) {

@@ -1,5 +1,9 @@
 { 
 	"component_list": [
 		"./tools/bass-o-matic --workspace=./ --components=paths | sed -e 's;./components/;;'"
-	]
+    ],
+  "metadata_generation_script": [
+    "test"
+  ],
+  "change_to_component_dir": false
 }

@@ -1,10 +1,10 @@
 [package]
-name = "config"
+name = "forge_config"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-config.workspace = true
+config = "0.14.1"
 directories = "5.0.1"
 serde = { version = "1.0.199", features = ["derive"] }
 thiserror.workspace = true

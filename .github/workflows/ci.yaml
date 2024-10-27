@@ -104,5 +104,5 @@ jobs:
           command: test
           args: --all-features --all --package forged
         env:
-          REDIS_URL: redis://localhost:${{job.services.redis.ports[6379]}}
+          REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres_test

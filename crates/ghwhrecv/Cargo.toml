@@ -7,7 +7,7 @@ edition.workspace = true
 [dependencies]
 thiserror.workspace = true
 miette = { workspace = true, features=["fancy"]}
-config.workspace = true
+config = "0.14.1"
 deadpool-lapin.workspace = true
 serde.workspace = true
 serde_json.workspace = true
