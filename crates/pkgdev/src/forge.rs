@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use clap::{Subcommand, ValueEnum};
 use miette::Diagnostic;
 use reqwest::header::HeaderMap;
-use secrecy::ExposeSecret;
+//use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::{ParseError, Url};
@@ -16,7 +16,7 @@ use gate::{Gate, GateError};
 
 use crate::forge::api::types::ActorSshKeyFingerprint;
 use crate::forge::api::{types, Client};
-use crate::{get_project_dir, openid};
+use crate::get_project_dir;
 
 mod api {
     include!(concat!(env!("OUT_DIR"), "/forge.codegen.rs"));
@@ -106,8 +106,8 @@ pub enum Error {
     #[diagnostic(transparent)]
     Component(#[from] ComponentError),
 
-    #[error(transparent)]
-    Octocrab(#[from] octocrab::Error),
+    //#[error(transparent)]
+    //Octocrab(#[from] octocrab::Error),
 
     #[error("component is missing {0}")]
     ComponentIncomplete(String),
@@ -349,9 +349,9 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
         ForgeArgs::Connect {
             target,
             select,
-            provider,
             handle,
-            display_name,
+            display_name, 
+            ..
         } => {
             let target_url: Url = target.parse()?;
             let host = target_url.host_str();
@@ -363,9 +363,9 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
 
             let host = host.unwrap();
 
-            let login_info = get_oauth_login_info(&target_url).await?;
+            let _login_info = get_oauth_login_info(&target_url).await?;
 
-            let token = openid::login_to_provider(provider, &login_info).await?;
+            //let token = openid::login_to_provider(provider, &login_info).await?;
             let forge_client = Client::new(target);
 
             let resp = forge_client
@@ -373,7 +373,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                     display_name: display_name.clone(),
                     handle: handle.to_string(),
                     ssh_keys: vec![],
-                    token: token.access_token.expose_secret().clone(),
+                    token: String::new(),
                 })
                 .await?;
 
