@@ -2,6 +2,3 @@
 rustflags = [
     "-C", "link-arg=-fuse-ld=lld",
 ]
-
-[alias]
-prisma = "run -p prisma --"

@@ -14,7 +14,7 @@ fn derive_output_name(pkg: &Component) -> String {
 
 pub fn make_release_tarball(wks: &Workspace, pkg: &Component) -> miette::Result<()> {
     let proto_dir = wks.get_or_create_prototype_dir()?;
-    let output_dir = config::Settings::get_or_create_output_dir().into_diagnostic()?;
+    let output_dir = forge_config::Settings::get_or_create_output_dir().into_diagnostic()?;
     let tarball_path_string = output_dir
         .join(derive_output_name(pkg))
         .to_string_lossy()

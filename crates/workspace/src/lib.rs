@@ -5,9 +5,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use miette::Diagnostic;
+use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use thiserror::Error;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum WorkspaceError {
@@ -41,7 +41,6 @@ pub struct Workspace {
 }
 
 impl Workspace {
-
     pub fn from_str(root_dir: &str) -> Result<Self> {
         let expanded_root_dir = shellexpand::full(root_dir)
             .map_err(|e| WorkspaceError::VariableLookupError(format!("{}", e.cause)))?
@@ -162,7 +161,7 @@ impl Workspace {
             ("build_dir".to_owned(), self.build_dir.clone()),
             ("source_dir".to_owned(), self.source_dir.clone()),
         ]
-            .into()
+        .into()
     }
 }
 

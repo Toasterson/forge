@@ -297,9 +297,9 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             let forge_client = forge_client.unwrap();
             let gate: Option<Gate> = if let Some(file) = file {
                 if file.exists() {
-                    Some(Gate::new(file)?)
+                    Some(Gate::load(file)?)
                 } else {
-                    Some(Gate::empty(file)?)
+                    Some(Gate::empty(file))
                 }
             } else {
                 None
@@ -325,7 +325,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                         Some(
                             gate.default_transforms
                                 .iter()
-                                .map(|t| t.to_string())
+                                .map(|t| t.to_transform_line())
                                 .collect::<Vec<String>>(),
                         ),
                     )
@@ -398,7 +398,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 return Err(Error::NoForgeConnected);
             }
             let forge_client = forge_client.unwrap();
-            let gate = Gate::new(gate)?;
+            let gate = Gate::load(gate)?;
             let component = Component::open_local(path)?;
 
             let gate_id = gate.id.ok_or(Error::GateNoId)?;
@@ -445,7 +445,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
                 return Err(Error::NoForgeConnected);
             }
             let forge_client = forge_client.unwrap();
-            let gate = Gate::new(gate)?;
+            let gate = Gate::load(gate)?;
             let component = Component::open_local(path)?;
 
             let gate_id = gate.id.ok_or(Error::GateNoId)?;

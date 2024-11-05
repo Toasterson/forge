@@ -8,7 +8,7 @@ use crate::metadata;
 use crate::modify::{edit_component, EditArgs};
 use crate::sources::download_sources;
 use clap::{Parser, Subcommand, ValueEnum};
-use config::Settings;
+use forge_config::Settings;
 use gate::Gate;
 use miette::{Context, IntoDiagnostic};
 use strum::Display;
@@ -22,7 +22,7 @@ pub struct Args {
     /// Allows one to change the workspace for this operation only. Intended for the CI usecase so that
     /// multiple jobs can be run simultaneously
     #[arg(long, short)]
-    workspace: Option<PathBuf>,
+    pub workspace: Option<PathBuf>,
 
     #[clap(subcommand)]
     pub command: Commands,
@@ -91,7 +91,7 @@ pub enum GenerateSchemaKind {
 
 pub async fn run(args: Args) -> miette::Result<()> {
     let gate = if let Some(gate_path) = args.gate {
-        let gate = Gate::new(gate_path)?;
+        let gate = Gate::load(gate_path)?;
         Some(gate)
     } else {
         None

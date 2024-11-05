@@ -6,7 +6,7 @@ use std::{
 
 use crate::sources::derive_source_name;
 use component::{Component, ConfigureBuildSection};
-use config::Settings;
+use forge_config::Settings;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use workspace::Workspace;
 

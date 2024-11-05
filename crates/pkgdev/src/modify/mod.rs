@@ -198,7 +198,7 @@ pub fn edit_component(
                                     .to_string();
                                 patch_vec.push(SourceNode::Patch(component::PatchSource::new(
                                     file_name, None,
-                                )?));
+                                )));
                             }
                             src_section.sources.append(&mut patch_vec);
                         }

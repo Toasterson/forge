@@ -20,16 +20,16 @@ pub enum BuildSteps {
 #[derive(Debug, Parser)]
 pub struct BuildArgs {
     #[arg(long = "step", short)]
-    stop_on_step: Option<BuildSteps>,
+    pub stop_on_step: Option<BuildSteps>,
 
     #[arg(long, default_value = "false")]
-    no_clean: bool,
+    pub no_clean: bool,
 
     #[arg(long, default_value = "false")]
-    archive_clean: bool,
+    pub archive_clean: bool,
 
     #[arg(short = 'I', long = "include")]
-    transform_include_dir: Option<PathBuf>,
+    pub transform_include_dir: Option<PathBuf>,
 }
 
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ use crate::sources::{download_sources, unpack};
 use automake::build_using_automake;
 use component::Component;
 use component::SourceSection;
-use config::Settings;
+use forge_config::Settings;
 use gate::Gate;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use script::build_using_scripts;

@@ -1,0 +1,17 @@
+---
+source: crates/forged/tests/requests/gates.rs
+assertion_line: 37
+expression: saved_gate
+---
+Ok(
+    Model {
+        created_at: DATE,
+        updated_at: DATE,
+        id: ID
+        pid: PID,
+        name: "userland",
+        version: "TOKEN",
+        branch: "TOKEN",
+        transforms: None,
+    },
+)

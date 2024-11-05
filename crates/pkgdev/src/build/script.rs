@@ -6,7 +6,7 @@ use std::{
 use crate::build::util::copy_with_rsync;
 use crate::sources::derive_source_name;
 use component::{Component, ScriptBuildSection};
-use config::Settings;
+use forge_config::Settings;
 use miette::{IntoDiagnostic, Result};
 use workspace::Workspace;
 

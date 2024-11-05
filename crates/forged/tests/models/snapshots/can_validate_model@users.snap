@@ -1,0 +1,10 @@
+---
+source: crates/forged/tests/models/users.rs
+assertion_line: 34
+expression: res
+---
+Err(
+    Custom(
+        "{\"email\":[{\"code\":\"email\",\"message\":null}],\"name\":[{\"code\":\"length\",\"message\":\"Name must be at least 2 characters long.\"}]}",
+    ),
+)
