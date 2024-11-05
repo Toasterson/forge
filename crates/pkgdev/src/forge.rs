@@ -108,7 +108,6 @@ pub enum Error {
 
     //#[error(transparent)]
     //Octocrab(#[from] octocrab::Error),
-
     #[error("component is missing {0}")]
     ComponentIncomplete(String),
 
@@ -350,7 +349,7 @@ pub async fn handle_forge_interaction(args: &ForgeArgs) -> Result<()> {
             target,
             select,
             handle,
-            display_name, 
+            display_name,
             ..
         } => {
             let target_url: Url = target.parse()?;

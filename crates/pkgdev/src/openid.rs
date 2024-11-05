@@ -82,17 +82,17 @@ impl From<OAuthWire> for OAuthConfig {
 //                 .base_uri("https://github.com")?
 //                 .add_header(ACCEPT, "application/json".to_string())
 //                 .build()?;
-// 
+//
 //             let device_flow_resp = crabby
 //                 .authenticate_as_device(&client_id, ["read:user", "read:project", "read:gpg_key"])
 //                 .await?;
-// 
+//
 //             let mut sleep_duration = Duration::from_secs(device_flow_resp.interval + 1);
 //             println!(
 //                 "To Login with GitHub visit: {} and enter the code {} ",
 //                 device_flow_resp.verification_uri, device_flow_resp.user_code
 //             );
-// 
+//
 //             loop {
 //                 tokio::time::sleep(sleep_duration).await;
 //                 let poll_resp = device_flow_resp.poll_once(&crabby, &client_id).await?;
