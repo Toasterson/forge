@@ -111,7 +111,7 @@ impl Hooks for App {
 
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue
-            .register(crate::workers::archive_fetcher::ArchiveFetcherWorker::build(ctx))
+            .register(crate::workers::archive_fetcher::Worker::build(ctx))
             .await?;
         queue
             .register(crate::workers::report_worker::Worker::build(ctx))
