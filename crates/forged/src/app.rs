@@ -72,6 +72,20 @@ impl Hooks for App {
         env!("CARGO_CRATE_NAME")
     }
 
+    async fn boot(mode: StartMode, environment: &Environment) -> Result<BootResult> {
+        create_app::<Self, Migrator>(mode, environment).await
+    }
+
+    fn routes(_ctx: &AppContext) -> AppRoutes {
+        AppRoutes::with_default_routes()
+            .prefix("/api/v1")
+            .add_route(controllers::archives::routes())
+            .add_route(controllers::components::routes())
+            .add_route(controllers::gates::routes())
+            .add_route(controllers::auth::routes())
+            .add_route(controllers::user::routes())
+    }
+
     async fn after_context(ctx: AppContext) -> Result<AppContext> {
         let mut ctx = ctx;
         if let Some(init) = &ctx.config.initializers {
@@ -95,20 +109,10 @@ impl Hooks for App {
         Ok(ctx)
     }
 
-    async fn boot(mode: StartMode, environment: &Environment) -> Result<BootResult> {
-        create_app::<Self, Migrator>(mode, environment).await
-    }
-
-    fn routes(_ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes()
-            .add_route(controllers::gates::routes())
-            .prefix("/api")
-            //.add_route(controllers::notes::routes())
-            .add_route(controllers::auth::routes())
-            .add_route(controllers::user::routes())
-    }
-
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
+        queue
+            .register(crate::workers::archive_fetcher::ArchiveFetcherWorker::build(ctx))
+            .await?;
         queue
             .register(crate::workers::report_worker::Worker::build(ctx))
             .await?;
