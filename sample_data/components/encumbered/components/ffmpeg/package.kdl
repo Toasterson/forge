@@ -18,7 +18,7 @@ build {
         flag "-I/usr/X11/include" name="CFLAGS"
         //flag "gcc_C99_ENABLE" name="CPPFLAGS"
         option "prefix=/usr"
-        option "libdir=/usr/lib/64"
+        option "libdir=/usr/lib/amd64"
         //option "mandir=/usr/share/man"
         option "cc=/usr/bin/gcc"
         option "enable-runtime-cpudetect"
@@ -79,10 +79,8 @@ package {
     file path="usr/share/ffmpeg/libvpx.*"
     file path="usr/share/ffmpeg/ffprobe.xsd"
     file path="usr/share/man/man1.*"
-}
-package "library/ffmpeg-7" {
-    file path="usr/lib/64.*\\.so"
-    link path="usr/lib/64.*\\.so"
+    file path="usr/lib/amd64.*\\.so"
+    link path="usr/lib/amd64.*\\.so"
 }
 package "developer/ffmpeg-7" {
     file path="usr/include.*"
