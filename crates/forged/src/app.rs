@@ -73,20 +73,20 @@ impl Hooks for App {
     }
 
     async fn after_context(ctx: AppContext) -> Result<AppContext> {
-        let mut ctx = ctx.clone();
+        let mut ctx = ctx;
         if let Some(init) = &ctx.config.initializers {
             for (name, value) in init {
                 match name.as_str() {
                     "s3" => {
                         let s3_config: S3Config = serde_json::from_value(value.clone())?;
                         let s3_driver = new_s3_driver(s3_config)?;
-                        ctx.storage = Storage::single(s3_driver).into()
+                        ctx.storage = Storage::single(s3_driver).into();
                     }
                     "local_storage" => {
                         let local_storage: LocalStorageConfig =
                             serde_json::from_value(value.clone())?;
                         let local_driver = drivers::local::new_with_prefix(local_storage.path)?;
-                        ctx.storage = Storage::single(local_driver).into()
+                        ctx.storage = Storage::single(local_driver).into();
                     }
                     &_ => {}
                 }
