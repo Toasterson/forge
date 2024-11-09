@@ -85,16 +85,28 @@ pub async fn run_build(
     if !args.no_clean {
         std::fs::remove_dir_all(wks.get_or_create_download_dir()?)
             .into_diagnostic()
-            .wrap_err("could not clean the download directory")?;
+            .wrap_err(format!(
+                "could not clean the download directory in workspace {0}",
+                wks.get_root_path().display()
+            ))?;
         std::fs::remove_dir_all(wks.get_or_create_build_dir()?)
             .into_diagnostic()
-            .wrap_err("could not clean the build directory")?;
+            .wrap_err(format!(
+                "could not clean the build directory in workspace {0}",
+                wks.get_root_path().display()
+            ))?;
         std::fs::remove_dir_all(wks.get_or_create_prototype_dir()?)
             .into_diagnostic()
-            .wrap_err("could not clean the prototype directory")?;
+            .wrap_err(format!(
+                "could not clean the prototype directory in workspace {0}",
+                wks.get_root_path().display()
+            ))?;
         std::fs::remove_dir_all(wks.get_or_create_manifest_dir()?)
             .into_diagnostic()
-            .wrap_err("could not clean the manifest directory")?;
+            .wrap_err(format!(
+                "could not clean the manifest directory in workspace {0}",
+                wks.get_root_path().display()
+            ))?;
     }
 
     ensure_packages_are_installed(wks, false, &component)?;
