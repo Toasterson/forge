@@ -17,5 +17,7 @@ target/
 *.pdb
 
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 tests/requests/snapshots/*.new
