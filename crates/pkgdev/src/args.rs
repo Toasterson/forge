@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use crate::build::{run_build, BuildArgs};
 use crate::component::open_component_local;
 use crate::create::create_component;
-use crate::forge::{handle_forge_interaction, ForgeArgs};
 use crate::metadata;
 use crate::modify::{edit_component, EditArgs};
 use crate::sources::download_sources;
@@ -60,11 +59,11 @@ pub enum Commands {
         #[clap(subcommand)]
         args: EditArgs,
     },
-    #[clap(name = "forge")]
-    Forge {
-        #[clap(subcommand)]
-        args: ForgeArgs,
-    },
+    // #[clap(name = "forge")]
+    // Forge {
+    //     #[clap(subcommand)]
+    //     args: ForgeArgs,
+    // },
     #[clap(name = "build")]
     Build {
         #[arg(short, long, default_value = ".")]
@@ -137,7 +136,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
         }
         Commands::Create { fmri, args } => create_component(args, fmri),
         Commands::Edit { component, args } => edit_component(component, gate, args),
-        Commands::Forge { args } => Ok(handle_forge_interaction(&args).await?),
+        //Commands::Forge { args } => Ok(handle_forge_interaction(&args).await?),
         Commands::Build { component, args } => {
             let component =
                 open_component_local(component, &gate).wrap_err("cannot open component")?;
