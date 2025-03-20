@@ -1,0 +1,13 @@
+[package]
+name = "depot"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum = { workspace = true, features = ["http2", "multipart"] }
+clap = { workspace = true, features = ["derive"] }
+miette = { workspace = true, features = ["fancy"] }
+schemars = "0.8.22"
+serde.workspace = true
+thiserror.workspace = true
+utoipa.workspace = true
