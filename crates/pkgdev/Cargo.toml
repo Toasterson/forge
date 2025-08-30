@@ -38,3 +38,9 @@ compress-tools = { version = "0.15.1", features = ["blocking"] }
 microtemplate = "1.0.3"
 file-matcher = "0.7.0"
 uuid = { workspace = true, features = ["serde", "v4"] }
+libips = { git = "https://github.com/OpenFlowLabs/ips.git", optional = true }
+
+[features]
+default = []
+# Enable libips integration against the external library.
+libips = ["dep:libips"]

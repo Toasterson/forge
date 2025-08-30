@@ -44,6 +44,7 @@ gate = { version = "*", path = "crates/gate" }
 utoipa = { version = "4.2.0", features = ["axum_extras", "serde_yaml", "uuid", "chrono", "url"] }
 base64 = "0.22.1"
 uuid = { version = "1.9.1", features = ["v4", "serde"] }
+chrono = "0.4.41"
 
 [profile.dev.package]
 insta.opt-level = 3

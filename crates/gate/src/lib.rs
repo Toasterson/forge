@@ -206,21 +206,65 @@ impl MetadataTransform {
 
 #[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
 pub struct Transform {
+    // Legacy textual actions (pkgmogrify lines). Kept for backward compatibility.
     #[knuffel(arguments)]
     actions: Vec<String>,
+    // Optional include file path (legacy include semantics)
     #[knuffel(property)]
     include: Option<String>,
+    // New: KDL-based, typed transform rules encoded as child nodes
+    #[knuffel(children(name = "rule"))]
+    pub rules: Vec<TransformRuleAst>,
+}
+
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+pub struct TransformRuleAst {
+    #[knuffel(children(name = "select"))]
+    pub selectors: Vec<TransformSelectorAst>,
+    #[knuffel(children(name = "op"))]
+    pub ops: Vec<TransformOpAst>,
+}
+
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+pub struct TransformSelectorAst {
+    // The IPS action type to match (e.g., file, link, hardlink, dir). Optional to allow attr-only matches.
+    #[knuffel(property, str)]
+    pub action: Option<String>,
+    // Attribute name to match on (e.g., path, mode, owner)
+    #[knuffel(property, str)]
+    pub attr: Option<String>,
+    // Pattern or exact string to match
+    #[knuffel(property(name = "pattern"), str)]
+    pub pat: Option<String>,
+}
+
+#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+pub struct TransformOpAst {
+    // Operation name, e.g., set, delete, drop, default
+    #[knuffel(argument)]
+    pub name: String,
+    // Optional key for set/delete/default operations
+    #[knuffel(property, default = None, str)]
+    pub key: Option<String>,
+    // Optional value for set/default operations
+    #[knuffel(property, default = None, str)]
+    pub value: Option<String>,
 }
 
 impl Transform {
     #[must_use]
     pub fn to_transform_line(&self) -> String {
+        // Preserve legacy behavior for callers that still expect textual mogrify lines
         let mut lines = self.actions.clone();
         if let Some(include_prop) = &self.include {
             lines.push(format!("<include {include_prop}>"));
         }
-
         lines.join("\n")
+    }
+
+    /// Access typed KDL rules if provided
+    pub fn ast_rules(&self) -> &[TransformRuleAst] {
+        &self.rules
     }
 
     #[must_use]
@@ -229,11 +273,40 @@ impl Transform {
         for (idx, action) in self.actions.iter().enumerate() {
             node.insert(idx, action.as_str());
         }
-
         if let Some(include_prop) = &self.include {
             node.insert("include", include_prop.as_str());
         }
-
+        // Serialize typed rules back into KDL children
+        let doc = node.ensure_children();
+        for rule in &self.rules {
+            let mut rule_node = kdl::KdlNode::new("rule");
+            let rule_doc = rule_node.ensure_children();
+            for sel in &rule.selectors {
+                let mut sel_node = kdl::KdlNode::new("select");
+                if let Some(action) = &sel.action {
+                    sel_node.insert("action", action.as_str());
+                }
+                if let Some(attr) = &sel.attr {
+                    sel_node.insert("attr", attr.as_str());
+                }
+                if let Some(pat) = &sel.pat {
+                    sel_node.insert("pattern", pat.as_str());
+                }
+                rule_doc.nodes_mut().push(sel_node);
+            }
+            for op in &rule.ops {
+                let mut op_node = kdl::KdlNode::new("op");
+                op_node.insert(0, op.name.as_str());
+                if let Some(key) = &op.key {
+                    op_node.insert("key", key.as_str());
+                }
+                if let Some(value) = &op.value {
+                    op_node.insert("value", value.as_str());
+                }
+                rule_doc.nodes_mut().push(op_node);
+            }
+            doc.nodes_mut().push(rule_node);
+        }
         node
     }
 }

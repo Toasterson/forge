@@ -1,18 +1,15 @@
 use crate::sources::derive_source_name;
 use component::{Component, SourceNode, TransformNode};
 use forge_config::Settings;
-use fs_extra::file::write_all;
 use gate::Gate;
-use microtemplate::{render, Substitutions};
-use miette::{IntoDiagnostic, Result};
+#[cfg(not(feature = "libips"))]
+use microtemplate::Substitutions;
+use miette::{IntoDiagnostic, Result, WrapErr};
 use std::fmt::{Display, Formatter};
-use std::{
-    fs::File,
-    path::PathBuf,
-    process::{Command, Stdio},
-};
+use std::path::PathBuf;
 use workspace::Workspace;
 
+#[cfg(not(feature = "libips"))]
 const DEFAULT_IPS_TEMPLATE: &str = r#"
 #
 # This file and its contents are supplied under the terms of the
@@ -40,6 +37,7 @@ license {license_file_name} license='{license_name}'
 "#;
 //TODO implement ips component version formatter. build_num (year)
 
+#[cfg(not(feature = "libips"))]
 #[derive(Substitutions)]
 struct StringInterpolationVars<'a> {
     pub name: &'a str,
@@ -66,6 +64,8 @@ fn get_source_url<'a>(src: &'a SourceNode) -> &'a str {
 pub struct ManifestCollection {
     pkg_name: String,
     name: String,
+    #[cfg(feature = "libips")]
+    manifest: libips::api::Manifest,
 }
 
 impl Display for ManifestCollection {
@@ -75,29 +75,52 @@ impl Display for ManifestCollection {
 }
 
 impl ManifestCollection {
+    #[cfg(not(feature = "libips"))]
     pub fn new(name: &str) -> Self {
         ManifestCollection {
             pkg_name: name.to_string(),
             name: name.replace("/", "-"),
+            #[cfg(feature = "libips")]
+            manifest: libips::api::Manifest::default(),
         }
+    }
+    #[cfg(feature = "libips")]
+    pub fn new_with_manifest(name: &str, manifest: libips::api::Manifest) -> Self {
+        ManifestCollection {
+            pkg_name: name.to_string(),
+            name: name.replace("/", "-"),
+            manifest,
+        }
+    }
+    #[cfg(feature = "libips")]
+    pub fn manifest(&self) -> &libips::api::Manifest {
+        &self.manifest
+    }
+    #[cfg(feature = "libips")]
+    pub fn manifest_mut(&mut self) -> &mut libips::api::Manifest {
+        &mut self.manifest
     }
 
     pub fn get_pkg_name(&self) -> String {
         self.pkg_name.clone()
     }
 
+    #[cfg(not(feature = "libips"))]
     pub fn get_base_manifest_name(&self) -> String {
         format!("{}-generated.p5m", self.name)
     }
 
+    #[cfg(not(feature = "libips"))]
     pub fn get_mogrified_name(&self) -> String {
         format!("{}.mogrified.p5m", self.name)
     }
 
+    #[cfg(not(feature = "libips"))]
     pub fn get_depend_name(&self) -> String {
         format!("{}.dep", self.name)
     }
 
+    #[cfg(not(feature = "libips"))]
     pub fn get_resolved_name(&self) -> String {
         format!("{}.dep.res", self.name)
     }
@@ -108,6 +131,7 @@ impl ManifestCollection {
     }
 }
 
+#[cfg(not(feature = "libips"))]
 pub fn run_generate_filelist(wks: &Workspace, pkg: &Component) -> Result<()> {
     let proto_path = wks.get_or_create_prototype_dir()?;
     let manifest_path = wks.get_or_create_manifest_dir()?;
@@ -135,6 +159,13 @@ pub fn run_generate_filelist(wks: &Workspace, pkg: &Component) -> Result<()> {
     }
 }
 
+#[cfg(feature = "libips")]
+pub fn run_generate_filelist(_wks: &Workspace, _pkg: &Component) -> Result<()> {
+    // In libips mode, we do not generate a filelist; manifests are built directly from the prototype.
+    Ok(())
+}
+
+#[cfg(not(feature = "libips"))]
 pub fn generate_manifest_files(
     wks: &Workspace,
     pkg: &Component,
@@ -332,6 +363,96 @@ pub fn generate_manifest_files(
     Ok(manifests)
 }
 
+#[cfg(feature = "libips")]
+pub fn generate_manifest_files(
+    _wks: &Workspace,
+    pkg: &Component,
+    gate: &Option<Gate>,
+    _transform_includes: Option<PathBuf>,
+) -> Result<Vec<ManifestCollection>> {
+    let mut collections: Vec<ManifestCollection> = Vec::new();
+
+    let build_version = gate.clone().unwrap_or_default().version;
+    let branch_version = gate.clone().unwrap_or_default().branch;
+
+    let mut build_for_name = |pkg_name: String| -> Result<ManifestCollection> {
+        // Compose FMRI components
+        let version = pkg
+            .recipe
+            .version
+            .clone()
+            .unwrap_or_else(|| "0.5.11".to_string());
+        let revision = pkg
+            .recipe
+            .revision
+            .clone()
+            .unwrap_or_else(|| "1".to_string());
+        let publisher = gate.clone().unwrap_or_default().publisher;
+        let fmri_str = format!(
+            "pkg://{publisher}/{pkg_name}@{version},{build_version}-{branch_version}.{revision}"
+        );
+        let fmri = libips::api::Fmri::parse(&fmri_str)
+            .into_diagnostic()
+            .wrap_err("failed to parse FMRI for manifest")?;
+        let summary = pkg
+            .recipe
+            .summary
+            .clone()
+            .ok_or_else(|| miette::miette!("no summary specified"))?;
+        let classification = pkg
+            .recipe
+            .classification
+            .clone()
+            .ok_or_else(|| miette::miette!("no classification specified"))?;
+        let project_url = pkg
+            .recipe
+            .project_url
+            .clone()
+            .ok_or_else(|| miette::miette!("no project_url specified"))?;
+        let source_url = get_source_url(&pkg.recipe.sources[0].sources[0]).to_string();
+        let license_file_name = pkg
+            .recipe
+            .license_file
+            .clone()
+            .ok_or_else(|| miette::miette!("no license_file specified"))?;
+        let license_name = pkg
+            .recipe
+            .license
+            .clone()
+            .ok_or_else(|| miette::miette!("no license specified"))?;
+
+        // Build typed manifest via libips using plausible builder methods
+        let mut builder = libips::api::ManifestBuilder::new();
+        builder.add_set("pkg.fmri", &fmri);
+        builder.add_set("pkg.summary", &summary);
+        builder.add_set(
+            "info.classification",
+            &format!("org.opensolaris.category.2008:{classification}"),
+        );
+        builder.add_set("info.upstream-url", &project_url);
+        builder.add_set("info.source-url", &source_url);
+        builder.add_license(&license_file_name, &license_name);
+        let manifest = builder.build();
+
+        Ok(ManifestCollection::new_with_manifest(&pkg_name, manifest))
+    };
+
+    if pkg.recipe.package_sections.is_empty() {
+        let name = pkg.get_name();
+        let collection = build_for_name(name)?;
+        collections.push(collection);
+    } else {
+        for p in pkg.recipe.package_sections.iter() {
+            let name = p.clone().name.unwrap_or(pkg.get_name());
+            let collection = build_for_name(name)?;
+            collections.push(collection);
+        }
+    }
+
+    Ok(collections)
+}
+
+#[allow(dead_code)]
 fn generate_transform_lines(manifest: &mut String, nodes: &Vec<TransformNode>) {
     for node in nodes {
         for (attribute, selector) in node.selectors.iter() {
@@ -344,7 +465,8 @@ fn generate_transform_lines(manifest: &mut String, nodes: &Vec<TransformNode>) {
     }
 }
 
-pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
+#[cfg(not(feature = "libips"))]
+pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &mut [ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
     let prototype_path = wks.get_or_create_prototype_dir()?;
 
@@ -385,7 +507,41 @@ pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &[ManifestCollection])
     Ok(())
 }
 
-pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
+#[cfg(feature = "libips")]
+pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &mut [ManifestCollection]) -> Result<()> {
+    use libips::repository::{FileBackend, ReadableRepository};
+    use std::path::Path;
+    // Prototype directory is required for file-level dependency generation
+    let proto_dir = wks.get_or_create_prototype_dir()?;
+    // Open repository backend to allow resolution of deps to FMRIs
+    let repo_path = Settings::get_or_create_repo_dir().into_diagnostic()?;
+    let mut backend = FileBackend::open(Path::new(&repo_path))
+        .into_diagnostic()
+        .wrap_err("failed to open IPS repository backend for dependency generation")?;
+
+    for m in manifests.iter_mut() {
+        let updated = libips::api::DependencyGenerator::generate_with_repo(
+            &mut backend,
+            None, // resolve across all publishers in the repo
+            Path::new(&proto_dir),
+            m.manifest(),
+            libips::api::DependGenerateOptions::default(),
+        )
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to generate dependencies for manifest {}", m))?;
+
+        // replace manifest with the dependency-enriched one
+        *m.manifest_mut() = updated;
+    }
+
+    Ok(())
+}
+
+#[cfg(not(feature = "libips"))]
+pub fn run_resolve_dependencies(
+    wks: &Workspace,
+    manifests: &mut [ManifestCollection],
+) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
     println!("Attempting to resolve runtime dependencies");
@@ -416,6 +572,15 @@ pub fn run_resolve_dependencies(wks: &Workspace, manifests: &[ManifestCollection
     Ok(())
 }
 
+#[cfg(feature = "libips")]
+pub fn run_resolve_dependencies(
+    _wks: &Workspace,
+    _manifests: &mut [ManifestCollection],
+) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(not(feature = "libips"))]
 pub fn run_lint(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
@@ -440,6 +605,18 @@ pub fn run_lint(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()>
     Ok(())
 }
 
+#[cfg(feature = "libips")]
+pub fn run_lint(_wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()> {
+    for m in manifests.iter() {
+        // Use libips lint facade; if the API requires a config, pass Default.
+        libips::api::lint::lint_manifest(m.manifest(), &Default::default())
+            .into_diagnostic()
+            .wrap_err_with(|| format!("manifest lint failed for {}", m))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "libips"))]
 pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
     let repo_base = Settings::get_or_create_repo_dir().into_diagnostic()?;
 
@@ -476,6 +653,34 @@ pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "libips")]
+pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
+    use std::path::Path;
+    let repo_base = forge_config::Settings::get_or_create_repo_dir().into_diagnostic()?;
+    // Prefer open, create if missing
+    let repo = if repo_base.join("pkg5.repository").exists() {
+        libips::api::Repository::open(Path::new(&repo_base))
+            .into_diagnostic()
+            .wrap_err("failed to open IPS repository")?
+    } else {
+        libips::api::Repository::create(Path::new(&repo_base))
+            .into_diagnostic()
+            .wrap_err("failed to create IPS repository")?
+    };
+
+    let has_pub = repo
+        .has_publisher(publisher)
+        .into_diagnostic()
+        .wrap_err("failed to query publisher in IPS repository")?;
+    if !has_pub {
+        repo.add_publisher(publisher)
+            .into_diagnostic()
+            .wrap_err("failed to add publisher to IPS repository")?;
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "libips"))]
 pub fn publish(
     wks: &Workspace,
     pkg: &Component,
@@ -520,5 +725,72 @@ pub fn publish(
             return Err(miette::miette!("publish failed for {}", manifest));
         }
     }
+    Ok(())
+}
+
+#[cfg(feature = "libips")]
+pub fn publish(
+    wks: &Workspace,
+    pkg: &Component,
+    publisher: &str,
+    manifests: &[ManifestCollection],
+) -> Result<()> {
+    use std::path::Path;
+    let proto_dir = wks.get_or_create_prototype_dir()?;
+    let build_dir = wks.get_or_create_build_dir()?;
+    let unpack_name = derive_source_name(pkg.recipe.name.clone());
+    let unpack_path = build_dir.join(&unpack_name);
+    let repo_path = Settings::get_or_create_repo_dir().into_diagnostic()?;
+
+    // Open or create repository
+    let repo = if repo_path.join("pkg5.repository").exists() {
+        libips::api::Repository::open(Path::new(&repo_path))
+            .into_diagnostic()
+            .wrap_err("failed to open IPS repository")?
+    } else {
+        libips::api::Repository::create(Path::new(&repo_path))
+            .into_diagnostic()
+            .wrap_err("failed to create IPS repository")?
+    };
+
+    let client = libips::api::PublisherClient::new(repo, publisher.to_string());
+
+    for m in manifests {
+        let mut txn = client
+            .begin()
+            .into_diagnostic()
+            .wrap_err("failed to begin IPS txn")?;
+        txn.add_payload_dir(&proto_dir)
+            .into_diagnostic()
+            .wrap_err("failed to add prototype dir to txn")?;
+        if unpack_path.exists() {
+            txn.add_payload_dir(&unpack_path)
+                .into_diagnostic()
+                .wrap_err("failed to add unpack dir to txn")?;
+        }
+        // Add the component's package directory as payload too
+        txn.add_payload_dir(Path::new(&pkg.get_path()))
+            .into_diagnostic()
+            .wrap_err("failed to add pkg dir to txn")?;
+
+        // Add the typed manifest
+        txn.add_manifest(
+            #[cfg(feature = "libips")]
+            m.manifest(),
+        );
+
+        txn.commit()
+            .into_diagnostic()
+            .wrap_err("failed to commit IPS transaction")?;
+
+        println!(
+            "Published manifest {}. Install with: pkg set-publisher {}; pkg install -g {} {}",
+            m,
+            publisher,
+            repo_path.display(),
+            m.get_pkg_name()
+        );
+    }
+
     Ok(())
 }

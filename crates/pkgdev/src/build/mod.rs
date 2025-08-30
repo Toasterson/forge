@@ -168,13 +168,13 @@ fn run_ips_actions(
 ) -> Result<()> {
     ips::run_generate_filelist(wks, pkg).wrap_err("generating file list failed")?;
 
-    let manifests = ips::generate_manifest_files(wks, pkg, gate, transform_include_dir)
+    let mut manifests = ips::generate_manifest_files(wks, pkg, gate, transform_include_dir)
         .wrap_err("mogrify failed")?;
 
-    ips::run_generate_pkgdepend(wks, manifests.as_slice())
+    ips::run_generate_pkgdepend(wks, &mut manifests)
         .wrap_err("failed to generate dependency entries")?;
 
-    ips::run_resolve_dependencies(wks, manifests.as_slice())
+    ips::run_resolve_dependencies(wks, &mut manifests)
         .wrap_err("failed to resolve dependencies")?;
 
     ips::run_lint(wks, manifests.as_slice()).wrap_err("lint failed")?;
