@@ -1,9 +1,5 @@
 # Contributing Packages to OpenIndiana Userland
 
-> If you need more information about how to fill in this template, read the accompanying [guide](./guide-concept.md).
-
-> This template includes writing instructions and boilerplate text that you can customize, use as-is, or completely replace with your own text. This text is indicated in {(curly brackets)}. Make sure you replace the placeholders with your own text.
-
 A summary paragraph introducing a concept, explaining its importance or
 relevance, and providing an overview of the content that will be covered
 in the document (scope).
