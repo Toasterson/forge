@@ -257,3 +257,9 @@ impl Settings {
         Ok(Workspace::from_config(&wks)?)
     }
 }
+
+impl Settings {
+    pub fn get_or_create_appdata_dir() -> Result<std::path::PathBuf> {
+        Self::get_or_create_data_dir()
+    }
+}

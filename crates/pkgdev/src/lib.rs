@@ -11,6 +11,7 @@ pub mod forge;
 pub mod metadata;
 pub mod modify;
 pub mod openid;
+pub mod repo;
 pub mod sources;
 
 #[derive(Debug, Error, Diagnostic)]

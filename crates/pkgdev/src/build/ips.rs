@@ -1,12 +1,19 @@
 use crate::sources::derive_source_name;
 use component::{Component, SourceNode, TransformNode};
-use forge_config::Settings;
+#[cfg(not(feature = "libips"))]
+use fs_extra::file::write_all;
 use gate::Gate;
+#[cfg(not(feature = "libips"))]
+use microtemplate::render;
 #[cfg(not(feature = "libips"))]
 use microtemplate::Substitutions;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::fmt::{Display, Formatter};
+#[cfg(not(feature = "libips"))]
+use std::fs::File;
 use std::path::PathBuf;
+#[cfg(not(feature = "libips"))]
+use std::process::{Command, Stdio};
 use workspace::Workspace;
 
 #[cfg(not(feature = "libips"))]
@@ -466,7 +473,11 @@ fn generate_transform_lines(manifest: &mut String, nodes: &Vec<TransformNode>) {
 }
 
 #[cfg(not(feature = "libips"))]
-pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &mut [ManifestCollection]) -> Result<()> {
+pub fn run_generate_pkgdepend(
+    wks: &Workspace,
+    manifests: &mut [ManifestCollection],
+    _repo_base: &std::path::Path,
+) -> Result<()> {
     let manifest_path = wks.get_or_create_manifest_dir()?;
     let prototype_path = wks.get_or_create_prototype_dir()?;
 
@@ -508,14 +519,17 @@ pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &mut [ManifestCollecti
 }
 
 #[cfg(feature = "libips")]
-pub fn run_generate_pkgdepend(wks: &Workspace, manifests: &mut [ManifestCollection]) -> Result<()> {
+pub fn run_generate_pkgdepend(
+    wks: &Workspace,
+    manifests: &mut [ManifestCollection],
+    repo_base: &std::path::Path,
+) -> Result<()> {
     use libips::repository::{FileBackend, ReadableRepository};
     use std::path::Path;
     // Prototype directory is required for file-level dependency generation
     let proto_dir = wks.get_or_create_prototype_dir()?;
     // Open repository backend to allow resolution of deps to FMRIs
-    let repo_path = Settings::get_or_create_repo_dir().into_diagnostic()?;
-    let mut backend = FileBackend::open(Path::new(&repo_path))
+    let mut backend = FileBackend::open(repo_base)
         .into_diagnostic()
         .wrap_err("failed to open IPS repository backend for dependency generation")?;
 
@@ -617,9 +631,10 @@ pub fn run_lint(_wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()
 }
 
 #[cfg(not(feature = "libips"))]
-pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
-    let repo_base = Settings::get_or_create_repo_dir().into_diagnostic()?;
-
+pub fn ensure_repo_with_publisher_exists(
+    repo_base: &std::path::Path,
+    publisher: &str,
+) -> Result<()> {
     if !repo_base.join("pkg5.repository").exists() {
         let pkg_repo_status = Command::new("pkgrepo")
             .arg("create")
@@ -654,16 +669,17 @@ pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
 }
 
 #[cfg(feature = "libips")]
-pub fn ensure_repo_with_publisher_exists(publisher: &str) -> Result<()> {
-    use std::path::Path;
-    let repo_base = forge_config::Settings::get_or_create_repo_dir().into_diagnostic()?;
+pub fn ensure_repo_with_publisher_exists(
+    repo_base: &std::path::Path,
+    publisher: &str,
+) -> Result<()> {
     // Prefer open, create if missing
     let repo = if repo_base.join("pkg5.repository").exists() {
-        libips::api::Repository::open(Path::new(&repo_base))
+        libips::api::Repository::open(repo_base)
             .into_diagnostic()
             .wrap_err("failed to open IPS repository")?
     } else {
-        libips::api::Repository::create(Path::new(&repo_base))
+        libips::api::Repository::create(repo_base)
             .into_diagnostic()
             .wrap_err("failed to create IPS repository")?
     };
@@ -686,12 +702,12 @@ pub fn publish(
     pkg: &Component,
     publisher: &str,
     manifests: &[ManifestCollection],
+    repo_base: &std::path::Path,
 ) -> Result<()> {
     let proto_dir = wks.get_or_create_prototype_dir()?;
     let build_dir = wks.get_or_create_build_dir()?;
     let unpack_name = derive_source_name(pkg.recipe.name.clone());
     let unpack_path = build_dir.join(&unpack_name);
-    let repo_path = Settings::get_or_create_repo_dir().into_diagnostic()?;
 
     for manifest in manifests {
         let manifest_path = wks
@@ -707,7 +723,7 @@ pub fn publish(
             .arg("-d")
             .arg(&pkg.get_path())
             .arg("-s")
-            .arg(&repo_path.to_string_lossy().to_string())
+            .arg(&repo_base.to_string_lossy().to_string())
             .arg(&manifest_path.to_string_lossy().to_string())
             .stdout(Stdio::inherit())
             .status()
@@ -718,7 +734,7 @@ pub fn publish(
             println!(
                 "Install with pkg set-publisher {}; pkg install -g {} {}",
                 publisher,
-                repo_path.display(),
+                repo_base.display(),
                 manifest.get_pkg_name()
             );
         } else {
@@ -734,21 +750,20 @@ pub fn publish(
     pkg: &Component,
     publisher: &str,
     manifests: &[ManifestCollection],
+    repo_base: &std::path::Path,
 ) -> Result<()> {
     use std::path::Path;
     let proto_dir = wks.get_or_create_prototype_dir()?;
     let build_dir = wks.get_or_create_build_dir()?;
     let unpack_name = derive_source_name(pkg.recipe.name.clone());
     let unpack_path = build_dir.join(&unpack_name);
-    let repo_path = Settings::get_or_create_repo_dir().into_diagnostic()?;
-
     // Open or create repository
-    let repo = if repo_path.join("pkg5.repository").exists() {
-        libips::api::Repository::open(Path::new(&repo_path))
+    let repo = if repo_base.join("pkg5.repository").exists() {
+        libips::api::Repository::open(repo_base)
             .into_diagnostic()
             .wrap_err("failed to open IPS repository")?
     } else {
-        libips::api::Repository::create(Path::new(&repo_path))
+        libips::api::Repository::create(repo_base)
             .into_diagnostic()
             .wrap_err("failed to create IPS repository")?
     };
@@ -787,7 +802,7 @@ pub fn publish(
             "Published manifest {}. Install with: pkg set-publisher {}; pkg install -g {} {}",
             m,
             publisher,
-            repo_path.display(),
+            repo_base.display(),
             m.get_pkg_name()
         );
     }

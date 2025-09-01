@@ -6,7 +6,7 @@ use miette::IntoDiagnostic;
 
 use crate::component::open_component_local;
 use component::{
-    ArchiveSourceBuilder, BuildOptionNode, BuildSectionBuilder, Component, ConfigureBuildSection,
+    ArchiveSourceBuilder, BuildOptionNode, BuildSectionBuilder, ConfigureBuildSection,
     DependencyBuilder, DependencyKind, ScriptBuildSection, ScriptNode, SourceNode, SourceSection,
 };
 use gate::Gate;

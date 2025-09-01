@@ -5,6 +5,7 @@ use crate::component::open_component_local;
 use crate::create::create_component;
 use crate::metadata;
 use crate::modify::{edit_component, EditArgs};
+use crate::repo::RepoManager;
 use crate::sources::download_sources;
 use clap::{Parser, Subcommand, ValueEnum};
 use forge_config::Settings;
@@ -25,12 +26,25 @@ pub struct Args {
     #[arg(long, short)]
     pub workspace: Option<PathBuf>,
 
+    /// Override the repository path to publish to for this command invocation.
+    #[arg(long, global = true)]
+    pub repo: Option<PathBuf>,
+
+    /// Select a named repository context for this command invocation.
+    #[arg(long = "repo-context", global = true)]
+    pub repo_context: Option<String>,
+
     #[clap(subcommand)]
     pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    #[clap(name = "repo")]
+    Repo {
+        #[clap(subcommand)]
+        cmd: RepoCmd,
+    },
     #[clap(name = "download")]
     Download {
         /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
@@ -90,6 +104,18 @@ pub struct ComponentArgs {
     pub component: PathBuf,
 }
 
+#[derive(Debug, Subcommand)]
+pub enum RepoCmd {
+    #[clap(name = "list")]
+    List,
+    #[clap(name = "create")]
+    Create { name: String, path: Option<PathBuf> },
+    #[clap(name = "delete")]
+    Delete { name: String },
+    #[clap(name = "select")]
+    Select { name: String },
+}
+
 #[derive(Debug, Default, Display, Clone, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
 pub enum GenerateSchemaKind {
@@ -119,6 +145,51 @@ pub async fn run(args: Args) -> miette::Result<()> {
     };
 
     match args.command {
+        Commands::Repo { cmd } => {
+            let mut mgr = RepoManager::load()
+                .into_diagnostic()
+                .wrap_err("unable to open repo contexts")?;
+            match cmd {
+                RepoCmd::List => {
+                    for r in mgr.list() {
+                        println!("{}\t{}", r.name, r.path.display());
+                    }
+                    Ok(())
+                }
+                RepoCmd::Create { name, path } => {
+                    let resolved_path = match path {
+                        Some(p) => p,
+                        None => {
+                            let base = Settings::get_or_create_appdata_dir()
+                                .into_diagnostic()
+                                .wrap_err("failed to resolve APPDATA directory")?;
+                            base.join(&name)
+                        }
+                    };
+                    mgr.create(&name, &resolved_path)
+                        .into_diagnostic()
+                        .wrap_err("failed to create repo context")?;
+                    println!("created repo context at {}", resolved_path.display());
+                    Ok(())
+                }
+                RepoCmd::Delete { name } => {
+                    mgr.delete(name)
+                        .into_diagnostic()
+                        .wrap_err("failed to delete repo context")?;
+                    println!("deleted repo context");
+                    Ok(())
+                }
+                RepoCmd::Select { name } => {
+                    mgr.select(name)
+                        .into_diagnostic()
+                        .wrap_err("failed to select repo context")?;
+                    if let Some(cur) = mgr.current() {
+                        println!("selected {} -> {}", cur.name, cur.path.display());
+                    }
+                    Ok(())
+                }
+            }
+        }
         Commands::Metadata { args, format } => metadata::print_component(args, format, &gate),
         Commands::Generate { kind } => match kind {
             GenerateSchemaKind::ComponentRecipe => {
@@ -147,12 +218,27 @@ pub async fn run(args: Args) -> miette::Result<()> {
         Commands::Create { fmri, args } => create_component(args, fmri),
         Commands::Edit { component, args } => edit_component(component, gate, args),
         //Commands::Forge { args } => Ok(handle_forge_interaction(&args).await?),
-        Commands::Build { component, args } => {
+        Commands::Build {
+            component,
+            args: build_args,
+        } => {
             let component =
                 open_component_local(component, &gate).wrap_err("cannot open component")?;
-            run_build(&component, &gate, &wks, &settings, &args)
-                .await
-                .wrap_err("build failed")
+            let repo_mgr = RepoManager::load()
+                .into_diagnostic()
+                .wrap_err("unable to open repo contexts")?;
+            run_build(
+                &component,
+                &gate,
+                &wks,
+                &settings,
+                &build_args,
+                &repo_mgr,
+                args.repo.clone(),
+                args.repo_context.clone(),
+            )
+            .await
+            .wrap_err("build failed")
         }
     }
 }

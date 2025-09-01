@@ -2,7 +2,7 @@ mod automake;
 mod compile;
 mod dependencies;
 mod install;
-mod ips;
+pub mod ips;
 mod script;
 mod tarball;
 mod util;
@@ -66,6 +66,9 @@ pub async fn run_build(
     wks: &Workspace,
     settings: &Settings,
     args: &BuildArgs,
+    repo_mgr: &crate::repo::RepoManager,
+    repo_override_path: Option<PathBuf>,
+    repo_override_context: Option<String>,
 ) -> Result<()> {
     let transform_include_dir =
         args.transform_include_dir
@@ -153,7 +156,16 @@ pub async fn run_build(
             tarball::make_release_tarball(&wks, &component)?;
         }
         gate::DistributionType::IPS => {
-            run_ips_actions(&wks, &component, gate, transform_include_dir)?;
+            // Resolve repository path using the manager and CLI overrides
+            let repo_path =
+                repo_mgr.resolve(repo_override_path.clone(), repo_override_context.clone())?;
+            run_ips_actions(
+                &wks,
+                &component,
+                gate,
+                transform_include_dir,
+                repo_path.as_path(),
+            )?;
         }
     }
 
@@ -165,13 +177,14 @@ fn run_ips_actions(
     pkg: &Component,
     gate: &Option<Gate>,
     transform_include_dir: Option<PathBuf>,
+    repo_path: &std::path::Path,
 ) -> Result<()> {
     ips::run_generate_filelist(wks, pkg).wrap_err("generating file list failed")?;
 
     let mut manifests = ips::generate_manifest_files(wks, pkg, gate, transform_include_dir)
         .wrap_err("mogrify failed")?;
 
-    ips::run_generate_pkgdepend(wks, &mut manifests)
+    ips::run_generate_pkgdepend(wks, &mut manifests, repo_path)
         .wrap_err("failed to generate dependency entries")?;
 
     ips::run_resolve_dependencies(wks, &mut manifests)
@@ -180,10 +193,11 @@ fn run_ips_actions(
     ips::run_lint(wks, manifests.as_slice()).wrap_err("lint failed")?;
 
     let publisher = gate.clone().unwrap_or_default().publisher;
-    ips::ensure_repo_with_publisher_exists(&publisher)
+    ips::ensure_repo_with_publisher_exists(repo_path, &publisher)
         .wrap_err("failed to ensure repository exists")?;
 
-    ips::publish(wks, pkg, &publisher, manifests.as_slice()).wrap_err("package publish failed")?;
+    ips::publish(wks, pkg, &publisher, manifests.as_slice(), repo_path)
+        .wrap_err("package publish failed")?;
 
     Ok(())
 }

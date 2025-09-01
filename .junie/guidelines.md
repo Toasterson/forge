@@ -4,7 +4,7 @@ This document provides guidelines for Junie (JetBrains AI Coding Agent) when wor
 
 ### Dependencies
 The project uses several key dependencies:
-- **Error handling**: thiserror and miette
+- **Error handling**: thiserror and miette. Use WrapErr to enhance error handling.
 - **Serialization**: serde and serde_json
 - **Logging**: tracing and tracing-subscriber
 - **Configuration**: config
@@ -67,6 +67,10 @@ Examples:
 
 - In library code (like `libips`), always return specific error types
 - In application code, you can use `miette::Result` for convenience
+- In application code, you can enable the "fancy" feature in miette to get more information about the error
+- In application code, you can wrap std::io::Error with transparent error
+- In application code, you can wrap external library errors with transparent error or convert with From
+- Use WrapErr to enhance error information with contextual information
 
 ### Decision Tree for Error Handling
 
