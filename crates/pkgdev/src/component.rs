@@ -1,6 +1,6 @@
 use component::Component;
 use gate::Gate;
-use miette::IntoDiagnostic;
+use miette::{IntoDiagnostic, WrapErr};
 use std::path::{Component as PathComponent, Path};
 
 fn first_segment_is_components<P: AsRef<Path>>(p: P) -> bool {
@@ -46,7 +46,20 @@ pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(
         }
     };
 
-    let full_component_path = full_component_path.canonicalize().into_diagnostic()?;
+    let full_component_path = full_component_path
+        .canonicalize()
+        .into_diagnostic()
+        .wrap_err_with(|| format!(
+            "failed to resolve component path (canonicalize) for '{}'. Hint: ensure the component directory exists under <gate>/components/<component> or provide an absolute path.",
+            component_path.display()
+        ))?;
 
-    Ok(Component::open_local(full_component_path.as_path())?)
+    Ok(Component::open_local(full_component_path.as_path())
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to open component at '{}': missing package.kdl or invalid component layout",
+                full_component_path.display()
+            )
+        })?)
 }

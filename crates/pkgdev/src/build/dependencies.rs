@@ -1,5 +1,5 @@
 use component::Component;
-use miette::{IntoDiagnostic, Report, Result};
+use miette::{IntoDiagnostic, Report, Result, WrapErr};
 use std::fs::{read_to_string, File};
 use std::process::Command;
 use workspace::Workspace;
@@ -7,7 +7,7 @@ use workspace::Workspace;
 const INSTALLED_PACKAGES_FILE: &str = "installed_packages.txt";
 
 fn install_development_dependencies(pkg: &Component) -> Result<()> {
-    println!("Installing all development dependencies in one transaction");
+    tracing::info!(target: "pkgdev::deps", "Installing all development dependencies in one transaction");
     let build_dependencies = pkg
         .recipe
         .dependencies
@@ -21,26 +21,29 @@ fn install_development_dependencies(pkg: &Component) -> Result<()> {
         .arg("install")
         .args(build_dependencies.iter().map(|d| d.as_str()))
         .status()
-        .into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err("failed to run pfexec pkg install; ensure IPS tools are available")?;
 
     if pkg_status.success() {
-        println!("Dependencies Installed");
+        tracing::info!(target: "pkgdev::deps", "Dependencies installed");
         Ok(())
     } else {
         Err(miette::miette!(
-            "non zero return code from pkg check logs above"
+            "non zero return code from pkg; check logs above"
         ))
     }
 }
 
 fn get_installed_packages_list(wks: &Workspace) -> Result<()> {
-    let installed_package_file =
-        File::create(wks.get_root_path().join(INSTALLED_PACKAGES_FILE)).into_diagnostic()?;
+    let installed_package_file = File::create(wks.get_root_path().join(INSTALLED_PACKAGES_FILE))
+        .into_diagnostic()
+        .wrap_err("failed to create installed packages list file")?;
     let pkg_status = Command::new("pkg")
         .arg("list")
         .stdout(installed_package_file)
         .status()
-        .into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err("failed to run pkg list; is the IPS 'pkg' tool available?")?;
 
     if pkg_status.success() {
         Ok(())
@@ -54,6 +57,12 @@ pub fn ensure_packages_are_installed(
     force_refresh: bool,
     pkg: &Component,
 ) -> Result<()> {
+    // On non-illumos hosts (e.g., Linux), skip IPS package checks/installs gracefully.
+    if cfg!(not(target_os = "illumos")) {
+        tracing::info!(target: "pkgdev::deps", "Skipping IPS package checks on non-illumos host");
+        return Ok(());
+    }
+
     if let Some(stat) = std::fs::metadata(wks.get_root_path().join(INSTALLED_PACKAGES_FILE)).ok() {
         let mod_time = stat.modified().into_diagnostic()?;
         let elapsed = mod_time.elapsed().into_diagnostic()?;
@@ -69,7 +78,7 @@ pub fn ensure_packages_are_installed(
     for dep in pkg.recipe.dependencies.iter() {
         if dep.dev {
             if !package_list.contains(&dep.name) {
-                println!("Package {} not installed", &dep.name);
+                tracing::info!(target: "pkgdev::deps", "Package '{}' not installed", &dep.name);
                 run_install = true
             }
         }
@@ -83,8 +92,9 @@ pub fn ensure_packages_are_installed(
 }
 
 fn read_installed_packages_file(wks: &Workspace) -> Result<Vec<String>, Report> {
-    let file_contents =
-        read_to_string(wks.get_root_path().join(INSTALLED_PACKAGES_FILE)).into_diagnostic()?;
+    let file_contents = read_to_string(wks.get_root_path().join(INSTALLED_PACKAGES_FILE))
+        .into_diagnostic()
+        .wrap_err("failed to read installed packages list file")?;
     let installed_packages = file_contents
         .lines()
         .filter_map(|l| {

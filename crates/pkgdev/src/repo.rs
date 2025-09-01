@@ -110,6 +110,7 @@ impl RepoManager {
         if !path_buf.exists() {
             DirBuilder::new().recursive(true).create(&path_buf)?;
         }
+        tracing::info!(target: "pkgdev::repo", "[repo] create: creating context '{}' at {}", name, path_buf.display());
         // Initialize IPS repository and default publisher matching the context name
         if let Err(e) = ips::ensure_repo_with_publisher_exists(&path_buf, &name) {
             return Err(RepoError::RepoInitError(format!(
@@ -166,17 +167,22 @@ impl RepoManager {
         repo_context: Option<String>,
     ) -> Result<PathBuf> {
         if let Some(p) = repo_path {
+            tracing::info!(target: "pkgdev::repo", "[repo] resolve: using explicit path override: {}", p.display());
             return Ok(p);
         }
         if let Some(name) = repo_context {
             if let Some(ctx) = self.get_by_name(&name) {
+                tracing::info!(target: "pkgdev::repo", "[repo] resolve: using named context '{}' at {}", name, ctx.path.display());
                 return Ok(ctx.path.clone());
             }
+            tracing::warn!(target: "pkgdev::repo", "[repo] resolve: named context '{}' not found", name);
             return Err(RepoError::NotFound(name));
         }
         if let Some(cur) = self.current() {
+            tracing::info!(target: "pkgdev::repo", "[repo] resolve: using currently selected context '{}' at {}", cur.name, cur.path.display());
             return Ok(cur.path.clone());
         }
+        tracing::warn!(target: "pkgdev::repo", "[repo] resolve: no repository selection available");
         Err(RepoError::NoSelection)
     }
 }

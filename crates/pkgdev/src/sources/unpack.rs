@@ -73,7 +73,12 @@ pub fn unpack_sources(
                         .to_string_lossy()
                         .to_string();
                     let unpack_arg = unpack_path.to_string_lossy().to_string();
-                    let mut patch_cmd = Command::new("gpatch");
+                    let patch_bin = if cfg!(target_os = "illumos") {
+                        "gpatch"
+                    } else {
+                        "patch"
+                    };
+                    let mut patch_cmd = Command::new(patch_bin);
                     patch_cmd.arg("-d");
                     patch_cmd.arg(&unpack_arg);
                     if let Some(drop_directories) = patch.drop_directories {
@@ -83,10 +88,12 @@ pub fn unpack_sources(
                     patch_cmd.arg("-i");
                     patch_cmd.arg(&src_path);
 
-                    let status = patch_cmd
-                        .status()
-                        .into_diagnostic()
-                        .wrap_err("could not run gpatch")?;
+                    let status = patch_cmd.status().into_diagnostic().wrap_err_with(|| {
+                        format!(
+                            "failed to run '{}' to apply patch {} in {}",
+                            patch_bin, src_path, unpack_arg
+                        )
+                    })?;
 
                     if !status.success() {
                         return Err(miette::miette!("failed to patch sources"));

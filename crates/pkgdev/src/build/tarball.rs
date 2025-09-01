@@ -1,7 +1,7 @@
 use std::process::{Command, Stdio};
 
 use component::Component;
-use miette::IntoDiagnostic;
+use miette::{IntoDiagnostic, WrapErr};
 use workspace::Workspace;
 
 fn derive_output_name(pkg: &Component) -> String {
@@ -13,15 +13,25 @@ fn derive_output_name(pkg: &Component) -> String {
 }
 
 pub fn make_release_tarball(wks: &Workspace, pkg: &Component) -> miette::Result<()> {
-    let proto_dir = wks.get_or_create_prototype_dir()?;
-    let output_dir = forge_config::Settings::get_or_create_output_dir().into_diagnostic()?;
+    let proto_dir = wks
+        .get_or_create_prototype_dir()
+        .wrap_err("failed to get or create prototype directory")?;
+    let output_dir = forge_config::Settings::get_or_create_output_dir()
+        .into_diagnostic()
+        .wrap_err("failed to get or create output directory")?;
     let tarball_path_string = output_dir
         .join(derive_output_name(pkg))
         .to_string_lossy()
         .to_string();
 
     let dirs = std::fs::read_dir(&proto_dir)
-        .into_diagnostic()?
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to read prototype directory at {}",
+                proto_dir.display()
+            )
+        })?
         .into_iter()
         .map(|p| {
             p.unwrap()
@@ -44,7 +54,13 @@ pub fn make_release_tarball(wks: &Workspace, pkg: &Component) -> miette::Result<
             .as_slice(),
     );
     tar_cmd.stdout(Stdio::inherit());
-    let tar_cmd_status = tar_cmd.status().into_diagnostic()?;
+    let tar_cmd_status = tar_cmd.status().into_diagnostic().wrap_err_with(|| {
+        format!(
+            "failed to run gtar to create {} from prototype dir {}",
+            tarball_path_string,
+            proto_dir.display()
+        )
+    })?;
 
     if tar_cmd_status.success() {
         println!("Generated Output tarball {}", tarball_path_string);

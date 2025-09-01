@@ -4,7 +4,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use miette::{IntoDiagnostic, Result};
+use miette::{IntoDiagnostic, Result, WrapErr};
 use workspace::Workspace;
 
 pub fn copy_with_rsync<P: AsRef<Path>>(
@@ -30,10 +30,23 @@ pub fn copy_with_rsync<P: AsRef<Path>>(
 
     println!("writing file list:\n{}", &file_list);
 
-    let mut contents_file = std::fs::File::create(&contents_file_path).into_diagnostic()?;
+    let mut contents_file = std::fs::File::create(&contents_file_path)
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to create file list at {}",
+                contents_file_path.display()
+            )
+        })?;
     contents_file
         .write_all(&mut file_list.as_bytes())
-        .into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to write file list to {}",
+                contents_file_path.display()
+            )
+        })?;
     drop(contents_file);
     let contents_file_arg = format!(
         "--files-from={}",
@@ -41,14 +54,24 @@ pub fn copy_with_rsync<P: AsRef<Path>>(
     );
 
     // point rsync command to it to copy over selected files
+    let from_str = path_2_string(&from);
+    let to_str = path_2_string(&to);
     let rsync_status = Command::new("rsync")
         .arg("-avp")
         .arg(&contents_file_arg)
-        .arg(path_2_string(from))
-        .arg(path_2_string(to))
+        .arg(&from_str)
+        .arg(&to_str)
         .stdout(Stdio::inherit())
         .status()
-        .into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to run rsync from '{}' to '{}' using file list {}",
+                from_str,
+                to_str,
+                contents_file_path.display()
+            )
+        })?;
 
     if rsync_status.success() {
         Ok(())

@@ -3,7 +3,7 @@ use std::{collections::HashMap, process::Stdio};
 use crate::sources::derive_source_name;
 use component::Component;
 use forge_config::Settings;
-use miette::{IntoDiagnostic, Result};
+use miette::{IntoDiagnostic, Result, WrapErr};
 use std::process::Command;
 use workspace::Workspace;
 
@@ -28,9 +28,23 @@ pub fn run_compile(wks: &Workspace, pkg: &Component, settings: &Settings) -> Res
     let unpack_path = build_dir.join(&unpack_name);
     if pkg.recipe.seperate_build_dir {
         let out_dir = build_dir.join("out");
-        std::env::set_current_dir(&out_dir).into_diagnostic()?;
+        std::env::set_current_dir(&out_dir)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to change directory to build output at {}",
+                    out_dir.display()
+                )
+            })?;
     } else {
-        std::env::set_current_dir(&unpack_path).into_diagnostic()?;
+        std::env::set_current_dir(&unpack_path)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to change directory to unpack path at {}",
+                    unpack_path.display()
+                )
+            })?;
     }
 
     let build_tool_check_dir = if pkg.recipe.seperate_build_dir {
@@ -56,9 +70,7 @@ pub fn run_compile(wks: &Workspace, pkg: &Component, settings: &Settings) -> Res
     build_cmd.stdin(Stdio::null());
     build_cmd.stdout(Stdio::inherit());
 
-    println!(
-        "Running {}; env=[{}]",
-        //option_vec.join(" "),
+    tracing::info!(target: "pkgdev::build", "Running {}; env=[{}]",
         build_tool.to_string(),
         env_flags
             .into_iter()
@@ -67,9 +79,19 @@ pub fn run_compile(wks: &Workspace, pkg: &Component, settings: &Settings) -> Res
             .join(",")
     );
 
-    let status = build_cmd.status().into_diagnostic()?;
+    let cwd = std::env::current_dir()
+        .ok()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "<unknown>".into());
+    let status = build_cmd.status().into_diagnostic().wrap_err_with(|| {
+        format!(
+            "failed to run build tool '{}' in cwd {}",
+            build_tool.to_string(),
+            cwd
+        )
+    })?;
     if status.success() {
-        println!("Successfully built {}", pkg.get_name());
+        tracing::info!(target: "pkgdev::build", "Successfully built {}", pkg.get_name());
     } else {
         return Err(miette::miette!(format!(
             "Could not build {}",

@@ -143,23 +143,43 @@ pub fn run_generate_filelist(wks: &Workspace, pkg: &Component) -> Result<()> {
     let proto_path = wks.get_or_create_prototype_dir()?;
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
-    let formatted_manifest = File::create(manifest_path.join("filelist.fmt")).into_diagnostic()?;
+    let filelist_path = manifest_path.join("filelist.fmt");
+    let formatted_manifest = File::create(&filelist_path)
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to create formatted filelist at {}",
+                filelist_path.display()
+            )
+        })?;
 
     let pkg_send_cmd = Command::new("pkgsend")
         .arg("generate")
         .arg(proto_path.to_string_lossy().to_string())
         .stdout(Stdio::piped())
         .spawn()
-        .into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            let cwd = std::env::current_dir()
+                .ok()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "<unknown>".into());
+            format!(
+                "failed to spawn pkgsend generate in cwd {} for prototype dir {}",
+                cwd,
+                proto_path.display()
+            )
+        })?;
 
     let pkg_fmt_cmd_status = Command::new("pkgfmt")
         .stdin(pkg_send_cmd.stdout.unwrap())
         .stdout(formatted_manifest)
         .status()
-        .into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err("failed to run pkgfmt to format filelist from pkgsend output")?;
 
     if pkg_fmt_cmd_status.success() {
-        println!("Generated filelist for {}", pkg.get_name());
+        tracing::info!(target: "pkgdev::ips", "Generated filelist for {}", pkg.get_name());
         Ok(())
     } else {
         Err(miette::miette!("non zero code returned from pkgfmt"))
@@ -223,11 +243,10 @@ pub fn generate_manifest_files(
 
         let manifest_collection = ManifestCollection::new(&pkg.get_name());
 
-        write_all(
-            manifest_path.join(&manifest_collection.get_base_manifest_name()),
-            &manifest,
-        )
-        .into_diagnostic()?;
+        let base_path = manifest_path.join(&manifest_collection.get_base_manifest_name());
+        write_all(&base_path, &manifest)
+            .into_diagnostic()
+            .wrap_err_with(|| format!("failed to write base manifest {}", base_path.display()))?;
         vec![manifest_collection]
     } else {
         let mut manifests = vec![];
@@ -284,11 +303,12 @@ pub fn generate_manifest_files(
             manifest.push_str(drop_dir_line);
 
             let manifest_collection = ManifestCollection::new(&name);
-            write_all(
-                manifest_path.join(manifest_collection.get_base_manifest_name()),
-                &manifest,
-            )
-            .into_diagnostic()?;
+            let base_path = manifest_path.join(manifest_collection.get_base_manifest_name());
+            write_all(&base_path, &manifest)
+                .into_diagnostic()
+                .wrap_err_with(|| {
+                    format!("failed to write base manifest {}", base_path.display())
+                })?;
             manifests.push(manifest_collection);
         }
         manifests
@@ -305,11 +325,15 @@ pub fn generate_manifest_files(
                 .join("\n");
             include_str.push_str("\n");
             let inc_path = manifest_path.join("includes.mog");
-            println!("Adding includes {} to includes.mog", &include_str);
-            write_all(&inc_path, &include_str).into_diagnostic()?;
+            tracing::info!(target: "pkgdev::ips", "Adding includes {} to includes.mog", &include_str);
+            write_all(&inc_path, &include_str)
+                .into_diagnostic()
+                .wrap_err_with(|| {
+                    format!("failed to write includes.mog at {}", inc_path.display())
+                })?;
             Some(inc_path.to_string_lossy().to_string())
         } else {
-            println!("Gate {} has no transforms", gate.name);
+            tracing::info!(target: "pkgdev::ips", "Gate {} has no transforms", gate.name);
             None
         }
     } else {
@@ -318,8 +342,15 @@ pub fn generate_manifest_files(
     };
 
     for manifest in manifests.iter() {
-        let mogrified_manifest =
-            File::create(manifest_path.join(manifest.get_mogrified_name())).into_diagnostic()?;
+        let mog_path = manifest_path.join(manifest.get_mogrified_name());
+        let mogrified_manifest = File::create(&mog_path)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to create mogrified manifest at {}",
+                    mog_path.display()
+                )
+            })?;
         let mut pkg_mogrify_cmd = Command::new("pkgmogrify");
 
         if let Some(includes_path) = transform_includes.clone() {
@@ -349,19 +380,31 @@ pub fn generate_manifest_files(
         }
 
         pkg_mogrify_cmd.stdout(Stdio::piped());
-        let pkg_mogrify_status = pkg_mogrify_cmd.spawn().into_diagnostic()?;
+        let pkg_mogrify_status = pkg_mogrify_cmd
+            .spawn()
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                let cwd = std::env::current_dir()
+                    .ok()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "<unknown>".into());
+                format!(
+                    "failed to spawn pkgmogrify in cwd {} for base manifest '{}'; includes: {:?}",
+                    cwd,
+                    manifest.get_base_manifest_name(),
+                    include_path
+                )
+            })?;
 
         let pkg_fmt_cmd_status = Command::new("pkgfmt")
             .stdin(pkg_mogrify_status.stdout.unwrap())
             .stdout(mogrified_manifest)
             .status()
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err_with(|| "failed to run pkgfmt to format mogrified manifest".to_string())?;
 
         if pkg_fmt_cmd_status.success() {
-            println!(
-                "Finished manifest transformations for manifest {}",
-                &manifest
-            );
+            tracing::info!(target: "pkgdev::ips", "Finished manifest transformations for manifest {}", &manifest);
         } else {
             return Err(miette::miette!("non zero code returned from pkgfmt"));
         }
@@ -482,8 +525,15 @@ pub fn run_generate_pkgdepend(
     let prototype_path = wks.get_or_create_prototype_dir()?;
 
     for manifest in manifests {
-        let depend_manifest =
-            File::create(manifest_path.join(manifest.get_depend_name())).into_diagnostic()?;
+        let dep_path = manifest_path.join(manifest.get_depend_name());
+        let depend_manifest = File::create(&dep_path)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to create dependency manifest {}",
+                    dep_path.display()
+                )
+            })?;
 
         let pkg_depend_cmd = Command::new("pkgdepend")
             .arg("generate")
@@ -498,13 +548,26 @@ pub fn run_generate_pkgdepend(
             )
             .stdout(Stdio::piped())
             .spawn()
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                let cwd = std::env::current_dir()
+                    .ok()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "<unknown>".into());
+                format!(
+                    "failed to spawn pkgdepend generate in cwd {} using prototype {} and mogrified {}",
+                    cwd,
+                    prototype_path.display(),
+                    manifest_path.join(manifest.get_mogrified_name()).display()
+                )
+            })?;
 
         let pkg_fmt_cmd_status = Command::new("pkgfmt")
             .stdin(pkg_depend_cmd.stdout.unwrap())
             .stdout(depend_manifest)
             .status()
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err("failed to run pkgfmt to format dependency manifest")?;
 
         if pkg_fmt_cmd_status.success() {
             println!("Generated dependency entries for manifest {}", manifest);
@@ -576,7 +639,13 @@ pub fn run_resolve_dependencies(
         )
         .stdout(Stdio::inherit())
         .status()
-        .into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err_with(|| {
+            format!(
+                "failed to run pkgdepend resolve for manifests in {}",
+                manifest_path.display()
+            )
+        })?;
 
     if pkg_depend_cmd.success() {
         println!("Resolved dependencies");
@@ -599,16 +668,13 @@ pub fn run_lint(wks: &Workspace, manifests: &[ManifestCollection]) -> Result<()>
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
     for manifest in manifests {
+        let res_path = manifest_path.join(manifest.get_resolved_name());
         let pkg_lint_cmd = Command::new("pkglint")
-            .arg(
-                manifest_path
-                    .join(manifest.get_resolved_name())
-                    .to_string_lossy()
-                    .to_string(),
-            )
+            .arg(res_path.to_string_lossy().to_string())
             .stdout(Stdio::inherit())
             .status()
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err_with(|| format!("failed to run pkglint for {}", res_path.display()))?;
 
         if pkg_lint_cmd.success() {
             println!("Lint success for manifest {}", manifest);
@@ -641,7 +707,13 @@ pub fn ensure_repo_with_publisher_exists(
             .arg(&repo_base.to_string_lossy().to_string())
             .stdout(Stdio::inherit())
             .status()
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to run pkgrepo create for repo {}",
+                    repo_base.display()
+                )
+            })?;
         if !pkg_repo_status.success() {
             return Err(miette::miette!(
                 "pkgrepo create failed with non zero exit code"
@@ -657,7 +729,14 @@ pub fn ensure_repo_with_publisher_exists(
             .arg(publisher)
             .stdout(Stdio::inherit())
             .status()
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to run pkgrepo add-publisher '{}' for repo {}",
+                    publisher,
+                    repo_base.display()
+                )
+            })?;
         if !pkg_repo_status.success() {
             return Err(miette::miette!(
                 "pkgrepo create failed with non zero exit code"
@@ -727,7 +806,15 @@ pub fn publish(
             .arg(&manifest_path.to_string_lossy().to_string())
             .stdout(Stdio::inherit())
             .status()
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err_with(|| format!(
+                "failed to run pkgsend publish to repo {} for manifest {} (proto {}, unpack {}, pkgdir {})",
+                repo_base.display(),
+                manifest_path.display(),
+                proto_dir.display(),
+                unpack_path.display(),
+                pkg.get_path().display()
+            ))?;
 
         if pkgsend_status.success() {
             println!("Published manifest {}", manifest);

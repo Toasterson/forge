@@ -14,8 +14,11 @@ fn get_largefile_flag() -> Result<Vec<String>> {
     let getconf_out = Command::new("getconf")
         .arg("LFS64_CFLAGS")
         .output()
-        .into_diagnostic()?;
-    let flags = String::from_utf8(getconf_out.stdout).into_diagnostic()?;
+        .into_diagnostic()
+        .wrap_err("failed to run getconf LFS64_CFLAGS to determine large-file flags")?;
+    let flags = String::from_utf8(getconf_out.stdout)
+        .into_diagnostic()
+        .wrap_err("getconf output was not valid UTF-8")?;
 
     Ok(flags.lines().map(|s| s.to_owned()).collect::<Vec<String>>())
 }
@@ -32,9 +35,23 @@ pub fn build_using_automake(
     if pkg.recipe.seperate_build_dir {
         let out_dir = build_dir.join("out");
         DirBuilder::new().create(&out_dir).into_diagnostic()?;
-        std::env::set_current_dir(&out_dir).into_diagnostic()?;
+        std::env::set_current_dir(&out_dir)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to change directory to build output at {}",
+                    out_dir.display()
+                )
+            })?;
     } else {
-        std::env::set_current_dir(&unpack_path).into_diagnostic()?;
+        std::env::set_current_dir(&unpack_path)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to change directory to unpack path at {}",
+                    unpack_path.display()
+                )
+            })?;
     }
 
     let mut option_vec: Vec<_> = vec![];
@@ -110,7 +127,7 @@ pub fn build_using_automake(
     configure_cmd.envs(&env_flags);
     configure_cmd.args(&option_vec);
     if !build_section.disable_destdir_configure_option {
-        println!("DESTDIR option not injecting into configure script options");
+        tracing::info!(target: "pkgdev::build", "DESTDIR option not injecting into configure script options");
         configure_cmd.arg(&destdir_arg);
     }
 
@@ -128,7 +145,16 @@ pub fn build_using_automake(
             .join(",")
     );
 
-    let status = configure_cmd.status().into_diagnostic()?;
+    let cwd = std::env::current_dir()
+        .ok()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "<unknown>".into());
+    let status = configure_cmd.status().into_diagnostic().wrap_err_with(|| {
+        format!(
+            "failed to run configure script '{}' in cwd {}",
+            bin_path, cwd
+        )
+    })?;
     if status.success() {
         println!("Successfully configured {}", pkg.get_name());
     } else {

@@ -126,15 +126,18 @@ pub enum GenerateSchemaKind {
 
 pub async fn run(args: Args) -> miette::Result<()> {
     let gate = if let Some(gate_path) = args.gate {
+        tracing::info!(target: "pkgdev::cli", "[pkgdev] Using gate file: {}", gate_path.display());
         let gate = Gate::load(gate_path)?;
         Some(gate)
     } else {
+        tracing::info!(target: "pkgdev::cli", "[pkgdev] No gate specified; using current directory as gate root");
         None
     };
 
     let settings = Settings::open().wrap_err("unable to open app settings")?;
 
     let wks = if let Some(wks_path) = args.workspace {
+        tracing::info!(target: "pkgdev::cli", "[pkgdev] Using workspace override: {}", wks_path.display());
         settings
             .get_workspace_from(wks_path.as_path())
             .wrap_err("unable to open workspace path provided")?
@@ -144,6 +147,14 @@ pub async fn run(args: Args) -> miette::Result<()> {
             .wrap_err("unable to open current workspace path")?
     };
 
+    tracing::info!(target: "pkgdev::cli", "[pkgdev] Subcommand: {:?}", args.command);
+    if let Some(p) = &args.repo {
+        tracing::info!(target: "pkgdev::cli", "[pkgdev] Repo override path: {}", p.display());
+    }
+    if let Some(c) = &args.repo_context {
+        tracing::info!(target: "pkgdev::cli", "[pkgdev] Repo context override: {}", c);
+    }
+
     match args.command {
         Commands::Repo { cmd } => {
             let mut mgr = RepoManager::load()
@@ -152,6 +163,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
             match cmd {
                 RepoCmd::List => {
                     for r in mgr.list() {
+                        // This is intentional stdout output for the CLI list command.
                         println!("{}\t{}", r.name, r.path.display());
                     }
                     Ok(())
@@ -169,14 +181,14 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     mgr.create(&name, &resolved_path)
                         .into_diagnostic()
                         .wrap_err("failed to create repo context")?;
-                    println!("created repo context at {}", resolved_path.display());
+                    tracing::info!(target: "pkgdev::repo", "created repo context at {}", resolved_path.display());
                     Ok(())
                 }
                 RepoCmd::Delete { name } => {
                     mgr.delete(name)
                         .into_diagnostic()
                         .wrap_err("failed to delete repo context")?;
-                    println!("deleted repo context");
+                    tracing::info!(target: "pkgdev::repo", "deleted repo context");
                     Ok(())
                 }
                 RepoCmd::Select { name } => {
@@ -184,7 +196,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         .into_diagnostic()
                         .wrap_err("failed to select repo context")?;
                     if let Some(cur) = mgr.current() {
-                        println!("selected {} -> {}", cur.name, cur.path.display());
+                        tracing::info!(target: "pkgdev::repo", "selected {} -> {}", cur.name, cur.path.display());
                     }
                     Ok(())
                 }
