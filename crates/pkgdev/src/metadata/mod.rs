@@ -1,8 +1,10 @@
 use clap::ValueEnum;
+use gate::Gate;
 use miette::IntoDiagnostic;
 use strum::Display;
 
 use crate::args::ComponentArgs;
+use crate::component::open_component_local;
 
 mod repology;
 
@@ -13,8 +15,12 @@ pub enum MetadataFormat {
     Repology,
 }
 
-pub fn print_component(args: ComponentArgs, format: MetadataFormat) -> miette::Result<()> {
-    let component = component::Component::open_local(&args.component)?;
+pub fn print_component(
+    args: ComponentArgs,
+    format: MetadataFormat,
+    gate: &Option<Gate>,
+) -> miette::Result<()> {
+    let component = open_component_local(&args.component, gate)?;
     match format {
         MetadataFormat::Forge => {
             println!(

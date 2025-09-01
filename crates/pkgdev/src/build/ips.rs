@@ -53,7 +53,7 @@ struct StringInterpolationVars<'a> {
     pub license_name: &'a str,
 }
 
-fn get_source_url<'a>(src: &'a SourceNode) -> &'a str {
+fn get_source_url(src: &SourceNode) -> &str {
     match src {
         SourceNode::Archive(a) => &a.src,
         SourceNode::Git(g) => &g.repository,
@@ -375,7 +375,7 @@ pub fn generate_manifest_files(
     let build_version = gate.clone().unwrap_or_default().version;
     let branch_version = gate.clone().unwrap_or_default().branch;
 
-    let mut build_for_name = |pkg_name: String| -> Result<ManifestCollection> {
+    let build_for_name = |pkg_name: String| -> Result<ManifestCollection> {
         // Compose FMRI components
         let version = pkg
             .recipe

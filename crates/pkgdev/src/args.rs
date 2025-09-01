@@ -15,7 +15,9 @@ use strum::Display;
 #[derive(Debug, Parser)]
 pub struct Args {
     #[arg(long, global = true)]
-    /// Path to the gate kdl file adding gate wide settings to this all components
+    /// Path to the gate .kdl file. If omitted, the current working directory is treated as the gate root
+    /// for resolving components (i.e., <cwd>/components/<component>). Provide --gate only when the gate
+    /// is not the current directory.
     pub gate: Option<PathBuf>,
 
     /// Allows one to change the workspace for this operation only. Intended for the CI usecase so that
@@ -31,6 +33,8 @@ pub struct Args {
 pub enum Commands {
     #[clap(name = "download")]
     Download {
+        /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
+        /// If omitted, current directory is used. Absolute paths are accepted.
         #[clap(short, long, default_value = ".")]
         component: PathBuf,
     },
@@ -54,6 +58,8 @@ pub enum Commands {
     },
     #[clap(name = "edit")]
     Edit {
+        /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
+        /// If omitted, current directory is used. Absolute paths are accepted.
         #[clap(short, long, default_value = ".")]
         component: PathBuf,
         #[clap(subcommand)]
@@ -66,6 +72,8 @@ pub enum Commands {
     // },
     #[clap(name = "build")]
     Build {
+        /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
+        /// If omitted, current directory is used. Absolute paths are accepted.
         #[arg(short, long, default_value = ".")]
         component: PathBuf,
 
@@ -76,6 +84,8 @@ pub enum Commands {
 
 #[derive(Debug, Parser, Clone)]
 pub struct ComponentArgs {
+    /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
+    /// If omitted, current directory is used. Absolute paths are accepted.
     #[clap(short, long, default_value = ".")]
     pub component: PathBuf,
 }
@@ -109,7 +119,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
     };
 
     match args.command {
-        Commands::Metadata { args, format } => metadata::print_component(args, format),
+        Commands::Metadata { args, format } => metadata::print_component(args, format, &gate),
         Commands::Generate { kind } => match kind {
             GenerateSchemaKind::ComponentRecipe => {
                 let schema = component::get_schema();

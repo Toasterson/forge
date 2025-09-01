@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use clap::{arg, Subcommand, ValueEnum};
 use miette::IntoDiagnostic;
 
+use crate::component::open_component_local;
 use component::{
     ArchiveSourceBuilder, BuildOptionNode, BuildSectionBuilder, Component, ConfigureBuildSection,
     DependencyBuilder, DependencyKind, ScriptBuildSection, ScriptNode, SourceNode, SourceSection,
@@ -112,7 +113,7 @@ pub fn edit_component(
     gate: Option<Gate>,
     args: EditArgs,
 ) -> miette::Result<()> {
-    let mut c = Component::open_local(component_path)?;
+    let mut c = open_component_local(component_path, &gate)?;
     match args {
         EditArgs::Add { args } => match args {
             AddArgs::Dependency { dev, kind, package } => {
