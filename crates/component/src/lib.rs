@@ -162,7 +162,7 @@ impl Component {
                 sources: vec![node],
             };
             self.recipe.sources.push(src_section);
-        };
+        }
         self.save_document()?;
         self.open_document()?;
         Ok(())

@@ -263,6 +263,7 @@ impl Transform {
     }
 
     /// Access typed KDL rules if provided
+    #[must_use]
     pub fn ast_rules(&self) -> &[TransformRuleAst] {
         &self.rules
     }
