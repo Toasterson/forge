@@ -1206,6 +1206,9 @@ impl BuildFlagNode {
     pub fn to_node(&self) -> kdl::KdlNode {
         let mut node = kdl::KdlNode::new("flag");
         node.insert(0, self.flag.as_str());
+        if let Some(name) = &self.flag_name {
+            node.insert("name", name.as_str());
+        }
         node
     }
 }

@@ -6,8 +6,9 @@ use miette::IntoDiagnostic;
 
 use crate::component::open_component_local;
 use component::{
-    ArchiveSourceBuilder, BuildOptionNode, BuildSectionBuilder, ConfigureBuildSection,
-    DependencyBuilder, DependencyKind, ScriptBuildSection, ScriptNode, SourceNode, SourceSection,
+    ArchiveSourceBuilder, BuildFlagNode, BuildOptionNode, BuildSectionBuilder,
+    ConfigureBuildSection, DependencyBuilder, DependencyKind, ScriptBuildSection, ScriptNode,
+    SourceNode, SourceSection,
 };
 use gate::Gate;
 
@@ -75,6 +76,12 @@ pub enum AddArgs {
     },
     Build {
         kind: BuildKind,
+        /// Environment variables to set at configure time, in the form KEY=VALUE. Repeatable.
+        #[arg(long = "env")]
+        env: Vec<String>,
+        /// Configure options to pass (without leading --). Collected as trailing args.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
     Source {
         #[clap(subcommand)]
@@ -124,18 +131,59 @@ pub fn edit_component(
                     .build()?;
                 c.recipe.dependencies.push(dep);
             }
-            AddArgs::Build { kind } => {
+            AddArgs::Build { kind, env, args } => {
                 let mut bsb = BuildSectionBuilder::default();
                 match kind {
                     BuildKind::Configure => {
-                        bsb.configure(ConfigureBuildSection {
+                        // Build Configure section with provided env and options
+                        let mut cfg = ConfigureBuildSection {
                             options: vec![],
                             flags: vec![],
                             compiler: None,
                             linker: None,
                             disable_destdir_configure_option: false,
                             enable_large_files: false,
-                        });
+                        };
+
+                        // Parse and add env KEY=VALUE as flags with names
+                        for e in env {
+                            if let Some((k, v)) = e.split_once('=') {
+                                cfg.flags.push(BuildFlagNode {
+                                    flag: v.to_string(),
+                                    flag_name: Some(k.to_string()),
+                                });
+                            } else {
+                                return Err(miette::miette!(format!(
+                                    "invalid --env format (expected KEY=VALUE): {}",
+                                    e
+                                )));
+                            }
+                        }
+
+                        // Add configure options from trailing args, applying gate transforms if present
+                        'outer: for arg in args {
+                            if let Some(gate) = &gate {
+                                for transform in &gate.metadata_transforms {
+                                    if arg.contains(&transform.matcher) {
+                                        if !transform.drop {
+                                            println!(
+                                                "replacing {} with {}",
+                                                &arg, &transform.replacement
+                                            );
+                                            cfg.options.push(BuildOptionNode {
+                                                option: transform.replacement.clone(),
+                                            });
+                                        } else {
+                                            println!("dropping {}", &arg);
+                                        }
+                                        continue 'outer;
+                                    }
+                                }
+                            }
+                            cfg.options.push(BuildOptionNode { option: arg });
+                        }
+
+                        bsb.configure(cfg);
                     }
                     BuildKind::Script => {
                         bsb.script(ScriptBuildSection {
