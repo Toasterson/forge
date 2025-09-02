@@ -28,7 +28,8 @@ async fn can_add() {
             "branch": "2024.0.0"
         });
 
-        let _response = request.post("/api/gates").json(&payload).await;
+        let response = request.post("/api/gates").json(&payload).await;
+        assert!(response.status_code().is_success());
         let saved_gate = gates::Model::find_by_name(&ctx.db, "userland").await;
 
         with_settings!({
