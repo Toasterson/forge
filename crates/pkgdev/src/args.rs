@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::build::{run_build, BuildArgs};
 use crate::component::open_component_local;
@@ -8,9 +9,12 @@ use crate::modify::{edit_component, EditArgs};
 use crate::repo::RepoManager;
 use crate::sources::download_sources;
 use clap::{Parser, Subcommand, ValueEnum};
+use component::{Component, SourceNode};
 use forge_config::Settings;
 use gate::Gate;
 use miette::{Context, IntoDiagnostic};
+use repology::MetadataBuilder;
+use semver::Version;
 use strum::Display;
 
 #[derive(Debug, Parser)]
@@ -63,6 +67,9 @@ pub enum Commands {
     Generate {
         #[clap(default_value_t = GenerateSchemaKind::default())]
         kind: GenerateSchemaKind,
+        /// Output file path for generated data (stdout if omitted)
+        #[clap(long, short)]
+        output: Option<PathBuf>,
     },
     #[clap(name = "create")]
     Create {
@@ -122,6 +129,7 @@ pub enum GenerateSchemaKind {
     #[default]
     ComponentRecipe,
     ForgeIntegrationManifest,
+    Repology,
 }
 
 pub async fn run(args: Args) -> miette::Result<()> {
@@ -203,7 +211,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
             }
         }
         Commands::Metadata { args, format } => metadata::print_component(args, format, &gate),
-        Commands::Generate { kind } => match kind {
+        Commands::Generate { kind, output } => match kind {
             GenerateSchemaKind::ComponentRecipe => {
                 let schema = component::get_schema();
                 println!(
@@ -220,6 +228,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 );
                 Ok(())
             }
+            GenerateSchemaKind::Repology => generate_repology(&gate, output.as_deref()),
         },
         Commands::Download { component } => {
             let component = open_component_local(&component, &gate)?;
@@ -253,4 +262,158 @@ pub async fn run(args: Args) -> miette::Result<()> {
             .wrap_err("build failed")
         }
     }
+}
+
+fn last_segment<S: AsRef<str>>(s: S) -> String {
+    let s = s.as_ref();
+    s.rsplit('/').next().unwrap_or(s).to_string()
+}
+
+fn find_component_dirs(start: &Path, out: &mut Vec<PathBuf>) -> miette::Result<()> {
+    for entry in fs::read_dir(start)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to read dir {}", start.display()))?
+    {
+        let entry = entry.into_diagnostic()?;
+        let path = entry.path();
+        if path.is_dir() {
+            if path.join("package.kdl").exists() {
+                out.push(path);
+            } else {
+                find_component_dirs(&path, out)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn component_to_repology(c: &Component) -> Option<repology::Metadata> {
+    let r = &c.recipe;
+
+    let version_str = match &r.version {
+        Some(v) => v.clone(),
+        None => {
+            tracing::warn!(target: "pkgdev::generate", "skipping {}: missing version", r.name);
+            return None;
+        }
+    };
+
+    let version = match Version::parse(&version_str) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(target: "pkgdev::generate", "skipping {}: invalid semver '{}': {}", r.name, version_str, e);
+            return None;
+        }
+    };
+
+    let summary = r.summary.clone().unwrap_or_else(|| r.name.clone());
+    let project_name = r
+        .project_name
+        .clone()
+        .unwrap_or_else(|| last_segment(&r.name));
+    let source_name = r.project_name.clone().unwrap_or_else(|| r.name.clone());
+    let fmri = format!(
+        "{}@{}-{}",
+        r.name,
+        version_str,
+        r.revision.clone().unwrap_or_else(|| "0".to_string())
+    );
+
+    let mut builder = MetadataBuilder::default();
+    builder
+        .summary(summary)
+        .source_name(source_name)
+        .fmri(fmri)
+        .project_name(project_name)
+        .version(version);
+
+    if !r.maintainers.is_empty() {
+        builder.maintainers(r.maintainers.clone());
+    }
+
+    let mut homepages: Vec<String> = Vec::new();
+    if let Some(u) = &r.project_url {
+        homepages.push(u.clone());
+    }
+    builder.homepages(homepages);
+
+    let mut licenses: Vec<String> = Vec::new();
+    if let Some(l) = &r.license {
+        for part in l.split(',') {
+            let t = part.trim();
+            if !t.is_empty() {
+                licenses.push(t.to_string());
+            }
+        }
+    }
+    if !licenses.is_empty() {
+        builder.licenses(licenses);
+    }
+
+    let mut source_links: Vec<String> = Vec::new();
+    for section in &r.sources {
+        for src in &section.sources {
+            if let SourceNode::Archive(a) = src {
+                source_links.push(a.src.clone());
+            }
+        }
+    }
+    builder.source_links(source_links);
+
+    let mut categories: Vec<String> = Vec::new();
+    if let Some(c) = &r.classification {
+        if !c.is_empty() {
+            categories.push(c.clone());
+        }
+    }
+    builder.categories(categories);
+
+    match builder.build() {
+        Ok(m) => Some(m),
+        Err(e) => {
+            tracing::warn!(target: "pkgdev::generate", "skipping {}: failed to build repology metadata: {}", r.name, e);
+            None
+        }
+    }
+}
+
+fn generate_repology(gate: &Option<Gate>, output: Option<&Path>) -> miette::Result<()> {
+    let root = if let Some(g) = gate {
+        g.get_gate_path().join("components")
+    } else {
+        let cwd = std::env::current_dir().into_diagnostic()?;
+        let components = cwd.join("components");
+        if components.exists() {
+            components
+        } else {
+            cwd
+        }
+    };
+
+    let mut component_dirs = Vec::new();
+    find_component_dirs(&root, &mut component_dirs)?;
+
+    let mut all: Vec<repology::Metadata> = Vec::new();
+    for dir in component_dirs {
+        match Component::open_local(&dir) {
+            Ok(c) => {
+                if let Some(m) = component_to_repology(&c) {
+                    all.push(m);
+                }
+            }
+            Err(e) => {
+                tracing::warn!(target: "pkgdev::generate", "failed to open component at {}: {}", dir.display(), e);
+            }
+        }
+    }
+
+    let json = serde_json::to_string_pretty(&all).into_diagnostic()?;
+    if let Some(path) = output {
+        fs::write(path, json)
+            .into_diagnostic()
+            .wrap_err_with(|| format!("failed to write output file {}", path.display()))?;
+    } else {
+        println!("{}", json);
+    }
+    Ok(())
 }
