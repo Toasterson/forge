@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use clap::{Subcommand, ValueEnum};
 use miette::Diagnostic;
+use progenitor_client::ClientInfo;
 use reqwest::header::HeaderMap;
-//use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::{ParseError, Url};
