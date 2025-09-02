@@ -231,12 +231,15 @@ impl Write for DownloadFile {
 
     fn flush(&mut self) -> io::Result<()> {
         #![cfg(not(target_os = "illumos"))]
-        {
-            match self.hasher_kind {
-                HasherKind::Sha256 => self.hasher256.flush()?,
-                HasherKind::Sha512 => self.hasher512.flush()?,
-            };
-        }
+        match self.hasher_kind {
+            HasherKind::Sha256 => self.hasher256.flush()?,
+            HasherKind::Sha512 => self.hasher512.flush()?,
+        };
+        self.handle.flush()
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        #![cfg(target_os = "illumos")]
         self.handle.flush()
     }
 }
