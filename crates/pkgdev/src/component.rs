@@ -28,12 +28,21 @@ pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(
     let full_component_path = if component_path.is_absolute() {
         component_path.to_path_buf()
     } else if let Some(gate) = gate {
-        // If we have a gate we look for the component under <gate_path>/components/<component_path>
-        let base = gate.get_gate_path();
-        if first_segment_is_components(component_path) {
-            base.join(component_path)
+        // If a gate is provided, prefer the current working directory if it points to a component.
+        // This allows `--component .` to work when invoked from inside a component directory.
+        let cwd = std::env::current_dir().into_diagnostic()?;
+        let cwd_candidate = cwd.join(component_path);
+        let cwd_package = cwd_candidate.join("package.kdl");
+        if cwd_package.exists() {
+            cwd_candidate
         } else {
-            base.join("components").join(component_path)
+            // Fall back to <gate_path>/components/<component_path>
+            let base = gate.get_gate_path();
+            if first_segment_is_components(component_path) {
+                base.join(component_path)
+            } else {
+                base.join("components").join(component_path)
+            }
         }
     } else {
         // No gate provided: treat the current working directory as the gate root

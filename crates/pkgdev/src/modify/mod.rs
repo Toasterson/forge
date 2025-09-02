@@ -162,25 +162,38 @@ pub fn edit_component(
 
                         // Add configure options from trailing args, applying gate transforms if present
                         'outer: for arg in args {
+                            let raw_arg = arg.clone();
+                            let normalized_arg = raw_arg.trim_start_matches('-').to_string();
                             if let Some(gate) = &gate {
                                 for transform in &gate.metadata_transforms {
-                                    if arg.contains(&transform.matcher) {
+                                    let matcher = &transform.matcher;
+                                    let norm_matcher = matcher.trim_start_matches('-');
+                                    if raw_arg.contains(matcher)
+                                        || normalized_arg.contains(norm_matcher)
+                                    {
                                         if !transform.drop {
+                                            let replacement = transform
+                                                .replacement
+                                                .trim_start_matches('-')
+                                                .to_string();
                                             println!(
                                                 "replacing {} with {}",
-                                                &arg, &transform.replacement
+                                                &raw_arg, &replacement
                                             );
                                             cfg.options.push(BuildOptionNode {
-                                                option: transform.replacement.clone(),
+                                                option: replacement,
                                             });
                                         } else {
-                                            println!("dropping {}", &arg);
+                                            println!("dropping {}", &raw_arg);
                                         }
                                         continue 'outer;
                                     }
                                 }
                             }
-                            cfg.options.push(BuildOptionNode { option: arg });
+                            // Store option without leading dashes to avoid doubling at build time
+                            cfg.options.push(BuildOptionNode {
+                                option: normalized_arg,
+                            });
                         }
 
                         bsb.configure(cfg);
@@ -284,25 +297,38 @@ pub fn edit_component(
                 if let Some(section) = c.recipe.build_sections.get_mut(index) {
                     if let Some(configure) = &mut section.configure {
                         'outer: for arg in args {
+                            let raw_arg = arg.clone();
+                            let normalized_arg = raw_arg.trim_start_matches('-').to_string();
                             if let Some(gate) = &gate {
                                 for transform in &gate.metadata_transforms {
-                                    if arg.contains(&transform.matcher) {
+                                    let matcher = &transform.matcher;
+                                    let norm_matcher = matcher.trim_start_matches('-');
+                                    if raw_arg.contains(matcher)
+                                        || normalized_arg.contains(norm_matcher)
+                                    {
                                         if !transform.drop {
+                                            let replacement = transform
+                                                .replacement
+                                                .trim_start_matches('-')
+                                                .to_string();
                                             println!(
                                                 "replacing {} with {}",
-                                                &arg, &transform.replacement
+                                                &raw_arg, &replacement
                                             );
                                             configure.options.push(BuildOptionNode {
-                                                option: transform.replacement.clone(),
+                                                option: replacement,
                                             });
                                         } else {
-                                            println!("dropping {}", &arg);
+                                            println!("dropping {}", &raw_arg);
                                         }
                                         continue 'outer;
                                     }
                                 }
                             }
-                            configure.options.push(BuildOptionNode { option: arg });
+                            // Store option without leading dashes to avoid doubling at build time
+                            configure.options.push(BuildOptionNode {
+                                option: normalized_arg,
+                            });
                         }
                     } else if let Some(script) = &mut section.script {
                         for arg in args {
