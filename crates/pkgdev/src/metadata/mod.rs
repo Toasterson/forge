@@ -6,6 +6,7 @@ use strum::Display;
 use crate::args::ComponentArgs;
 use crate::component::open_component_local;
 
+pub mod cargo;
 mod repology;
 
 #[derive(Debug, ValueEnum, Clone, Default, Display)]

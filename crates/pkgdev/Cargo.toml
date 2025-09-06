@@ -41,6 +41,7 @@ uuid = { workspace = true, features = ["serde", "v4"] }
 libips = { git = "https://github.com/OpenFlowLabs/ips.git", optional = true }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+cargo_metadata = "0.22"
 
 [features]
 default = []

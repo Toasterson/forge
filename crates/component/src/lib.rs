@@ -981,6 +981,9 @@ pub struct BuildSection {
     #[knuffel(child)]
     #[builder(default)]
     pub script: Option<ScriptBuildSection>,
+    #[knuffel(child, default = false)]
+    #[builder(default)]
+    pub cargo: bool,
 }
 
 impl BuildSection {
@@ -995,6 +998,8 @@ impl BuildSection {
             doc.nodes_mut().push(configure.to_node());
         } else if let Some(script) = &self.script {
             doc.nodes_mut().push(script.to_node());
+        } else if self.cargo {
+            doc.nodes_mut().push(kdl::KdlNode::new("cargo"));
         } else {
             doc.nodes_mut().push(kdl::KdlNode::new("no-build"));
         }
