@@ -4,6 +4,70 @@ use semver::Version;
 use serde::Serialize;
 use thiserror::Error;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Semverish {
+    raw: String,
+    strict: Option<Version>,
+}
+
+impl Semverish {
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        let raw = s.into();
+        let strict = Version::parse(&raw).ok();
+        Self { raw, strict }
+    }
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+    pub fn is_strict(&self) -> bool {
+        self.strict.is_some()
+    }
+    pub fn as_semver(&self) -> Option<&Version> {
+        self.strict.as_ref()
+    }
+}
+
+impl core::fmt::Display for Semverish {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(&self.raw)
+    }
+}
+
+impl From<&str> for Semverish {
+    fn from(value: &str) -> Self {
+        Semverish::new(value)
+    }
+}
+impl From<String> for Semverish {
+    fn from(value: String) -> Self {
+        Semverish::new(value)
+    }
+}
+impl From<Version> for Semverish {
+    fn from(value: Version) -> Self {
+        Semverish::new(value.to_string())
+    }
+}
+
+impl serde::Serialize for Semverish {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.raw)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Semverish {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Semverish::new(s))
+    }
+}
+
 #[derive(Debug, Error, Diagnostic)]
 pub enum Error {
     #[error(transparent)]
@@ -38,7 +102,7 @@ pub struct Metadata {
     pub licenses: Vec<String>,
     pub source_links: Vec<String>,
     pub categories: Vec<String>,
-    pub version: Version,
+    pub version: Semverish,
 }
 
 impl MetadataBuilder {
@@ -94,7 +158,7 @@ mod tests {
             .project_name("ansible")
             .homepages([String::from("https://ansible.com/")])
             .licenses([String::from("GPL-3.0-only")])
-            .version(Version::parse("7.4.0")?)
+            .version("7.4.0")
             .source_links([String::from("https://files.pythonhosted.org/packages/45/4b/2087a0fe8265828df067e57d7d156426cdc8f7cd94ad3178c6510d81e2c0/ansible-7.4.0.tar.gz")])
             .categories([String::from("Development/Python")])
             .build()
@@ -119,5 +183,27 @@ mod tests {
         println!("{}", &actual);
         assert_contents("ansible_repology_data.json", &actual);
         Ok(())
+    }
+
+    #[test]
+    fn semverish_strict_and_raw() {
+        let s = Semverish::from("7.4.0");
+        assert!(s.is_strict());
+        assert_eq!(s.raw(), "7.4.0");
+        assert_eq!(s.to_string(), "7.4.0");
+        let json = serde_json::to_string(&s).unwrap();
+        assert_eq!(json, "\"7.4.0\"");
+    }
+
+    #[test]
+    fn semverish_non_strict_examples() {
+        let cases = ["26", "1.15", "1.0.2.21", "2.1.ROLLING", "25.03"];
+        for case in cases {
+            let s = Semverish::from(case);
+            assert!(!s.is_strict(), "case {} unexpectedly strict", case);
+            assert_eq!(s.raw(), case);
+            let json = serde_json::to_string(&s).unwrap();
+            assert_eq!(json, format!("\"{}\"", case));
+        }
     }
 }

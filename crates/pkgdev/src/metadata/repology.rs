@@ -1,5 +1,4 @@
-use miette::{Diagnostic, IntoDiagnostic};
-use semver::Version;
+use miette::Diagnostic;
 use thiserror::Error;
 
 use component::{Component, SourceNode};
@@ -39,10 +38,7 @@ pub(crate) fn build_metadata(c: &Component) -> miette::Result<repology::Metadata
                 .ok_or(RepologyError::NoProjectUrl)?,
         )
         .add_license(recipe.license.clone().ok_or(RepologyError::NoLicense)?)
-        .version(
-            Version::parse(&recipe.version.clone().ok_or(RepologyError::NoVersion)?)
-                .into_diagnostic()?,
-        )
+        .version(recipe.version.clone().ok_or(RepologyError::NoVersion)?)
         .source_links(
             recipe
                 .sources

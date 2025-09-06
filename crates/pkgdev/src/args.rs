@@ -14,7 +14,6 @@ use forge_config::Settings;
 use gate::Gate;
 use miette::{Context, IntoDiagnostic};
 use repology::MetadataBuilder;
-use semver::Version;
 use strum::Display;
 
 #[derive(Debug, Parser)]
@@ -298,13 +297,7 @@ fn component_to_repology(c: &Component) -> Option<repology::Metadata> {
         }
     };
 
-    let version = match Version::parse(&version_str) {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::warn!(target: "pkgdev::generate", "skipping {}: invalid semver '{}': {}", r.name, version_str, e);
-            return None;
-        }
-    };
+    // Preserve semverish version strings; do not skip non-strict versions.
 
     let summary = r.summary.clone().unwrap_or_else(|| r.name.clone());
     let project_name = r
@@ -325,7 +318,7 @@ fn component_to_repology(c: &Component) -> Option<repology::Metadata> {
         .source_name(source_name)
         .fmri(fmri)
         .project_name(project_name)
-        .version(version);
+        .version(version_str);
 
     if !r.maintainers.is_empty() {
         builder.maintainers(r.maintainers.clone());
