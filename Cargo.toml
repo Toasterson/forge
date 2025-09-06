@@ -6,6 +6,8 @@ edition.workspace = true
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2"
+repository = "https://github.com/toasterson/forge.git"
 
 [dependencies]
 miette.workspace = true

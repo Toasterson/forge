@@ -2,6 +2,9 @@
 name = "pkgdev"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Package development utility to interact and use package kdl metadata"
 
 [build-dependencies]
 prettyplease = "0.2.22"
