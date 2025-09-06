@@ -531,6 +531,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
 }
 
 #[derive(Serialize, Default)]
+#[allow(dead_code)]
 struct ReturnValue {
     error: Option<String>,
 }

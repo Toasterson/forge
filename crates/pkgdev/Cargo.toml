@@ -44,6 +44,6 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 cargo_metadata = "0.22"
 
 [features]
-default = []
+default = ["libips"]
 # Enable libips integration against the external library.
 libips = ["dep:libips"]

@@ -242,23 +242,87 @@ pub async fn run(args: Args) -> miette::Result<()> {
             component,
             args: build_args,
         } => {
-            let component =
-                open_component_local(component, &gate).wrap_err("cannot open component")?;
+            // Resolve the provided component path relative to cwd
+            let full_path = if component.is_absolute() {
+                component.clone()
+            } else {
+                std::env::current_dir()
+                    .into_diagnostic()
+                    .wrap_err("failed to get current directory")?
+                    .join(&component)
+            };
+            let full_path = full_path
+                .canonicalize()
+                .into_diagnostic()
+                .wrap_err_with(|| format!(
+                    "failed to resolve build path '{}'; provide a valid component dir or a Cargo workspace/crate",
+                    component.display()
+                ))?;
+
             let repo_mgr = RepoManager::load()
                 .into_diagnostic()
                 .wrap_err("unable to open repo contexts")?;
-            run_build(
-                &component,
-                &gate,
-                &wks,
-                &settings,
-                &build_args,
-                &repo_mgr,
-                args.repo.clone(),
-                args.repo_context.clone(),
-            )
-            .await
-            .wrap_err("build failed")
+
+            let has_kdl = full_path.join("package.kdl").exists();
+            let has_cargo = full_path.join("Cargo.toml").exists();
+
+            if !has_kdl && has_cargo {
+                // Cargo project/workspace: derive all members and build/package each
+                let derived = crate::metadata::cargo::components_from_cargo_dir(&full_path)
+                    .wrap_err("failed to derive components from Cargo workspace")?;
+                if derived.is_empty() {
+                    return Err(miette::miette!(
+                        "no cargo packages found under {}",
+                        full_path.display()
+                    ));
+                }
+                let mut first = true;
+                for d in derived {
+                    tracing::info!(target: "pkgdev::cli", "[pkgdev] Building cargo member: {} ({})", d.component.get_name(), d.component.get_path().display());
+                    let mut ba = build_args.clone();
+                    if !first {
+                        // Avoid re-downloading/unpacking/build dir cleaning, but ensure we start with a clean prototype/manifest
+                        ba.no_clean = true;
+                        // Proactively clean prototype and manifest to avoid cross-contamination between packages
+                        if let Ok(proto) = wks.get_or_create_prototype_dir() {
+                            let _ = std::fs::remove_dir_all(&proto);
+                        }
+                        if let Ok(mani) = wks.get_or_create_manifest_dir() {
+                            let _ = std::fs::remove_dir_all(&mani);
+                        }
+                    }
+                    first = false;
+                    run_build(
+                        &d.component,
+                        &gate,
+                        &wks,
+                        &settings,
+                        &ba,
+                        &repo_mgr,
+                        args.repo.clone(),
+                        args.repo_context.clone(),
+                    )
+                    .await
+                    .wrap_err("build failed")?;
+                }
+                Ok(())
+            } else {
+                // Traditional component (package.kdl) or path that needs gate resolution
+                let component =
+                    open_component_local(component, &gate).wrap_err("cannot open component")?;
+                run_build(
+                    &component,
+                    &gate,
+                    &wks,
+                    &settings,
+                    &build_args,
+                    &repo_mgr,
+                    args.repo.clone(),
+                    args.repo_context.clone(),
+                )
+                .await
+                .wrap_err("build failed")
+            }
         }
     }
 }

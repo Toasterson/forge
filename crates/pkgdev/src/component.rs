@@ -45,10 +45,16 @@ pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(
             }
         }
     } else {
-        // No gate provided: treat the current working directory as the gate root
-        // If we're already inside a components/ subtree, don't prefix again.
+        // No gate provided: first prefer the direct path from cwd if it looks like a component
+        // (has package.kdl) or a Cargo project (has Cargo.toml). Otherwise, fall back to
+        // treating cwd as a gate root (<cwd>/components/<component>).
         let cwd = std::env::current_dir().into_diagnostic()?;
-        if first_segment_is_components(component_path) || cwd_is_inside_components()? {
+        let direct = cwd.join(component_path);
+        let direct_has_component =
+            direct.join("package.kdl").exists() || direct.join("Cargo.toml").exists();
+        if direct_has_component {
+            direct
+        } else if first_segment_is_components(component_path) || cwd_is_inside_components()? {
             cwd.join(component_path)
         } else {
             cwd.join("components").join(component_path)
@@ -63,12 +69,29 @@ pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(
             component_path.display()
         ))?;
 
-    Ok(Component::open_local(full_component_path.as_path())
-        .into_diagnostic()
-        .wrap_err_with(|| {
-            format!(
-                "failed to open component at '{}': missing package.kdl or invalid component layout",
-                full_component_path.display()
-            )
-        })?)
+    // If package.kdl exists, open as a traditional component. Otherwise, try Cargo.toml.
+    let kdl_path = full_component_path.join("package.kdl");
+    if kdl_path.exists() {
+        return Ok(Component::open_local(full_component_path.as_path())
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to open component at '{}': missing package.kdl or invalid component layout",
+                    full_component_path.display()
+                )
+            })?);
+    }
+
+    let cargo_toml = full_component_path.join("Cargo.toml");
+    if cargo_toml.exists() {
+        // Build a synthetic Component from Cargo.toml
+        let derived = crate::metadata::cargo::component_from_cargo_dir(&full_component_path)
+            .wrap_err("failed to derive component from Cargo.toml")?;
+        return Ok(derived.component);
+    }
+
+    Err(miette::miette!(
+        "failed to open component at '{}': expected either package.kdl or Cargo.toml",
+        full_component_path.display()
+    ))
 }

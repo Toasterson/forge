@@ -18,7 +18,7 @@ pub enum BuildSteps {
     Build,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Clone)]
 pub struct BuildArgs {
     #[arg(long = "step", short)]
     pub stop_on_step: Option<BuildSteps>,

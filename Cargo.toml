@@ -20,6 +20,10 @@ uuid.workspace = true
 members = ["crates/*"]
 resolver = "2"
 
+[workspace.metadata.forge]
+fmri = "developer/packaging/forge"
+classification = "org.opensolaris.category.2008:Development/System"
+
 [workspace.dependencies]
 thiserror = "1.0.50"
 miette = "5.10.0"

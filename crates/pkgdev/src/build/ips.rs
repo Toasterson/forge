@@ -1,3 +1,4 @@
+#[cfg(not(feature = "libips"))]
 use crate::sources::derive_source_name;
 use component::{Component, SourceNode, TransformNode};
 #[cfg(not(feature = "libips"))]
@@ -15,6 +16,33 @@ use std::path::PathBuf;
 #[cfg(not(feature = "libips"))]
 use std::process::{Command, Stdio};
 use workspace::Workspace;
+
+fn metadata_fmri(pkg: &Component) -> Option<String> {
+    if let Some(meta) = &pkg.recipe.metadata {
+        for item in &meta.0 {
+            if item.name == "fmri" && !item.value.is_empty() {
+                return Some(item.value.clone());
+            }
+        }
+    }
+    None
+}
+
+fn prefixed_name(pkg: &Component, original: String) -> String {
+    if let Some(prefix) = metadata_fmri(pkg) {
+        let prefix = prefix.trim_end_matches('/');
+        // If the prefix already contains the original as the last segment, return the prefix itself
+        if prefix.ends_with(&format!("/{}", original)) || original == prefix {
+            prefix.to_string()
+        } else if original.starts_with(&format!("{}/", prefix)) {
+            original
+        } else {
+            format!("{}/{}", prefix, original)
+        }
+    } else {
+        original
+    }
+}
 
 #[cfg(not(feature = "libips"))]
 const DEFAULT_IPS_TEMPLATE: &str = r#"
@@ -202,7 +230,7 @@ pub fn generate_manifest_files(
     let manifest_path = wks.get_or_create_manifest_dir()?;
 
     let manifests = if pkg.recipe.package_sections.is_empty() {
-        let name = pkg.get_name();
+        let name = prefixed_name(pkg, pkg.get_name());
         let vars = StringInterpolationVars {
             name: &name,
             version: &pkg.recipe.version.clone().unwrap_or(String::from("0.5.11")), //TODO take this default version from the gate
@@ -241,7 +269,7 @@ pub fn generate_manifest_files(
         let drop_dir_line = "\n<transform dir path=.* -> drop>";
         manifest.push_str(drop_dir_line);
 
-        let manifest_collection = ManifestCollection::new(&pkg.get_name());
+        let manifest_collection = ManifestCollection::new(&name);
 
         let base_path = manifest_path.join(&manifest_collection.get_base_manifest_name());
         write_all(&base_path, &manifest)
@@ -251,7 +279,8 @@ pub fn generate_manifest_files(
     } else {
         let mut manifests = vec![];
         for p in pkg.recipe.package_sections.iter() {
-            let name = p.clone().name.unwrap_or(pkg.get_name());
+            let base = p.clone().name.unwrap_or(pkg.get_name());
+            let name = prefixed_name(pkg, base);
             let vars = StringInterpolationVars {
                 name: &name,
                 version: &pkg.recipe.version.clone().unwrap_or(String::from("0.5.11")), //TODO take this default version from the gate
@@ -426,6 +455,9 @@ pub fn generate_manifest_files(
     let branch_version = gate.clone().unwrap_or_default().branch;
 
     let build_for_name = |pkg_name: String| -> Result<ManifestCollection> {
+        // Prefer fmri from metadata, falling back to provided name
+        let pkg_name = prefixed_name(pkg, pkg_name);
+
         // Compose FMRI components
         let version = pkg
             .recipe
@@ -459,17 +491,39 @@ pub fn generate_manifest_files(
             .project_url
             .clone()
             .ok_or_else(|| miette::miette!("no project_url specified"))?;
-        let source_url = get_source_url(&pkg.recipe.sources[0].sources[0]).to_string();
-        let license_file_name = pkg
-            .recipe
-            .license_file
-            .clone()
-            .ok_or_else(|| miette::miette!("no license_file specified"))?;
-        let license_name = pkg
-            .recipe
-            .license
-            .clone()
-            .ok_or_else(|| miette::miette!("no license specified"))?;
+        // Derive a source_url; fall back to project_url if no sources are present
+        let source_url = if let Some(sec) = pkg.recipe.sources.get(0) {
+            if let Some(src) = sec.sources.get(0) {
+                get_source_url(src).to_string()
+            } else {
+                project_url.clone()
+            }
+        } else {
+            project_url.clone()
+        };
+        // Determine license file: prefer recipe.license_file else common filenames in component dir; if not found, skip
+        let license_file_name: Option<String> = if let Some(f) = pkg.recipe.license_file.clone() {
+            Some(f)
+        } else {
+            let base = pkg.get_path();
+            let candidates = [
+                "LICENSE",
+                "LICENSE.md",
+                "COPYING",
+                "COPYRIGHT",
+                "LICENCE",
+                "LICENCE.md",
+            ];
+            candidates
+                .iter()
+                .map(|c| base.join(c))
+                .find(|p| p.exists())
+                .and_then(|p| p.file_name().map(|s| s.to_string_lossy().to_string()))
+        };
+        let license_name: Option<String> = pkg.recipe.license.clone();
+        if license_file_name.is_none() || license_name.is_none() {
+            tracing::warn!(target: "pkgdev::ips", "No license file/name found for {}; proceeding without license action", pkg.get_name());
+        }
 
         // Build typed manifest via libips using plausible builder methods
         let mut builder = libips::api::ManifestBuilder::new();
@@ -481,7 +535,11 @@ pub fn generate_manifest_files(
         );
         builder.add_set("info.upstream-url", &project_url);
         builder.add_set("info.source-url", &source_url);
-        builder.add_license(&license_file_name, &license_name);
+        if let (Some(ref lf), Some(ref ln)) = (license_file_name.as_ref(), license_name.as_ref()) {
+            builder.add_license(lf.as_str(), ln.as_str());
+        } else {
+            tracing::warn!(target: "pkgdev::ips", "Skipping license action for {} (missing file and/or name)", pkg.get_name());
+        }
         let manifest = builder.build();
 
         Ok(ManifestCollection::new_with_manifest(&pkg_name, manifest))
@@ -834,16 +892,12 @@ pub fn publish(
 #[cfg(feature = "libips")]
 pub fn publish(
     wks: &Workspace,
-    pkg: &Component,
+    _pkg: &Component,
     publisher: &str,
     manifests: &[ManifestCollection],
     repo_base: &std::path::Path,
 ) -> Result<()> {
-    use std::path::Path;
     let proto_dir = wks.get_or_create_prototype_dir()?;
-    let build_dir = wks.get_or_create_build_dir()?;
-    let unpack_name = derive_source_name(pkg.recipe.name.clone());
-    let unpack_path = build_dir.join(&unpack_name);
     // Open or create repository
     let repo = if repo_base.join("pkg5.repository").exists() {
         libips::api::Repository::open(repo_base)
@@ -862,18 +916,11 @@ pub fn publish(
             .begin()
             .into_diagnostic()
             .wrap_err("failed to begin IPS txn")?;
+        // Only include the staged prototype directory as payload to ensure we publish
+        // just what was staged during the build, not the entire source tree.
         txn.add_payload_dir(&proto_dir)
             .into_diagnostic()
             .wrap_err("failed to add prototype dir to txn")?;
-        if unpack_path.exists() {
-            txn.add_payload_dir(&unpack_path)
-                .into_diagnostic()
-                .wrap_err("failed to add unpack dir to txn")?;
-        }
-        // Add the component's package directory as payload too
-        txn.add_payload_dir(Path::new(&pkg.get_path()))
-            .into_diagnostic()
-            .wrap_err("failed to add pkg dir to txn")?;
 
         // Add the typed manifest
         txn.add_manifest(
