@@ -1,49 +1,75 @@
 [package]
 name = "forged"
-version = "0.1.0"
-edition = "2021"
-publish = false
-default-run = "forged-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = []
+otel = []
+quic = ["quiche"]
 
 [dependencies]
+# Application crates may enable fancy miette per guidelines
+miette = { version = "7.6.0", features = ["fancy"] }
+thiserror = "1.0.50"
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-opentelemetry = "0.27.0"
+opentelemetry = "0.26.0"
+opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.17.0", features = ["grpc-tonic"] }
 
-loco-rs = { version = "0.12.0", features = ["all_storage", "storage_aws_s3", "storage_azure", "storage_gcp"]}
-migration = { path = "migration" }
-object_store = "0.11.1"
+# Async runtime
+tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "signal", "time"] }
 
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tokio = { version = "1.33.0", default-features = false }
-async-trait = "0.1.74"
-tracing = "0.1.40"
-chrono = "0.4.41"
-validator = { version = "0.18.1" }
-sea-orm = { version = "1.0.0", features = [
-  "sqlx-sqlite",
-  "sqlx-postgres",
-  "runtime-tokio-rustls",
-  "macros",
-] }
+# Storage
+mongodb = { version = "3.3.0" }
 
-axum = "0.7.5"
-include_dir = "0.7"
-uuid = { version = "1.6.0", features = ["v4"] }
-tracing-subscriber = { version = "0.3.17", features = ["env-filter", "json"] }
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = "3.8.1"
+base64 = "0.22"
 
-[[bin]]
-name = "forged-cli"
-path = "src/bin/main.rs"
-required-features = []
+# Auth
+jsonwebtoken = "9.3"
 
-[[bin]]
-name = "tool"
-path = "src/bin/tool.rs"
-required-features = []
+# Config / CLI
+config = "0.14"
+clap = { version = "4.5", features = ["derive"] }
 
-[dev-dependencies]
-serial_test = "3.1.1"
-rstest = "0.23.0"
-loco-rs = { version = "0.12.0", features = ["testing"] }
-insta = { version = "1.34.0", features = ["redactions", "yaml", "filters"] }
+# Misc
+semver = "1.0"
+kdl = "4.6"
+
+# gRPC
+tonic = { version = "0.11", features = ["transport"] }
+prost = "0.12"
+tonic-health = "0.11"
+
+# IDs
+uuid = { version = "1.8", features = ["v4", "serde"] }
+
+# QUIC (optional stub)
+quiche = { version = "0.21", optional = true }
+
+# Utilities
+anyhow = "1.0"
+rand = "0.8"
+
+# Crypto
+age = { version = "0.11", features = ["ssh"] }
+rage = "0.11"
+ssh-key = { version = "0.6", features = ["ed25519", "rand_core"] }
+
+# Email
+lettre = { version = "0.11", default-features = false, features = ["builder", "serde", "tokio1", "smtp-transport", "hostname", "rustls-tls", "tokio1-rustls-tls"] }
+
+# Base gate model
+gate = { workspace = true }
+component = { workspace = true }
+
+[build-dependencies]
+tonic-build = "0.11"

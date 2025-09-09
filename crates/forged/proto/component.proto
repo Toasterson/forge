@@ -1,0 +1,35 @@
+syntax = "proto3";
+package forged.api.v1;
+
+// Component API definitions
+
+message ComponentId { string id = 1; }
+
+message StoredFile { string name = 1; string rel_path = 2; }
+
+message ComponentFiles {
+  repeated StoredFile patches = 1;
+  repeated StoredFile licenses = 2;
+  repeated StoredFile scripts = 3;
+}
+
+message Component {
+  string id = 1;
+  string name = 2;
+  ComponentFiles files = 3;
+}
+
+message GetComponentRequest { string id = 1; }
+message GetComponentResponse { Component component = 1; }
+
+message CreateComponentRequest { Component component = 1; }
+message CreateComponentResponse { Component component = 1; }
+
+message ListComponentsRequest { uint32 page_size = 1; string page_token = 2; }
+message ListComponentsResponse { repeated Component components = 1; string next_page_token = 2; }
+
+service ComponentService {
+  rpc GetComponent(GetComponentRequest) returns (GetComponentResponse);
+  rpc CreateComponent(CreateComponentRequest) returns (CreateComponentResponse);
+  rpc ListComponents(ListComponentsRequest) returns (ListComponentsResponse);
+}
