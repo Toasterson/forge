@@ -5,7 +5,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use base64::Engine;
 use lettre::AsyncTransport;
 use lettre::{message::Mailbox, AsyncSmtpTransport, Message, Tokio1Executor};
-use mongodb::bson::doc;
+// SurrealDB storage
+use crate::storage::surreal as sdb;
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
 use tracing::{info, warn};
@@ -15,42 +16,96 @@ use age::{Decryptor, Encryptor};
 use std::io::{BufReader, Cursor, Read, Write};
 use std::str::FromStr;
 
-#[derive(Debug, Default, Clone)]
-pub struct GateServiceImpl;
+#[derive(Debug, Clone)]
+pub struct GateServiceImpl {
+    state: Arc<State>,
+}
 
-#[derive(Debug, Default, Clone)]
-pub struct ComponentServiceImpl;
+impl Default for GateServiceImpl {
+    fn default() -> Self {
+        Self {
+            state: Arc::new(State::default()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ComponentServiceImpl {
+    state: Arc<State>,
+}
+
+impl Default for ComponentServiceImpl {
+    fn default() -> Self {
+        Self {
+            state: Arc::new(State::default()),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct AuthServiceImpl {
     state: Arc<State>,
 }
 
-impl AuthServiceImpl {
-    pub fn with_mongo_pending(client: mongodb::Client, db_name: &str) -> Self {
-        let coll = client
-            .database(db_name)
-            .collection::<PendingRegistration>("pending_registrations");
-        let mut state = State::default();
-        state.mongo_coll = Some(coll);
-        Self {
-            state: Arc::new(state),
-        }
-    }
+#[derive(Clone)]
+pub struct SharedState(Arc<State>);
 
-    pub fn with_mongo_pending_and_keys(
-        client: mongodb::Client,
-        db_name: &str,
+impl SharedState {
+    pub fn new(
+        db: sdb::Db,
         private_ssh: String,
         public_ssh: String,
+        mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
+        mail_from: Option<String>,
     ) -> Self {
-        let coll = client
-            .database(db_name)
-            .collection::<PendingRegistration>("pending_registrations");
         let mut state = State::default();
-        state.mongo_coll = Some(coll);
+        state.surreal = Some(db);
         state.server_private_ssh = private_ssh;
         state.server_public_ssh = public_ssh;
+        state.mailer = mailer;
+        state.mail_from = mail_from;
+        SharedState(Arc::new(state))
+    }
+}
+
+impl GateServiceImpl {
+    pub fn from_shared(shared: SharedState) -> Self {
+        Self {
+            state: shared.0.clone(),
+        }
+    }
+}
+
+impl ComponentServiceImpl {
+    pub fn from_shared(shared: SharedState) -> Self {
+        Self {
+            state: shared.0.clone(),
+        }
+    }
+}
+
+impl AuthServiceImpl {
+    pub fn from_shared(shared: SharedState) -> Self {
+        Self {
+            state: shared.0.clone(),
+        }
+    }
+}
+
+impl AuthServiceImpl {
+    pub fn with_surreal_keys_and_mailer(
+        db: sdb::Db,
+        private_ssh: String,
+        public_ssh: String,
+        mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
+        mail_from: Option<String>,
+    ) -> Self {
+        let mut state = State::default();
+        state.surreal = Some(db);
+        state.server_private_ssh = private_ssh;
+        state.server_public_ssh = public_ssh;
+        state.mailer = mailer;
+        state.mail_from = mail_from;
         Self {
             state: Arc::new(state),
         }
@@ -60,28 +115,6 @@ impl AuthServiceImpl {
         let mut state = State::default();
         state.server_private_ssh = private_ssh;
         state.server_public_ssh = public_ssh;
-        Self {
-            state: Arc::new(state),
-        }
-    }
-
-    pub fn with_mongo_pending_keys_and_mailer(
-        client: mongodb::Client,
-        db_name: &str,
-        private_ssh: String,
-        public_ssh: String,
-        mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
-        mail_from: Option<String>,
-    ) -> Self {
-        let coll = client
-            .database(db_name)
-            .collection::<PendingRegistration>("pending_registrations");
-        let mut state = State::default();
-        state.mongo_coll = Some(coll);
-        state.server_private_ssh = private_ssh;
-        state.server_public_ssh = public_ssh;
-        state.mailer = mailer;
-        state.mail_from = mail_from;
         Self {
             state: Arc::new(state),
         }
@@ -115,7 +148,7 @@ impl Default for AuthServiceImpl {
 #[derive(Debug)]
 struct State {
     pending: Mutex<HashMap<String, PendingRegistration>>, // key: actor_key(actor_id, kind)
-    mongo_coll: Option<mongodb::Collection<PendingRegistration>>, // present in Mongo mode
+    surreal: Option<sdb::Db>,                             // present when using SurrealDB backend
     server_private_ssh: String,
     server_public_ssh: String,
     mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
@@ -136,7 +169,7 @@ impl Default for State {
         let public_key_ssh = public.to_openssh().expect("encode openssh public");
         Self {
             pending: Mutex::new(HashMap::new()),
-            mongo_coll: None,
+            surreal: None,
             server_private_ssh: private_key_ssh,
             server_public_ssh: public_key_ssh,
             mailer: None,
@@ -348,23 +381,28 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
             }
         }
 
-        // Store pending (Mongo if configured, otherwise in-memory)
+        // Store pending (Surreal if configured, otherwise in-memory)
         let k = actor_key(&actor_id, actor_kind);
-        let pending = PendingRegistration {
-            id: k.clone(),
-            actor_id: actor_id.clone(),
-            actor_kind,
-            public_key: public_key.clone(),
-            expires_at,
-            envelope: envelope_bytes.clone(),
-        };
-        if let Some(coll) = &self.state.mongo_coll {
-            let filter = doc! {"_id": &k};
-            coll.replace_one(filter, &pending)
-                .upsert(true)
+        if let Some(db) = &self.state.surreal {
+            let rec = sdb::PendingRegistrationRec {
+                id: k.clone(),
+                actor_id: actor_id.clone(),
+                actor_kind: actor_kind as i32,
+                expires_at,
+                envelope: envelope_bytes.clone(),
+            };
+            sdb::upsert_pending_registration(db, &rec)
                 .await
-                .map_err(|_| Status::internal("mongo upsert pending"))?;
+                .map_err(|_| Status::internal("pending upsert failed"))?;
         } else {
+            let pending = PendingRegistration {
+                id: k.clone(),
+                actor_id: actor_id.clone(),
+                actor_kind,
+                public_key: public_key.clone(),
+                expires_at,
+                envelope: envelope_bytes.clone(),
+            };
             let mut guard = self
                 .state
                 .pending
@@ -442,16 +480,14 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
         };
         let k = actor_key(&req.actor_id, actor_kind);
         let now = now_sec();
-        if let Some(coll) = &self.state.mongo_coll {
-            // Mongo-backed pending
-            let filter = doc! {"actor_id": &req.actor_id, "actor_kind": actor_kind as i32};
-            let p = coll
-                .find_one(filter.clone())
+        if let Some(db) = &self.state.surreal {
+            // Surreal-backed pending
+            let p = sdb::get_pending_registration(db, &k)
                 .await
-                .map_err(|_| Status::internal("mongo find pending"))?
+                .map_err(|_| Status::internal("surreal get pending"))?
                 .ok_or_else(|| Status::failed_precondition("no pending registration for actor"))?;
             if p.expires_at <= now {
-                let _ = coll.delete_one(filter).await; // best-effort cleanup
+                let _ = sdb::delete_pending_registration(db, &k).await;
                 return Err(Status::failed_precondition("pending registration expired"));
             }
             if p.envelope != req.confirmation_envelope {
@@ -465,7 +501,7 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
                 return Err(Status::invalid_argument("envelope actor_id mismatch"));
             }
             if env.meta.expires_at <= now {
-                let _ = coll.delete_one(filter).await; // expire
+                let _ = sdb::delete_pending_registration(db, &k).await;
                 return Err(Status::failed_precondition("envelope expired"));
             }
             // Decrypt inner payload using server SSH private key via age
@@ -486,7 +522,7 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
             reader
                 .read_to_end(&mut plaintext)
                 .map_err(|_| Status::internal("decrypt read"))?;
-            let _ = coll.delete_one(filter).await; // remove pending after success
+            let _ = sdb::delete_pending_registration(db, &k).await; // remove pending after success
         } else {
             // In-memory pending
             let mut pending_guard = self

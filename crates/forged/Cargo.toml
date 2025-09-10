@@ -25,7 +25,7 @@ opentelemetry-otlp = { version = "0.17.0", features = ["grpc-tonic"] }
 tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "signal", "time"] }
 
 # Storage
-mongodb = { version = "3.3.0" }
+surrealdb = { version = "1.5.4", features = ["kv-rocksdb", "protocol-ws"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

@@ -6,9 +6,19 @@ pub struct ServerConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MongoConfig {
-    pub uri: Option<String>,
-    pub db: Option<String>,
+pub struct SurrealConfig {
+    /// Mode: "clustered" (remote) or "embedded" (rocksdb)
+    pub mode: Option<String>,
+    /// Remote endpoint, e.g. ws://127.0.0.1:8000
+    pub endpoint: Option<String>,
+    /// Credentials for remote mode
+    pub username: Option<String>,
+    pub password: Option<String>,
+    /// Namespace and database
+    pub namespace: Option<String>,
+    pub database: Option<String>,
+    /// Filesystem path for embedded RocksDB, e.g. ./data/surreal
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -24,7 +34,7 @@ pub struct SmtpConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Settings {
     pub server: ServerConfig,
-    pub mongodb: MongoConfig,
+    pub surreal: SurrealConfig,
     pub smtp: Option<SmtpConfig>,
 }
 

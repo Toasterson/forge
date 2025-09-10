@@ -2,12 +2,11 @@ use crate::api::forged::api::v1::{
     auth_service_server::AuthServiceServer, component_service_server::ComponentServiceServer,
     gate_service_server::GateServiceServer,
 };
-use crate::services::{AuthServiceImpl, ComponentServiceImpl, GateServiceImpl};
+use crate::services::{AuthServiceImpl, ComponentServiceImpl, GateServiceImpl, SharedState};
 use crate::settings::Settings;
-use crate::storage::json::JsonStore;
+use crate::storage::surreal as sdb;
 use lettre::{transport::smtp::authentication::Credentials, AsyncSmtpTransport, Tokio1Executor};
 use miette::{Context, IntoDiagnostic};
-use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -53,38 +52,26 @@ fn generate_server_settings() -> miette::Result<ServerSettings> {
     })
 }
 
-async fn load_or_init_server_settings_mongo(
-    client: &mongodb::Client,
-    db_name: &str,
-) -> miette::Result<ServerSettings> {
-    let coll = client
-        .database(db_name)
-        .collection::<ServerSettings>("settings");
-    if let Some(found) = coll
-        .find_one(doc! {"_id": "server_keys"})
-        .await
-        .into_diagnostic()
-        .wrap_err("mongo find settings")?
-    {
-        return Ok(found);
+async fn load_or_init_server_settings_surreal(db: &sdb::Db) -> miette::Result<ServerSettings> {
+    if let Some(found) = sdb::get_server_settings(db).await? {
+        return Ok(ServerSettings {
+            id: Some("server_keys".into()),
+            private_key_ssh: found.private_key_ssh,
+            public_key_ssh: found.public_key_ssh,
+            created_at: found.created_at,
+        });
     }
     let settings = generate_server_settings()?;
-    let filter = doc! {"_id": "server_keys"};
-    coll.replace_one(filter, &settings)
-        .upsert(true)
-        .await
-        .into_diagnostic()
-        .wrap_err("mongo upsert settings")?;
-    Ok(settings)
-}
-
-fn load_or_init_server_settings_file() -> miette::Result<ServerSettings> {
-    let store = JsonStore::new(".")?;
-    if let Some(s) = store.get::<ServerSettings>("server_keys")? {
-        return Ok(s);
-    }
-    let settings = generate_server_settings()?;
-    store.put("server_keys", &settings)?;
+    // Store into Surreal
+    sdb::put_server_settings(
+        db,
+        &sdb::ServerSettingsRec {
+            private_key_ssh: settings.private_key_ssh.clone(),
+            public_key_ssh: settings.public_key_ssh.clone(),
+            created_at: settings.created_at,
+        },
+    )
+    .await?;
     Ok(settings)
 }
 
@@ -132,47 +119,29 @@ pub async fn start_grpc_server(addr: SocketAddr) -> miette::Result<()> {
         (None, None)
     };
 
-    // Select backend and load/generate server SSH keys
-    let mongo_uri = settings
-        .mongodb
-        .uri
-        .clone()
-        .or_else(|| std::env::var("FORGED_MONGO_URI").ok());
-    let db_name = settings
-        .mongodb
-        .db
-        .clone()
-        .or_else(|| std::env::var("FORGED_MONGO_DB").ok())
-        .unwrap_or_else(|| "forged".to_string());
+    // Connect to SurrealDB (embedded or clustered) and load/generate server SSH keys
+    let surreal_cfg = &settings.surreal;
+    let db = sdb::connect_from_config(surreal_cfg)
+        .await
+        .wrap_err("connect surrealdb")?;
+    let keys = load_or_init_server_settings_surreal(&db).await?;
 
-    let auth_impl = if let Some(uri) = mongo_uri {
-        info!("using MongoDB for pending registrations and settings");
-        let client = crate::storage::connect(&uri)
-            .await
-            .wrap_err("connect mongodb")?;
-        let keys = load_or_init_server_settings_mongo(&client, &db_name).await?;
-        AuthServiceImpl::with_mongo_pending_keys_and_mailer(
-            client,
-            &db_name,
-            keys.private_key_ssh,
-            keys.public_key_ssh,
-            mailer_opt,
-            mail_from_opt,
-        )
-    } else {
-        let keys = load_or_init_server_settings_file()?;
-        AuthServiceImpl::with_keys_and_mailer(
-            keys.private_key_ssh,
-            keys.public_key_ssh,
-            mailer_opt,
-            mail_from_opt,
-        )
-    };
+    let shared = SharedState::new(
+        db,
+        keys.private_key_ssh,
+        keys.public_key_ssh,
+        mailer_opt,
+        mail_from_opt,
+    );
+
+    let gate_impl = GateServiceImpl::from_shared(shared.clone());
+    let component_impl = ComponentServiceImpl::from_shared(shared.clone());
+    let auth_impl = AuthServiceImpl::from_shared(shared);
 
     Server::builder()
         .add_service(health_service)
-        .add_service(GateServiceServer::new(GateServiceImpl::default()))
-        .add_service(ComponentServiceServer::new(ComponentServiceImpl::default()))
+        .add_service(GateServiceServer::new(gate_impl))
+        .add_service(ComponentServiceServer::new(component_impl))
         .add_service(AuthServiceServer::new(auth_impl))
         .serve_with_shutdown(addr, shutdown_signal())
         .await
