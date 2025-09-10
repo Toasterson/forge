@@ -1,16 +1,12 @@
 fn main() {
-    let src = "spec/forged.spec.json";
-    println!("cargo:rerun-if-changed={}", src);
-    let file = std::fs::File::open(src).unwrap();
-    let spec = serde_json::from_reader(file).unwrap();
-    let mut generator = progenitor::Generator::default();
+    // Re-run if the proto file changes
+    println!("cargo:rerun-if-changed=../forged/proto/auth.proto");
 
-    let tokens = generator.generate_tokens(&spec).unwrap();
-    let ast = syn::parse2(tokens).unwrap();
-    let content = prettyplease::unparse(&ast);
-
-    let mut out_file = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).to_path_buf();
-    out_file.push("forge.codegen.rs");
-
-    std::fs::write(out_file, content).unwrap();
+    // Compile the protobuf definitions for the client
+    tonic_build::configure()
+        .build_server(false)
+        .build_client(true)
+        .out_dir(std::env::var("OUT_DIR").unwrap())
+        .compile(&["../forged/proto/auth.proto"], &["../forged/proto"]) // input, include path
+        .expect("failed to compile protos for pkgdev client");
 }

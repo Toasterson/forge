@@ -7,10 +7,8 @@ repository.workspace = true
 description = "Package development utility to interact and use package kdl metadata"
 
 [build-dependencies]
-prettyplease = "0.2.22"
-progenitor = { git = "https://github.com/oxidecomputer/progenitor" }
-serde_json.workspace = true
-syn = "2.0.77"
+# Generate gRPC client from proto
+tonic-build = "0.11"
 
 [dependencies]
 component.workspace = true
@@ -29,7 +27,6 @@ repology.workspace = true
 semver = { version = "1.0.22", features = ["serde"] }
 gate.workspace = true
 directories = "5.0.1"
-forge.workspace = true
 tokio.workspace = true
 #octocrab = { version = "0.41.2" ,default-features = false, features = ["opentls", "follow-redirect", "retry", "timeout", "tracing", "default-client" ] }
 secrecy = { version = "0.10.3", features = ["serde"] }
@@ -45,6 +42,9 @@ libips = { git = "https://github.com/OpenFlowLabs/ips.git", optional = true }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 cargo_metadata = "0.22"
+# gRPC client
+tonic = { version = "0.11", features = ["transport"] }
+prost = "0.12"
 
 [features]
 default = ["libips"]

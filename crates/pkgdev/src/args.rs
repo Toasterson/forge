@@ -16,6 +16,11 @@ use miette::{Context, IntoDiagnostic};
 use repology::MetadataBuilder;
 use strum::Display;
 
+use crate::auth::{
+    self, default_auth_state_path, server_url_from_host, ActorKind, AuthClient, AuthState,
+    LoginEntry,
+};
+
 #[derive(Debug, Parser)]
 pub struct Args {
     #[arg(long, global = true)]
@@ -85,11 +90,11 @@ pub enum Commands {
         #[clap(subcommand)]
         args: EditArgs,
     },
-    // #[clap(name = "forge")]
-    // Forge {
-    //     #[clap(subcommand)]
-    //     args: ForgeArgs,
-    // },
+    #[clap(name = "auth")]
+    Auth {
+        #[clap(subcommand)]
+        cmd: AuthCmd,
+    },
     #[clap(name = "build")]
     Build {
         /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
@@ -108,6 +113,54 @@ pub struct ComponentArgs {
     /// If omitted, current directory is used. Absolute paths are accepted.
     #[clap(short, long, default_value = ".")]
     pub component: PathBuf,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AuthCmd {
+    /// Register a new actor with their SSH public key on a forge
+    Register {
+        /// Forge hostname (or hostname:port) to talk to (gRPC)
+        #[arg(long)]
+        host: String,
+        /// Actor identifier (e.g., email for users)
+        #[arg(long)]
+        actor_id: String,
+        /// Actor kind
+        #[arg(long, value_enum, default_value_t = ActorKind::User)]
+        kind: ActorKind,
+        /// Path to the SSH public key file (OpenSSH format)
+        #[arg(long)]
+        public_key: PathBuf,
+        /// Optional algorithm hint (ed25519, rsa-ssh, ecdsa-p256, ...)
+        #[arg(long)]
+        algorithm: Option<String>,
+    },
+    /// Confirm a pending registration with an envelope file
+    Confirm {
+        #[arg(long)]
+        host: String,
+        #[arg(long)]
+        actor_id: String,
+        #[arg(long, value_enum, default_value_t = ActorKind::User)]
+        kind: ActorKind,
+        /// Path to the envelope JSON you received via email
+        #[arg(long)]
+        envelope: PathBuf,
+    },
+    /// Mark yourself as logged in for a given forge/actor locally
+    Login {
+        #[arg(long)]
+        host: String,
+        #[arg(long)]
+        actor_id: String,
+        #[arg(long, value_enum, default_value_t = ActorKind::User)]
+        kind: ActorKind,
+    },
+    /// List current logins. If --host is provided, only show that forge.
+    List {
+        #[arg(long)]
+        host: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -163,6 +216,99 @@ pub async fn run(args: Args) -> miette::Result<()> {
     }
 
     match args.command {
+        Commands::Auth { cmd } => match cmd {
+            AuthCmd::Register {
+                host,
+                actor_id,
+                kind,
+                public_key,
+                algorithm,
+            } => {
+                let url = server_url_from_host(&host);
+                let client = AuthClient::connect(url)
+                    .await
+                    .wrap_err("failed to connect to forge host")?;
+                client
+                    .register_actor(actor_id, kind, &public_key, algorithm)
+                    .await
+                    .wrap_err("registration RPC failed")?;
+                println!("registration submitted on {}", host);
+                Ok(())
+            }
+            AuthCmd::Confirm {
+                host,
+                actor_id,
+                kind,
+                envelope,
+            } => {
+                let url = server_url_from_host(&host);
+                let client = AuthClient::connect(url)
+                    .await
+                    .wrap_err("failed to connect to forge host")?;
+                client
+                    .confirm_registration(actor_id, kind, &envelope)
+                    .await
+                    .wrap_err("confirmation RPC failed")?;
+                println!("registration confirmation sent on {}", host);
+                Ok(())
+            }
+            AuthCmd::Login {
+                host,
+                actor_id,
+                kind,
+            } => {
+                let path = default_auth_state_path();
+                let mut state = AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
+                    format!("failed to load auth state from {}", path.display())
+                })?;
+                state.add_login(
+                    &host,
+                    LoginEntry {
+                        actor_id: actor_id.clone(),
+                        kind,
+                    },
+                );
+                state
+                    .save(&path)
+                    .into_diagnostic()
+                    .wrap_err_with(|| format!("failed to save auth state to {}", path.display()))?;
+                println!(
+                    "logged in as '{}' ({:?}) on host '{}'",
+                    actor_id, kind, host
+                );
+                Ok(())
+            }
+            AuthCmd::List { host } => {
+                let path = default_auth_state_path();
+                let state = AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
+                    format!("failed to load auth state from {}", path.display())
+                })?;
+                match host {
+                    Some(h) => {
+                        let entries = state.list_for(&h);
+                        if entries.is_empty() {
+                            println!("no logins for host {}", h);
+                        } else {
+                            for e in entries {
+                                println!("{}\t{:?}", e.actor_id, e.kind);
+                            }
+                        }
+                    }
+                    None => {
+                        if state.logins.is_empty() {
+                            println!("no logins recorded");
+                        }
+                        for (h, set) in state.logins.iter() {
+                            println!("{}:", h);
+                            for k in set.iter() {
+                                println!("  {}\t{:?}", k.actor_id, k.kind);
+                            }
+                        }
+                    }
+                }
+                Ok(())
+            }
+        },
         Commands::Repo { cmd } => {
             let mut mgr = RepoManager::load()
                 .into_diagnostic()
