@@ -53,6 +53,7 @@ pub type Result<T, E = AuthClientError> = miette::Result<T, E>;
 
 #[derive(Clone)]
 pub struct AuthClient {
+    #[allow(dead_code)]
     server: String,
     channel: Channel,
 }
@@ -124,12 +125,10 @@ impl AuthClient {
         &self,
         actor_id: String,
         kind: ActorKind,
-        envelope_path: &Path,
+        envelope: &str,
     ) -> Result<()> {
-        let envelope_bytes = fs::read(envelope_path).await.map_err(|e| {
-            info!(path=%envelope_path.display(), error=?e, "failed to read envelope");
-            e
-        })?;
+        // The envelope is provided directly (Base64-URL or raw JSON). Send as-is.
+        let envelope_bytes = envelope.as_bytes().to_vec();
         let req = api::RegistrationConfirmationRequest {
             actor_id,
             actor_kind: api::ActorKind::from(kind) as i32,
@@ -171,6 +170,9 @@ pub struct LoginEntry {
 pub struct AuthState {
     // hostname -> set of (actor_id, kind)
     pub logins: BTreeMap<String, BTreeSet<LoginEntryKey>>, // internal uniq key
+    /// Currently selected context (host + login) for defaulting forge commands
+    #[serde(default)]
+    pub selected: Option<SelectedContext>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
@@ -186,6 +188,13 @@ impl From<&LoginEntry> for LoginEntryKey {
             kind: e.kind,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct SelectedContext {
+    pub host: String,
+    pub actor_id: String,
+    pub kind: ActorKind,
 }
 
 impl AuthState {
@@ -223,6 +232,22 @@ impl AuthState {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    pub fn set_selected<S: Into<String>>(&mut self, host: S, actor_id: S, kind: ActorKind) {
+        self.selected = Some(SelectedContext {
+            host: host.into(),
+            actor_id: actor_id.into(),
+            kind,
+        });
+    }
+
+    pub fn clear_selected(&mut self) {
+        self.selected = None;
+    }
+
+    pub fn get_selected(&self) -> Option<&SelectedContext> {
+        self.selected.as_ref()
     }
 }
 

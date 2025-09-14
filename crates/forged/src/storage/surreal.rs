@@ -1,5 +1,5 @@
 use miette::{Context, IntoDiagnostic};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use surrealdb::engine::any::{connect, Any};
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
@@ -83,7 +83,9 @@ pub async fn put_server_settings(db: &Db, s: &ServerSettingsRec) -> miette::Resu
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct PendingRegistrationRec {
-    #[serde(rename = "id")]
+    // Surreal stores its own record Thing as `id`. We keep a local id for keying,
+    // but do not serialize it into the stored content and ignore it on load.
+    #[serde(rename = "id", skip_serializing, default, skip_deserializing)]
     pub id: String,
     pub actor_id: String,
     pub actor_kind: i32,
@@ -129,11 +131,66 @@ pub async fn delete_pending_registration(db: &Db, id: &str) -> miette::Result<()
 }
 
 // Gate and Component storage helpers
+// Internal row shape returned by Surreal when selecting from 'gates' includes an 'id' Thing.
+#[derive(Deserialize)]
+struct GateRow {
+    id: surrealdb::sql::Thing,
+    base: gate::Gate,
+    owner: crate::types::ActorRef,
+    members: Vec<crate::gate::GateMember>,
+    created_at: u64,
+    updated_at: u64,
+    metadata: Option<serde_json::Value>,
+}
+
+fn thing_to_gate_id(t: &surrealdb::sql::Thing) -> crate::types::GateId {
+    use surrealdb::sql::Id;
+    let s = match &t.id {
+        Id::String(s) => s.clone(),
+        other => other.to_string(),
+    };
+    crate::types::GateId(s)
+}
+
+fn row_to_gate_record(r: GateRow) -> crate::gate::GateRecord {
+    crate::gate::GateRecord {
+        id: thing_to_gate_id(&r.id),
+        base: r.base,
+        owner: r.owner,
+        members: r.members,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        metadata: r.metadata,
+    }
+}
 pub async fn put_gate(db: &Db, gate: &GateRecord) -> miette::Result<()> {
+    // Avoid including the `id` field in the content payload to Surreal, as we are
+    // already addressing the record by key. Including `id` causes Surreal to error
+    // with: "Found s'<id>' for the id field, but a specific record has been specified".
+    #[derive(Serialize)]
+    struct GateRecordContent<'a> {
+        pub base: &'a gate::Gate,
+        pub owner: &'a crate::types::ActorRef,
+        pub members: &'a Vec<crate::gate::GateMember>,
+        pub created_at: u64,
+        pub updated_at: u64,
+        pub metadata: &'a Option<serde_json::Value>,
+    }
+
     let key: surrealdb::sql::Thing = ("gates", gate.id.0.as_str()).into();
-    let _: Option<GateRecord> = db
+    let content = GateRecordContent {
+        base: &gate.base,
+        owner: &gate.owner,
+        members: &gate.members,
+        created_at: gate.created_at,
+        updated_at: gate.updated_at,
+        metadata: &gate.metadata,
+    };
+
+    // We don't need the typed record back; deserialize into generic JSON to avoid schema coupling.
+    let _: Option<serde_json::Value> = db
         .update(key)
-        .content(gate)
+        .content(&content)
         .await
         .into_diagnostic()
         .wrap_err("upsert gate record")?;
@@ -142,12 +199,12 @@ pub async fn put_gate(db: &Db, gate: &GateRecord) -> miette::Result<()> {
 
 pub async fn get_gate(db: &Db, id: &GateId) -> miette::Result<Option<GateRecord>> {
     let key: surrealdb::sql::Thing = ("gates", id.0.as_str()).into();
-    let res: Option<GateRecord> = db
+    let res: Option<GateRow> = db
         .select(key)
         .await
         .into_diagnostic()
         .wrap_err("get gate record")?;
-    Ok(res)
+    Ok(res.map(row_to_gate_record))
 }
 
 pub async fn delete_gate(db: &Db, id: &GateId) -> miette::Result<()> {
@@ -161,38 +218,88 @@ pub async fn delete_gate(db: &Db, id: &GateId) -> miette::Result<()> {
 }
 
 pub async fn list_gates(db: &Db) -> miette::Result<Vec<GateRecord>> {
-    let res: Vec<GateRecord> = db
+    let rows: Vec<GateRow> = db
         .select("gates")
         .await
         .into_diagnostic()
         .wrap_err("list gate records")?;
-    Ok(res)
+    Ok(rows.into_iter().map(row_to_gate_record).collect())
 }
 
 pub async fn put_component(db: &Db, rec: &ComponentRecord) -> miette::Result<()> {
+    // Avoid including the `id` field in the content payload to Surreal, as we are
+    // already addressing the record by key. Mirror gate handling to prevent Surreal
+    // from erroring on explicit id in content.
+    #[derive(Serialize)]
+    struct ComponentRecordContent<'a> {
+        pub base: &'a component::Component,
+        pub files: &'a crate::component::ComponentFiles,
+        pub created_at: u64,
+        pub updated_at: u64,
+        pub metadata: &'a Option<serde_json::Value>,
+    }
+
     let key: surrealdb::sql::Thing = ("components", rec.id.0.as_str()).into();
-    let _: Option<ComponentRecord> = db
+    let content = ComponentRecordContent {
+        base: &rec.base,
+        files: &rec.files,
+        created_at: rec.created_at,
+        updated_at: rec.updated_at,
+        metadata: &rec.metadata,
+    };
+
+    let _: Option<serde_json::Value> = db
         .update(key)
-        .content(rec)
+        .content(&content)
         .await
         .into_diagnostic()
         .wrap_err("upsert component record")?;
     Ok(())
 }
 
+#[derive(Deserialize)]
+struct ComponentRow {
+    id: surrealdb::sql::Thing,
+    base: component::Component,
+    files: crate::component::ComponentFiles,
+    created_at: u64,
+    updated_at: u64,
+    metadata: Option<serde_json::Value>,
+}
+
+fn thing_to_component_id(t: &surrealdb::sql::Thing) -> crate::types::ComponentId {
+    use surrealdb::sql::Id;
+    let s = match &t.id {
+        Id::String(s) => s.clone(),
+        other => other.to_string(),
+    };
+    crate::types::ComponentId(s)
+}
+
+fn row_to_component_record(r: ComponentRow) -> ComponentRecord {
+    ComponentRecord {
+        id: thing_to_component_id(&r.id),
+        base: r.base,
+        files: r.files,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        metadata: r.metadata,
+    }
+}
+
 pub async fn get_component(db: &Db, id: &ComponentId) -> miette::Result<Option<ComponentRecord>> {
     let key: surrealdb::sql::Thing = ("components", id.0.as_str()).into();
-    let res: Option<ComponentRecord> = db
+    let res: Option<ComponentRow> = db
         .select(key)
         .await
         .into_diagnostic()
         .wrap_err("get component record")?;
-    Ok(res)
+    Ok(res.map(row_to_component_record))
 }
 
 pub async fn delete_component(db: &Db, id: &ComponentId) -> miette::Result<()> {
     let key: surrealdb::sql::Thing = ("components", id.0.as_str()).into();
-    let _: Option<ComponentRecord> = db
+    let _: Option<serde_json::Value> = db
         .delete(key)
         .await
         .into_diagnostic()
@@ -201,10 +308,10 @@ pub async fn delete_component(db: &Db, id: &ComponentId) -> miette::Result<()> {
 }
 
 pub async fn list_components(db: &Db) -> miette::Result<Vec<ComponentRecord>> {
-    let res: Vec<ComponentRecord> = db
+    let rows: Vec<ComponentRow> = db
         .select("components")
         .await
         .into_diagnostic()
         .wrap_err("list component records")?;
-    Ok(res)
+    Ok(rows.into_iter().map(row_to_component_record).collect())
 }

@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::api::forged::api::v1 as api;
 use crate::build::{run_build, BuildArgs};
 use crate::component::open_component_local;
 use crate::create::create_component;
@@ -17,9 +18,10 @@ use repology::MetadataBuilder;
 use strum::Display;
 
 use crate::auth::{
-    self, default_auth_state_path, server_url_from_host, ActorKind, AuthClient, AuthState,
-    LoginEntry,
+    default_auth_state_path, server_url_from_host, ActorKind, AuthClient, AuthState, LoginEntry,
 };
+use crate::component_client::ComponentClient;
+use crate::gate_client::GateClient;
 
 #[derive(Debug, Parser)]
 pub struct Args {
@@ -52,6 +54,12 @@ pub enum Commands {
     Repo {
         #[clap(subcommand)]
         cmd: RepoCmd,
+    },
+    #[clap(name = "forge")]
+    /// Interact with the forge.
+    Forge {
+        #[clap(subcommand)]
+        cmd: ForgeCmd,
     },
     #[clap(name = "download")]
     Download {
@@ -116,6 +124,116 @@ pub struct ComponentArgs {
 }
 
 #[derive(Debug, Subcommand)]
+pub enum GateCmd {
+    /// Open (create or update) a gate on the forge
+    Open {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Gate identifier (stable id)
+        #[arg(long)]
+        id: String,
+        /// Human-friendly name for the gate
+        #[arg(long)]
+        name: Option<String>,
+        /// Owner actor id; if omitted, will use the selected login for this host (or first recorded login)
+        #[arg(long)]
+        owner_id: Option<String>,
+        /// Owner actor kind (defaults to User)
+        #[arg(long, value_enum)]
+        owner_kind: Option<ActorKind>,
+    },
+    /// Upload local gate metadata to the forge (upsert)
+    Upload {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Owner actor id; if omitted, will use the selected login for this host (or first recorded login)
+        #[arg(long)]
+        owner_id: Option<String>,
+        /// Owner actor kind (defaults to User)
+        #[arg(long, value_enum)]
+        owner_kind: Option<ActorKind>,
+    },
+    /// List all gates on the forge
+    List {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Do not print the header line
+        #[arg(long = "no-header")]
+        no_header: bool,
+    },
+    /// Show details for a specific gate
+    Show {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Gate identifier
+        #[arg(long)]
+        id: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ComponentCmd {
+    /// Create (upsert) a component on the forge
+    Create {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Component identifier (stable id)
+        #[arg(long)]
+        id: String,
+        /// Human-friendly name for the component
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Upload local component metadata to the forge (upsert)
+    Upload {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
+        /// If omitted, current directory is used. Absolute paths are accepted.
+        #[arg(value_name = "COMPONENT", index = 1, default_value = ".")]
+        component: PathBuf,
+    },
+    /// List components available on the forge
+    List {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Do not print the header line
+        #[arg(long = "no-header")]
+        no_header: bool,
+    },
+    /// Show details for a specific component, rendering its package.kdl summary from the forge
+    Show {
+        /// Forge hostname (or hostname:port). If omitted, uses selected context.
+        #[arg(long)]
+        host: Option<String>,
+        /// Component identifier (positional)
+        #[arg(value_name = "ID", index = 1)]
+        id: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ForgeCmd {
+    /// Manage gates on the forge server
+    Gate {
+        #[clap(subcommand)]
+        cmd: GateCmd,
+    },
+    /// Manage components on the forge server
+    Component {
+        #[clap(subcommand)]
+        cmd: ComponentCmd,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 pub enum AuthCmd {
     /// Register a new actor with their SSH public key on a forge
     Register {
@@ -135,7 +253,7 @@ pub enum AuthCmd {
         #[arg(long)]
         algorithm: Option<String>,
     },
-    /// Confirm a pending registration with an envelope file
+    /// Confirm a pending registration with the envelope content
     Confirm {
         #[arg(long)]
         host: String,
@@ -143,9 +261,15 @@ pub enum AuthCmd {
         actor_id: String,
         #[arg(long, value_enum, default_value_t = ActorKind::User)]
         kind: ActorKind,
-        /// Path to the envelope JSON you received via email
+        /// Envelope content you received via email (Base64-URL or raw JSON)
         #[arg(long)]
-        envelope: PathBuf,
+        envelope: String,
+        /// After confirming, record a local login for this host/actor
+        #[arg(long)]
+        login: bool,
+        /// Also select this login as the default context
+        #[arg(long)]
+        select: bool,
     },
     /// Mark yourself as logged in for a given forge/actor locally
     Login {
@@ -155,11 +279,26 @@ pub enum AuthCmd {
         actor_id: String,
         #[arg(long, value_enum, default_value_t = ActorKind::User)]
         kind: ActorKind,
+        /// Select this login as the default context for future commands
+        #[arg(long)]
+        select: bool,
     },
     /// List current logins. If --host is provided, only show that forge.
     List {
         #[arg(long)]
         host: Option<String>,
+    },
+    /// Select the default login context (host + actor)
+    Select {
+        /// Forge hostname (or hostname:port)
+        #[arg(long)]
+        host: String,
+        /// Actor identifier (e.g., email for users)
+        #[arg(long)]
+        actor_id: String,
+        /// Actor kind
+        #[arg(long, value_enum, default_value_t = ActorKind::User)]
+        kind: ActorKind,
     },
 }
 
@@ -240,15 +379,40 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 actor_id,
                 kind,
                 envelope,
+                login,
+                select,
             } => {
                 let url = server_url_from_host(&host);
                 let client = AuthClient::connect(url)
                     .await
                     .wrap_err("failed to connect to forge host")?;
                 client
-                    .confirm_registration(actor_id, kind, &envelope)
+                    .confirm_registration(actor_id.clone(), kind, &envelope)
                     .await
                     .wrap_err("confirmation RPC failed")?;
+                // Optionally record login and select context
+                if login || select {
+                    let path = default_auth_state_path();
+                    let mut state =
+                        AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
+                            format!("failed to load auth state from {}", path.display())
+                        })?;
+                    if login {
+                        state.add_login(
+                            &host,
+                            LoginEntry {
+                                actor_id: actor_id.clone(),
+                                kind,
+                            },
+                        );
+                    }
+                    if select {
+                        state.set_selected(host.clone(), actor_id.clone(), kind);
+                    }
+                    state.save(&path).into_diagnostic().wrap_err_with(|| {
+                        format!("failed to save auth state to {}", path.display())
+                    })?;
+                }
                 println!("registration confirmation sent on {}", host);
                 Ok(())
             }
@@ -256,6 +420,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 host,
                 actor_id,
                 kind,
+                select,
             } => {
                 let path = default_auth_state_path();
                 let mut state = AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
@@ -268,13 +433,23 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         kind,
                     },
                 );
+                if select {
+                    state.set_selected(host.clone(), actor_id.clone(), kind);
+                }
                 state
                     .save(&path)
                     .into_diagnostic()
                     .wrap_err_with(|| format!("failed to save auth state to {}", path.display()))?;
                 println!(
-                    "logged in as '{}' ({:?}) on host '{}'",
-                    actor_id, kind, host
+                    "logged in as '{}' ({:?}) on host '{}'{}",
+                    actor_id,
+                    kind,
+                    host,
+                    if select {
+                        " and selected as default"
+                    } else {
+                        ""
+                    }
                 );
                 Ok(())
             }
@@ -308,7 +483,405 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 }
                 Ok(())
             }
+            AuthCmd::Select {
+                host,
+                actor_id,
+                kind,
+            } => {
+                let path = default_auth_state_path();
+                let mut state = AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
+                    format!("failed to load auth state from {}", path.display())
+                })?;
+                // Validate the login exists for the host
+                let exists = state
+                    .list_for(&host)
+                    .into_iter()
+                    .any(|e| e.actor_id == actor_id && e.kind == kind);
+                if !exists {
+                    return Err(miette::miette!(
+                        "no such login for host '{}': {} ({:?}). Use 'pkgdev auth login --host {} --actor-id {} --kind {}' first",
+                        host,
+                        actor_id,
+                        kind,
+                        host,
+                        actor_id,
+                        match kind { ActorKind::User => "user", ActorKind::Service => "service" }
+                    ));
+                }
+                state.set_selected(host.clone(), actor_id.clone(), kind);
+                state
+                    .save(&path)
+                    .into_diagnostic()
+                    .wrap_err_with(|| format!("failed to save auth state to {}", path.display()))?;
+                println!(
+                    "selected login '{}' ({:?}) on host '{}'",
+                    actor_id, kind, host
+                );
+                Ok(())
+            }
         },
+        Commands::Forge { cmd } => {
+            match cmd {
+                ForgeCmd::Gate { cmd } => match cmd {
+                    GateCmd::Open {
+                        host,
+                        id,
+                        name,
+                        owner_id,
+                        owner_kind,
+                    } => {
+                        let host = resolve_host_or_selected(host)?;
+                        let url = server_url_from_host(&host);
+                        let client = GateClient::connect(url)
+                            .await
+                            .wrap_err("failed to connect to forge host")?;
+                        let (oid, okind) = resolve_owner(&host, owner_id, owner_kind)?;
+                        let gate = api::Gate {
+                            id,
+                            name: name.unwrap_or_default(),
+                            owner: Some(api::ActorRef {
+                                id: oid,
+                                kind: actor_kind_str(okind),
+                            }),
+                            members: vec![],
+                        };
+                        let created = client
+                            .create_gate(gate)
+                            .await
+                            .wrap_err("create gate RPC failed")?;
+                        println!("gate '{}' created on {}", created.id, host);
+                        Ok(())
+                    }
+                    GateCmd::Upload {
+                        host,
+                        owner_id,
+                        owner_kind,
+                    } => {
+                        let Some(g) = &gate else {
+                            return Err(miette::miette!("--gate must be provided for 'forge gate upload' or run in a gate directory"));
+                        };
+                        let host = resolve_host_or_selected(host)?;
+                        let url = server_url_from_host(&host);
+                        let client = GateClient::connect(url)
+                            .await
+                            .wrap_err("failed to connect to forge host")?;
+                        let (oid, okind) = resolve_owner(&host, owner_id, owner_kind)?;
+                        let id = g.id.clone().unwrap_or_else(|| g.name.clone());
+                        let gate_msg = api::Gate {
+                            id,
+                            name: g.name.clone(),
+                            owner: Some(api::ActorRef {
+                                id: oid,
+                                kind: actor_kind_str(okind),
+                            }),
+                            members: vec![],
+                        };
+                        let created = client
+                            .create_gate(gate_msg)
+                            .await
+                            .wrap_err("upload gate RPC failed")?;
+                        println!("gate '{}' uploaded to {}", created.id, host);
+                        Ok(())
+                    }
+                    GateCmd::List { host, no_header } => {
+                        let host = resolve_host_or_selected(host)?;
+                        let url = server_url_from_host(&host);
+                        let client = GateClient::connect(url)
+                            .await
+                            .wrap_err("failed to connect to forge host")?;
+                        let gates = client
+                            .list_gates()
+                            .await
+                            .wrap_err("list gates RPC failed")?;
+                        if gates.is_empty() {
+                            println!("no gates on {}", host);
+                        } else {
+                            if !no_header {
+                                println!("ID\tNAME\tOWNER_ID\tOWNER_KIND");
+                            }
+                            for g in gates {
+                                let (owner_id, owner_kind) = if let Some(o) = g.owner {
+                                    (o.id, o.kind)
+                                } else {
+                                    (String::new(), String::new())
+                                };
+                                println!("{}\t{}\t{}\t{}", g.id, g.name, owner_id, owner_kind);
+                            }
+                        }
+                        Ok(())
+                    }
+                    GateCmd::Show { host, id } => {
+                        let host = resolve_host_or_selected(host)?;
+                        let url = server_url_from_host(&host);
+                        let client = GateClient::connect(url)
+                            .await
+                            .wrap_err("failed to connect to forge host")?;
+                        match client.get_gate(&id).await.wrap_err("get gate RPC failed")? {
+                            None => {
+                                println!("gate '{}' not found on {}", id, host);
+                            }
+                            Some(g) => {
+                                println!("id: {}", g.id);
+                                if !g.name.is_empty() {
+                                    println!("name: {}", g.name);
+                                }
+                                if let Some(o) = g.owner {
+                                    println!("owner: {} {}", o.kind, o.id);
+                                }
+                                if g.members.is_empty() {
+                                    println!("members: 0");
+                                } else {
+                                    println!("members:");
+                                    for m in g.members {
+                                        if let Some(ar) = m.actor.as_ref() {
+                                            let roles = if m.roles.is_empty() {
+                                                String::from("[]")
+                                            } else {
+                                                format!("[{}]", m.roles.join(","))
+                                            };
+                                            let perms = if m.permissions.is_empty() {
+                                                String::from("[]")
+                                            } else {
+                                                format!("[{}]", m.permissions.join(","))
+                                            };
+                                            println!(
+                                                "- {} {} roles:{} perms:{}",
+                                                ar.kind, ar.id, roles, perms
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
+                },
+                ForgeCmd::Component { cmd } => {
+                    match cmd {
+                        ComponentCmd::Create { host, id, name } => {
+                            let host = resolve_host_or_selected(host)?;
+                            let url = server_url_from_host(&host);
+                            let client = ComponentClient::connect(url)
+                                .await
+                                .wrap_err("failed to connect to forge host")?;
+                            let comp = api::Component {
+                                id,
+                                name: name.unwrap_or_default(),
+                                files: None,
+                                base_json: String::new(),
+                            };
+                            let created = client
+                                .create_component(comp)
+                                .await
+                                .wrap_err("create component RPC failed")?;
+                            println!("component '{}' created on {}", created.id, host);
+                            Ok(())
+                        }
+                        ComponentCmd::Upload { host, component } => {
+                            let host = resolve_host_or_selected(host)?;
+                            let url = server_url_from_host(&host);
+                            let client = ComponentClient::connect(url)
+                                .await
+                                .wrap_err("failed to connect to forge host")?;
+                            let comp_local = open_component_local(&component, &gate)
+                                .wrap_err("cannot open component")?;
+                            let id = comp_local.get_name().to_string();
+                            let base_json = serde_json::to_string(&comp_local)
+                                .into_diagnostic()
+                                .wrap_err("serialize component for upload")?;
+                            let comp_msg = api::Component {
+                                id: id.clone(),
+                                name: comp_local.get_name().to_string(),
+                                files: None,
+                                base_json,
+                            };
+                            let created = client
+                                .create_component(comp_msg)
+                                .await
+                                .wrap_err("upload component RPC failed")?;
+                            println!("component '{}' uploaded to {}", created.id, host);
+                            Ok(())
+                        }
+                        ComponentCmd::List { host, no_header } => {
+                            let host = resolve_host_or_selected(host)?;
+                            let url = server_url_from_host(&host);
+                            let client = ComponentClient::connect(url)
+                                .await
+                                .wrap_err("failed to connect to forge host")?;
+                            let components = client
+                                .list_components()
+                                .await
+                                .wrap_err("list components RPC failed")?;
+                            if components.is_empty() {
+                                println!("no components on {}", host);
+                            } else {
+                                if !no_header {
+                                    println!("ID\tNAME");
+                                }
+                                for c in components {
+                                    println!("{}\t{}", c.id, c.name);
+                                }
+                            }
+                            Ok(())
+                        }
+                        ComponentCmd::Show { host, id } => {
+                            let host = resolve_host_or_selected(host)?;
+                            let url = server_url_from_host(&host);
+                            let client = ComponentClient::connect(url)
+                                .await
+                                .wrap_err("failed to connect to forge host")?;
+
+                            let remote = client
+                                .get_component(&id)
+                                .await
+                                .wrap_err("get component RPC failed")?;
+
+                            println!("Component: {}", id);
+                            if let Some(rc) = &remote {
+                                println!("  Name: {}", rc.name);
+                                if let Some(files) = rc.files.as_ref() {
+                                    if files.patches.is_empty() {
+                                        println!("  Patches: 0");
+                                    } else {
+                                        println!("  Patches ({}):", files.patches.len());
+                                        for f in &files.patches {
+                                            println!("    - {} ({})", f.name, f.rel_path);
+                                        }
+                                    }
+                                    if files.licenses.is_empty() {
+                                        println!("  Licenses: 0");
+                                    } else {
+                                        println!("  Licenses ({}):", files.licenses.len());
+                                        for f in &files.licenses {
+                                            println!("    - {} ({})", f.name, f.rel_path);
+                                        }
+                                    }
+                                    if files.scripts.is_empty() {
+                                        println!("  Scripts: 0");
+                                    } else {
+                                        println!("  Scripts ({}):", files.scripts.len());
+                                        for f in &files.scripts {
+                                            println!("    - {} ({})", f.name, f.rel_path);
+                                        }
+                                    }
+                                }
+
+                                // Render package.kdl description from the forge (base_json)
+                                if !rc.base_json.is_empty() {
+                                    match serde_json::from_str::<Component>(&rc.base_json) {
+                                        Ok(model) => {
+                                            println!("\nPackage KDL (describe) [from forge]:");
+                                            println!("  Name: {}", model.get_name());
+                                            let r = &model.recipe;
+                                            if let Some(v) = &r.version {
+                                                println!("  Version: {}", v);
+                                            }
+                                            if let Some(rev) = &r.revision {
+                                                println!("  Revision: {}", rev);
+                                            }
+                                            if let Some(s) = &r.summary {
+                                                println!("  Summary: {}", s);
+                                            }
+                                            if let Some(u) = &r.project_url {
+                                                println!("  Project URL: {}", u);
+                                            }
+                                            if let Some(l) = &r.license {
+                                                println!("  License: {}", l);
+                                            }
+                                            if let Some(c) = &r.classification {
+                                                println!("  Classification: {}", c);
+                                            }
+                                            if !r.maintainers.is_empty() {
+                                                println!(
+                                                    "  Maintainers ({}):",
+                                                    r.maintainers.len()
+                                                );
+                                                for m in &r.maintainers {
+                                                    println!("    - {}", m);
+                                                }
+                                            }
+                                            if r.sources.is_empty() {
+                                                println!("  Sources: 0");
+                                            } else {
+                                                println!(
+                                                    "  Sources ({}):",
+                                                    r.sources
+                                                        .iter()
+                                                        .map(|s| s.sources.len())
+                                                        .sum::<usize>()
+                                                );
+                                                for (i, section) in r.sources.iter().enumerate() {
+                                                    for src in &section.sources {
+                                                        match src {
+                                                            SourceNode::Archive(a) => {
+                                                                println!(
+                                                                    "    - archive: {}",
+                                                                    a.src
+                                                                );
+                                                            }
+                                                            other => {
+                                                                println!("    - {:?}", other);
+                                                            }
+                                                        }
+                                                    }
+                                                    if i + 1 < r.sources.len() {
+                                                        // spacer between sections
+                                                    }
+                                                }
+                                            }
+                                            if r.build_sections.is_empty() {
+                                                println!("  Build: 0 sections");
+                                            } else {
+                                                println!(
+                                                    "  Build sections ({}):",
+                                                    r.build_sections.len()
+                                                );
+                                                for (idx, b) in r.build_sections.iter().enumerate()
+                                                {
+                                                    let mut kinds: Vec<&str> = Vec::new();
+                                                    if b.cargo {
+                                                        kinds.push("cargo");
+                                                    }
+                                                    if b.script.is_some() {
+                                                        kinds.push("script");
+                                                    }
+                                                    if b.configure.is_some() {
+                                                        kinds.push("configure");
+                                                    }
+                                                    if b.cmake.is_some() {
+                                                        kinds.push("cmake");
+                                                    }
+                                                    if b.meson.is_some() {
+                                                        kinds.push("meson");
+                                                    }
+                                                    if kinds.is_empty() {
+                                                        kinds.push("custom");
+                                                    }
+                                                    println!(
+                                                        "    - [{}] {}",
+                                                        idx + 1,
+                                                        kinds.join(", ")
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        Err(_) => {
+                                            println!("\nPackage KDL (describe): unable to parse stored base component");
+                                        }
+                                    }
+                                } else {
+                                    println!("\nPackage KDL (describe): no base information stored on server");
+                                }
+                            } else {
+                                println!("  Not found on host {}", host);
+                            }
+
+                            Ok(())
+                        }
+                    }
+                }
+            }
+        }
         Commands::Repo { cmd } => {
             let mut mgr = RepoManager::load()
                 .into_diagnostic()
@@ -619,4 +1192,56 @@ fn generate_repology(gate: &Option<Gate>, output: Option<&Path>) -> miette::Resu
         println!("{}", json);
     }
     Ok(())
+}
+
+// ---- Gate CLI helpers ----
+fn resolve_host_or_selected(host_arg: Option<String>) -> miette::Result<String> {
+    if let Some(h) = host_arg {
+        return Ok(h);
+    }
+    let path = default_auth_state_path();
+    let state = AuthState::load(&path)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to load auth state from {}", path.display()))?;
+    if let Some(sel) = state.get_selected() {
+        Ok(sel.host.clone())
+    } else {
+        Err(miette::miette!("--host not provided and no selected context found. Use 'pkgdev auth login --select' or specify --host"))
+    }
+}
+
+fn actor_kind_str(k: ActorKind) -> String {
+    match k {
+        ActorKind::User => "user".to_string(),
+        ActorKind::Service => "service".to_string(),
+    }
+}
+
+fn resolve_owner(
+    host: &str,
+    owner_id: Option<String>,
+    owner_kind: Option<ActorKind>,
+) -> miette::Result<(String, ActorKind)> {
+    if let Some(id) = owner_id {
+        return Ok((id, owner_kind.unwrap_or(ActorKind::User)));
+    }
+    let path = default_auth_state_path();
+    let state = AuthState::load(&path)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to load auth state from {}", path.display()))?;
+    // Prefer the selected context for this host, if any
+    if let Some(sel) = state.get_selected() {
+        if sel.host == host {
+            return Ok((sel.actor_id.clone(), sel.kind));
+        }
+    }
+    // Fallback to first recorded login for host
+    let entries = state.list_for(host);
+    if let Some(entry) = entries.first() {
+        return Ok((entry.actor_id.clone(), entry.kind));
+    }
+    Err(miette::miette!(
+        "owner-id not provided and no local login found for host '{}'",
+        host
+    ))
 }

@@ -17,6 +17,8 @@ message Component {
   string id = 1;
   string name = 2;
   ComponentFiles files = 3;
+  // JSON-serialized representation of the base component (package.kdl model)
+  string base_json = 4;
 }
 
 message GetComponentRequest { string id = 1; }

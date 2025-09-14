@@ -9,7 +9,7 @@ use lettre::{message::Mailbox, AsyncSmtpTransport, Message, Tokio1Executor};
 use crate::storage::surreal as sdb;
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::api::forged::api::v1 as api;
 use age::{Decryptor, Encryptor};
@@ -225,53 +225,344 @@ fn now_sec() -> u64 {
         .as_secs()
 }
 
+// ---- Gate type conversions between API and server models ----
+fn permission_to_str(p: &crate::rbac::Permission) -> String {
+    // Use serde's snake_case via JSON string, stripping quotes
+    serde_json::to_string(p)
+        .unwrap_or("\"unknown\"".into())
+        .trim_matches('"')
+        .to_string()
+}
+
+fn permission_from_str(s: &str) -> Option<crate::rbac::Permission> {
+    let quoted = format!("\"{}\"", s);
+    serde_json::from_str::<crate::rbac::Permission>(&quoted).ok()
+}
+
+fn api_actor_to_types(a: &api::ActorRef) -> crate::types::ActorRef {
+    let kind = match a.kind.to_ascii_lowercase().as_str() {
+        "service" => crate::types::ActorKind::Service,
+        _ => crate::types::ActorKind::User,
+    };
+    crate::types::ActorRef {
+        id: crate::types::ActorId(a.id.clone()),
+        kind,
+    }
+}
+
+fn types_actor_to_api(a: &crate::types::ActorRef) -> api::ActorRef {
+    let kind = match a.kind {
+        crate::types::ActorKind::User => "user",
+        crate::types::ActorKind::Service => "service",
+    };
+    api::ActorRef {
+        id: a.id.0.clone(),
+        kind: kind.to_string(),
+    }
+}
+
+fn gate_record_to_api(r: &crate::gate::GateRecord) -> api::Gate {
+    let members = r
+        .members
+        .iter()
+        .map(|m| api::GateMember {
+            actor: Some(types_actor_to_api(&m.actor)),
+            roles: m.roles.clone(),
+            permissions: m.permissions.iter().map(permission_to_str).collect(),
+        })
+        .collect();
+    api::Gate {
+        id: r.id.0.clone(),
+        name: r.base.name.clone(),
+        owner: Some(types_actor_to_api(&r.owner)),
+        members,
+    }
+}
+
+fn api_gate_to_record(g: api::Gate) -> Result<crate::gate::GateRecord, Status> {
+    use crate::gate::GateRecord;
+    let id = crate::types::GateId(g.id);
+    let mut base = gate::Gate::default();
+    if !g.name.is_empty() {
+        base.name = g.name.clone();
+    } else {
+        base.name = id.0.clone();
+    }
+    let owner = if let Some(o) = g.owner.as_ref() {
+        api_actor_to_types(o)
+    } else {
+        return Err(Status::invalid_argument("gate.owner is required"));
+    };
+    let mut rec = GateRecord::new(id, base, owner);
+    // members
+    for m in g.members.into_iter() {
+        if let Some(ar) = m.actor.as_ref() {
+            let actor = api_actor_to_types(ar);
+            let perms = m
+                .permissions
+                .iter()
+                .filter_map(|s| permission_from_str(s))
+                .collect();
+            let gm = crate::gate::GateMember {
+                actor,
+                roles: m.roles.clone(),
+                permissions: perms,
+            };
+            rec.upsert_member(gm);
+        }
+    }
+    Ok(rec)
+}
+
+// Normalize an incoming confirmation envelope which may be provided as
+// raw JSON bytes or as Base64 (URL-safe preferred). Returns the decoded
+// raw JSON bytes.
+fn normalize_envelope_bytes(raw: &[u8]) -> Vec<u8> {
+    // If it already looks like JSON, keep as-is to preserve exact bytes
+    if let Some(b'{') = raw.first().copied() {
+        return raw.to_vec();
+    }
+    // Try UTF-8 interpretation for trimming and base64 decoding
+    if let Ok(s) = std::str::from_utf8(raw) {
+        let trimmed = s.trim();
+        if trimmed.starts_with('{') {
+            return trimmed.as_bytes().to_vec();
+        }
+        // Try URL-safe without padding first, then URL-safe with padding, then standard
+        if let Ok(decoded) =
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(trimmed.as_bytes())
+        {
+            return decoded;
+        }
+        if let Ok(decoded) = base64::engine::general_purpose::URL_SAFE.decode(trimmed.as_bytes()) {
+            return decoded;
+        }
+        if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(trimmed.as_bytes()) {
+            return decoded;
+        }
+    }
+    // Fallback to raw bytes when nothing matched
+    raw.to_vec()
+}
+
 const REGISTRATION_TTL_SECS: u64 = 4 * 60 * 60; // 4 hours
 
 #[tonic::async_trait]
 impl api::gate_service_server::GateService for GateServiceImpl {
     async fn get_gate(
         &self,
-        _request: Request<api::GetGateRequest>,
+        request: Request<api::GetGateRequest>,
     ) -> Result<Response<api::GetGateResponse>, Status> {
-        Err(Status::unimplemented("GetGate not implemented"))
+        let req = request.into_inner();
+        let Some(db) = &self.state.surreal else {
+            return Err(Status::failed_precondition("database not available"));
+        };
+        if req.id.is_empty() {
+            return Err(Status::invalid_argument("id is required"));
+        }
+        let id = crate::types::GateId(req.id);
+        match sdb::get_gate(db, &id).await {
+            Ok(Some(rec)) => {
+                let gate = gate_record_to_api(&rec);
+                Ok(Response::new(api::GetGateResponse { gate: Some(gate) }))
+            }
+            Ok(None) => Err(Status::not_found("gate not found")),
+            Err(e) => {
+                error!(id=%id.0, error=?e, "surreal get gate failed");
+                Err(Status::internal("get gate failed"))
+            }
+        }
     }
 
     async fn create_gate(
         &self,
-        _request: Request<api::CreateGateRequest>,
+        request: Request<api::CreateGateRequest>,
     ) -> Result<Response<api::CreateGateResponse>, Status> {
-        Err(Status::unimplemented("CreateGate not implemented"))
+        let req = request.into_inner();
+        let Some(db) = &self.state.surreal else {
+            return Err(Status::failed_precondition("database not available"));
+        };
+        let Some(g) = req.gate else {
+            return Err(Status::invalid_argument("gate is required"));
+        };
+        if g.id.is_empty() {
+            return Err(Status::invalid_argument("gate.id is required"));
+        }
+        let rec = api_gate_to_record(g)?;
+        if let Err(e) = sdb::put_gate(db, &rec).await {
+            error!(id=%rec.id.0, error=?e, "surreal upsert gate failed");
+            return Err(Status::internal("create gate failed"));
+        }
+        let gate = gate_record_to_api(&rec);
+        Ok(Response::new(api::CreateGateResponse { gate: Some(gate) }))
     }
 
     async fn list_gates(
         &self,
         _request: Request<api::ListGatesRequest>,
     ) -> Result<Response<api::ListGatesResponse>, Status> {
-        Err(Status::unimplemented("ListGates not implemented"))
+        let Some(db) = &self.state.surreal else {
+            return Err(Status::failed_precondition("database not available"));
+        };
+        match sdb::list_gates(db).await {
+            Ok(list) => {
+                let gates = list.iter().map(gate_record_to_api).collect();
+                Ok(Response::new(api::ListGatesResponse {
+                    gates,
+                    next_page_token: String::new(),
+                }))
+            }
+            Err(e) => {
+                error!(error=?e, "surreal list gates failed");
+                Err(Status::internal("list gates failed"))
+            }
+        }
     }
+}
+
+// ---- Component type conversions between API and server models ----
+fn stored_file_to_api(f: &crate::component::StoredFile) -> api::StoredFile {
+    api::StoredFile {
+        name: f.name.clone(),
+        rel_path: f.rel_path.clone(),
+    }
+}
+
+fn stored_file_from_api(f: &api::StoredFile) -> crate::component::StoredFile {
+    crate::component::StoredFile {
+        name: f.name.clone(),
+        rel_path: f.rel_path.clone(),
+    }
+}
+
+fn component_record_to_api(r: &crate::component::ComponentRecord) -> api::Component {
+    let name = r.base.get_name().to_string();
+    let files = api::ComponentFiles {
+        patches: r.files.patches.iter().map(stored_file_to_api).collect(),
+        licenses: r.files.licenses.iter().map(stored_file_to_api).collect(),
+        scripts: r.files.scripts.iter().map(stored_file_to_api).collect(),
+    };
+    // Prefer returning the exact JSON that was uploaded (if we stored it in metadata).
+    let base_json_from_meta = r
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("base_json"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let base_json =
+        base_json_from_meta.unwrap_or_else(|| serde_json::to_string(&r.base).unwrap_or_default());
+    api::Component {
+        id: r.id.0.clone(),
+        name,
+        files: Some(files),
+        base_json,
+    }
+}
+
+fn api_component_to_record(c: api::Component) -> Result<crate::component::ComponentRecord, Status> {
+    use crate::component::ComponentRecord;
+    let id = crate::types::ComponentId(c.id);
+    // Prefer provided base_json if present; otherwise, synthesize a minimal base from the name/id.
+    let base = if !c.base_json.is_empty() {
+        serde_json::from_str::<component::Component>(&c.base_json)
+            .map_err(|_| Status::invalid_argument("invalid base_json for component"))?
+    } else {
+        let name = if !c.name.is_empty() {
+            c.name.clone()
+        } else {
+            id.0.clone()
+        };
+        component::Component::new(name, None::<&std::path::Path>)
+            .map_err(|_| Status::invalid_argument("invalid component name"))?
+    };
+    let mut rec = ComponentRecord::new(id, base);
+    if let Some(files) = c.files.as_ref() {
+        rec.files.patches = files.patches.iter().map(stored_file_from_api).collect();
+        rec.files.licenses = files.licenses.iter().map(stored_file_from_api).collect();
+        rec.files.scripts = files.scripts.iter().map(stored_file_from_api).collect();
+    }
+    // Stash the original base_json string in metadata for lossless round-trip and to avoid
+    // serialization failures on the server side. This keeps storage schema unchanged.
+    if !c.base_json.is_empty() {
+        rec.metadata = Some(serde_json::json!({"base_json": c.base_json}));
+    }
+    Ok(rec)
 }
 
 #[tonic::async_trait]
 impl api::component_service_server::ComponentService for ComponentServiceImpl {
     async fn get_component(
         &self,
-        _request: Request<api::GetComponentRequest>,
+        request: Request<api::GetComponentRequest>,
     ) -> Result<Response<api::GetComponentResponse>, Status> {
-        Err(Status::unimplemented("GetComponent not implemented"))
+        let req = request.into_inner();
+        let Some(db) = &self.state.surreal else {
+            return Err(Status::failed_precondition("database not available"));
+        };
+        if req.id.is_empty() {
+            return Err(Status::invalid_argument("id is required"));
+        }
+        let id = crate::types::ComponentId(req.id);
+        match sdb::get_component(db, &id).await {
+            Ok(Some(rec)) => {
+                let comp = component_record_to_api(&rec);
+                Ok(Response::new(api::GetComponentResponse {
+                    component: Some(comp),
+                }))
+            }
+            Ok(None) => Err(Status::not_found("component not found")),
+            Err(e) => {
+                error!(id=%id.0, error=?e, "surreal get component failed");
+                Err(Status::internal("get component failed"))
+            }
+        }
     }
 
     async fn create_component(
         &self,
-        _request: Request<api::CreateComponentRequest>,
+        request: Request<api::CreateComponentRequest>,
     ) -> Result<Response<api::CreateComponentResponse>, Status> {
-        Err(Status::unimplemented("CreateComponent not implemented"))
+        let req = request.into_inner();
+        let Some(db) = &self.state.surreal else {
+            return Err(Status::failed_precondition("database not available"));
+        };
+        let Some(c) = req.component else {
+            return Err(Status::invalid_argument("component is required"));
+        };
+        if c.id.is_empty() {
+            return Err(Status::invalid_argument("component.id is required"));
+        }
+        let rec = api_component_to_record(c)?;
+        if let Err(e) = sdb::put_component(db, &rec).await {
+            error!(id=%rec.id.0, error=?e, "surreal upsert component failed");
+            return Err(Status::internal("create component failed"));
+        }
+        let comp = component_record_to_api(&rec);
+        Ok(Response::new(api::CreateComponentResponse {
+            component: Some(comp),
+        }))
     }
 
     async fn list_components(
         &self,
         _request: Request<api::ListComponentsRequest>,
     ) -> Result<Response<api::ListComponentsResponse>, Status> {
-        Err(Status::unimplemented("ListComponents not implemented"))
+        let Some(db) = &self.state.surreal else {
+            return Err(Status::failed_precondition("database not available"));
+        };
+        match sdb::list_components(db).await {
+            Ok(list) => {
+                let components = list.iter().map(component_record_to_api).collect();
+                Ok(Response::new(api::ListComponentsResponse {
+                    components,
+                    next_page_token: String::new(),
+                }))
+            }
+            Err(e) => {
+                error!(error=?e, "surreal list components failed");
+                Err(Status::internal("list components failed"))
+            }
+        }
     }
 }
 
@@ -391,9 +682,10 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
                 expires_at,
                 envelope: envelope_bytes.clone(),
             };
-            sdb::upsert_pending_registration(db, &rec)
-                .await
-                .map_err(|_| Status::internal("pending upsert failed"))?;
+            if let Err(e) = sdb::upsert_pending_registration(db, &rec).await {
+                error!(actor_id=%actor_id, error=?e, "pending upsert failed");
+                return Err(Status::internal("pending upsert failed"));
+            }
         } else {
             let pending = PendingRegistration {
                 id: k.clone(),
@@ -424,15 +716,16 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
                 .map_err(|_| Status::invalid_argument("invalid SMTP from address configured"))?;
 
             // Build human-readable body with instructions and include the envelope
-            let envelope_text = String::from_utf8(envelope_bytes.clone()).unwrap_or_else(|_| {
-                base64::engine::general_purpose::STANDARD.encode(&envelope_bytes)
-            });
+            // Encode the envelope using URL-safe Base64 without padding for easy copy/paste and CLI usage
+            let envelope_text =
+                base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&envelope_bytes);
             let body = format!(
                 concat!(
                     "Hello,\n\n",
                     "You recently requested to register an actor in Forge.\n",
                     "To complete your registration, copy the envelope below exactly as-is and send it back to the server ",
                     "using your client via the RegistrationConfirmation request.\n",
+                    "The envelope below is Base64-URL encoded (no padding).\n",
                     "Do not share this envelope with anyone. It expires at UNIX time: {expires}.\n\n",
                     "--- BEGIN REGISTRATION ENVELOPE ---\n",
                     "{envelope}\n",
@@ -484,18 +777,23 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
             // Surreal-backed pending
             let p = sdb::get_pending_registration(db, &k)
                 .await
-                .map_err(|_| Status::internal("surreal get pending"))?
+                .map_err(|e| {
+                    error!(actor_id=%req.actor_id, error=?e, "surreal get pending failed");
+                    Status::internal("surreal get pending")
+                })?
                 .ok_or_else(|| Status::failed_precondition("no pending registration for actor"))?;
             if p.expires_at <= now {
                 let _ = sdb::delete_pending_registration(db, &k).await;
                 return Err(Status::failed_precondition("pending registration expired"));
             }
-            if p.envelope != req.confirmation_envelope {
+            // Normalize incoming envelope (supports Base64-URL and raw JSON)
+            let provided = normalize_envelope_bytes(&req.confirmation_envelope);
+            if p.envelope != provided {
                 return Err(Status::invalid_argument(
                     "confirmation envelope does not match",
                 ));
             }
-            let env: ConfirmationEnvelope = serde_json::from_slice(&req.confirmation_envelope)
+            let env: ConfirmationEnvelope = serde_json::from_slice(&provided)
                 .map_err(|_| Status::invalid_argument("invalid envelope json"))?;
             if env.meta.actor_id != req.actor_id {
                 return Err(Status::invalid_argument("envelope actor_id mismatch"));
@@ -540,14 +838,15 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
                 pending_guard.remove(&k);
                 return Err(Status::failed_precondition("pending registration expired"));
             }
-            // Validate envelope matches what we sent
-            if p.envelope != req.confirmation_envelope {
+            // Validate envelope matches what we sent (normalize first to support Base64-URL input)
+            let provided = normalize_envelope_bytes(&req.confirmation_envelope);
+            if p.envelope != provided {
                 return Err(Status::invalid_argument(
                     "confirmation envelope does not match",
                 ));
             }
             // Parse envelope and check metadata alignment
-            let env: ConfirmationEnvelope = serde_json::from_slice(&req.confirmation_envelope)
+            let env: ConfirmationEnvelope = serde_json::from_slice(&provided)
                 .map_err(|_| Status::invalid_argument("invalid envelope json"))?;
             if env.meta.actor_id != req.actor_id {
                 return Err(Status::invalid_argument("envelope actor_id mismatch"));
