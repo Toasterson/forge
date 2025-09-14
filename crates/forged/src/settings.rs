@@ -33,22 +33,40 @@ pub struct SmtpConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Settings {
+    #[serde(default)]
     pub server: ServerConfig,
+    #[serde(default)]
     pub surreal: SurrealConfig,
+    #[serde(default)]
     pub smtp: Option<SmtpConfig>,
 }
 
 impl Settings {
     pub fn load() -> miette::Result<Self> {
         use config::Config;
+        use miette::{Context, IntoDiagnostic};
         let mut builder = config::Config::builder();
 
-        // Default file: ./forged.toml if exists
-        let path = std::env::var("FORGED_CONFIG")
-            .ok()
-            .unwrap_or_else(|| "forged.toml".to_string());
-        if std::path::Path::new(&path).exists() {
-            builder = builder.add_source(config::File::with_name(&path));
+        // Determine config source
+        let mut source_desc = String::from("env only");
+
+        // Config file selection:
+        // - If FORGED_CONFIG is set, it must exist; otherwise it's an error.
+        // - If not set, use ./forged.toml if it exists; otherwise proceed with env-only defaults.
+        if let Ok(explicit_path) = std::env::var("FORGED_CONFIG") {
+            if !std::path::Path::new(&explicit_path).exists() {
+                return Err(miette::miette!(
+                    "config file not found at path specified by FORGED_CONFIG: {explicit_path}"
+                ));
+            }
+            builder = builder.add_source(config::File::with_name(&explicit_path));
+            source_desc = format!("file: {}", explicit_path);
+        } else {
+            let default_path = "forged.toml";
+            if std::path::Path::new(default_path).exists() {
+                builder = builder.add_source(config::File::with_name(default_path));
+                source_desc = format!("file: {}", default_path);
+            }
         }
 
         // Environment overrides: FORGED__SERVER__LISTEN_ADDR etc.
@@ -56,10 +74,12 @@ impl Settings {
 
         let cfg = builder
             .build()
-            .map_err(|e| miette::miette!("load config: {e}"))?;
+            .into_diagnostic()
+            .wrap_err_with(|| format!("load config ({})", source_desc))?;
         let settings: Settings = cfg
             .try_deserialize()
-            .map_err(|e| miette::miette!("deserialize config: {e}"))?;
+            .into_diagnostic()
+            .wrap_err("deserialize config into Settings")?;
         Ok(settings)
     }
 }

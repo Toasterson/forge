@@ -10,7 +10,14 @@ async fn main() {
     }
 
     // Load Settings and compute listen address with env fallback
-    let settings = Settings::load().unwrap_or_default();
+    let settings = match Settings::load() {
+        Ok(s) => s,
+        Err(e) => {
+            error!(error=?e, "failed to load settings; refusing to start");
+            eprintln!("failed to load settings: {e:?}");
+            std::process::exit(1);
+        }
+    };
     let addr_str = settings
         .server
         .listen_addr
