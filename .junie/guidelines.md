@@ -194,3 +194,109 @@ When working on the IPS project, Junie should follow this workflow:
 6. **Submit the Changes**: Submit the changes for review
 
 When implementing error handling, Junie should follow the error handling guidelines above and use the decision tree to determine the appropriate approach.
+
+
+
+## Forge project specifics (build, config, testing)
+
+This section documents repository-specific know-how for the forge workspace.
+
+### Build and run
+- Build entire workspace: `cargo build`.
+- Build a specific crate: `cargo build -p <crate>`.
+- Run the forged server locally: `cargo run -p forged`.
+- Optional features for `forged`:
+  - `quic`: enables a QUIC endpoint stub. Run with: `cargo run -p forged --features quic`. At runtime set `FORGED_QUIC_ADDR="127.0.0.1:50052"` to start it; if unset, QUIC stays disabled.
+  - `otel`: enables OpenTelemetry export. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to your collector (e.g., `http://localhost:4317`).
+
+### Configuration model (crates/forged)
+Settings loading (see `crates/forged/src/settings.rs::Settings::load`) resolves configuration in this precedence order:
+1. If `FORGED_CONFIG` is set, load that file (error if it does not exist).
+2. Else, if a `./forged.toml` exists in the current working directory, load it.
+3. Finally, apply environment overrides (always allowed) and defaults.
+
+Environment overrides use the `FORGED__` prefix with `__` as separator between nested fields. Useful keys:
+- `FORGED__SERVER__LISTEN_ADDR` — TCP gRPC bind address, e.g., `127.0.0.1:50051`.
+- SurrealDB (storage):
+  - `FORGED__SURREAL__MODE` — `embedded` (rocksdb) or `clustered` (remote), default: `embedded`.
+  - `FORGED__SURREAL__ENDPOINT` — remote endpoint for clustered mode, default: `ws://127.0.0.1:8000`.
+  - `FORGED__SURREAL__USERNAME`, `FORGED__SURREAL__PASSWORD` — credentials for clustered mode.
+  - `FORGED__SURREAL__NAMESPACE`, `FORGED__SURREAL__DATABASE` — logical db selection, defaults: `forged` / `default`.
+  - `FORGED__SURREAL__PATH` — embedded rocksdb dir, default: `./data/surreal`.
+- SMTP (optional notification email):
+  - `FORGED__SMTP__HOST`, `FORGED__SMTP__PORT`, `FORGED__SMTP__USERNAME`, `FORGED__SMTP__PASSWORD`, `FORGED__SMTP__FROM`, `FORGED__SMTP__STARTTLS`.
+
+Additional address fallback: `FORGED_ADDR` may be used by the binary to override `server.listen_addr` just before parsing; if neither is set, the default is `127.0.0.1:50051`.
+
+Example minimal `forged.toml` (use via `FORGED_CONFIG=/abs/path/forged.toml`):
+```toml
+[server]
+listen_addr = "127.0.0.1:50051"
+
+[surreal]
+# One of: "embedded" (rocksdb) or "clustered"
+mode = "embedded"
+path = "./data/surreal"
+
+# For clustered mode:
+# endpoint = "ws://127.0.0.1:8000"
+# username = "root"
+# password = "secret"
+# namespace = "forged"
+# database = "default"
+
+# [smtp]
+# host = "smtp.example.com"
+# port = 587
+# username = "forge@example.com"
+# password = "<set via env>"
+# from = "forge@example.com"
+# starttls = true
+```
+
+### Logging / telemetry
+- Logging is provided by `tracing` with `tracing-subscriber::EnvFilter`.
+  - Set `RUST_LOG` to control verbosity, e.g.: `RUST_LOG=forged=debug,forged::services=trace`.
+  - Default level is `info` if `RUST_LOG` is not set.
+- With `--features otel` and `OTEL_EXPORTER_OTLP_ENDPOINT` set, spans are exported over OTLP in addition to stdout formatting.
+
+### Storage: SurrealDB connection
+Implementation is in `crates/forged/src/storage/surreal.rs`:
+- Embedded mode uses RocksDB via URI `rocksdb:<path>` with default `./data/surreal`.
+- Clustered mode uses the `ws://` protocol; if `username` and `password` are set, a `Root` signin is performed.
+- After connect, the code selects namespace and database specified in settings (defaults: `forged` / `default`).
+
+### Testing in this workspace
+- Run all tests: `cargo test`.
+- Run tests for one crate: `cargo test -p forged` or `cargo test -p pkgdev`.
+- Existing integration tests under `crates/pkgdev/tests` use data in `sample_data/` (no external services required). The full workspace test run passes in a clean checkout.
+
+Caveats for config in tests:
+- Tests execute with the crate directory as CWD. The settings loader looks for `./forged.toml` relative to the CWD; the workspace’s top-level `forged.toml` is not seen by crate tests unless `FORGED_CONFIG` points to it. Environment overrides (`FORGED__...`) are the recommended way inside tests.
+
+#### Example: temporary unit test we validated
+We validated the following pattern locally (add to any file in `crates/forged/src/` within a `#[cfg(test)] mod tests` block):
+```rust
+#[test]
+fn env_overrides_listen_addr() {
+    use std::env;
+    let key = "FORGED__SERVER__LISTEN_ADDR";
+    let val = "127.0.0.1:12345";
+    let prev = env::var(key).ok();
+    env::set_var(key, val);
+    let settings = crate::settings::Settings::load().expect("load settings");
+    assert_eq!(settings.server.listen_addr.as_deref(), Some(val));
+    if let Some(p) = prev { env::set_var(key, p); } else { env::remove_var(key); }
+}
+```
+Run it with:
+```bash
+cargo test -p forged -- env_overrides_listen_addr
+```
+We added, ran, and then removed this test during verification to keep the repo clean.
+
+### Additional development notes
+- Do not commit real secrets. The repository’s top-level `forged.toml` is for local development; prefer keeping a private config outside VCS and point at it with `FORGED_CONFIG` or inject secrets via env variables.
+- When adding new CLI flags or configuration fields, update `Settings` in `crates/forged/src/settings.rs` and mirror them in the example `forged.toml` here.
+- If enabling QUIC or OTEL features in CI, ensure the feature flags are wired in the corresponding cargo invocations.
+- For noisy modules, prefer per-module `RUST_LOG` selectors to keep logs actionable during tests.
