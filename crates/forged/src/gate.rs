@@ -1,5 +1,5 @@
 use crate::rbac::Permission;
-use crate::types::{ActorId, ActorKind, ActorRef, GateId};
+use crate::types::{ActorRef, GateId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};

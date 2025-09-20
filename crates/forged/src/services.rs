@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use lettre::AsyncTransport;
@@ -584,7 +584,7 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
         if actor_id.is_empty() {
             return Err(Status::invalid_argument("actor_id is required"));
         }
-        let Some(actor_kind) = api::ActorKind::from_i32(req.actor_kind) else {
+        let Ok(actor_kind) = api::ActorKind::try_from(req.actor_kind) else {
             return Err(Status::invalid_argument("invalid actor_kind"));
         };
         let public_key = req.public_key.clone();
@@ -768,7 +768,7 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
         if req.actor_id.is_empty() {
             return Err(Status::invalid_argument("actor_id is required"));
         }
-        let Some(actor_kind) = api::ActorKind::from_i32(req.actor_kind) else {
+        let Ok(actor_kind) = api::ActorKind::try_from(req.actor_kind) else {
             return Err(Status::invalid_argument("invalid actor_kind"));
         };
         let k = actor_key(&req.actor_id, actor_kind);

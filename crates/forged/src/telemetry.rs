@@ -1,6 +1,7 @@
 use miette::{Context, IntoDiagnostic};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+#[allow(unused_variables)]
 pub fn init_tracing(service_name: &str) -> miette::Result<()> {
     // Base fmt + env filter
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));

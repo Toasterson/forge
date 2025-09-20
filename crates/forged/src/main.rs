@@ -1,7 +1,7 @@
 use forged::settings::Settings;
 use forged::{telemetry, transport};
 use std::net::SocketAddr;
-use tracing::{error, info};
+use tracing::error;
 
 #[tokio::main]
 async fn main() {

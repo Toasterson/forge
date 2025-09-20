@@ -43,7 +43,6 @@ pub struct Settings {
 
 impl Settings {
     pub fn load() -> miette::Result<Self> {
-        use config::Config;
         use miette::{Context, IntoDiagnostic};
         let mut builder = config::Config::builder();
 
