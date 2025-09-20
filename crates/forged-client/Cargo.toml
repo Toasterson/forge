@@ -1,0 +1,34 @@
+[package]
+name = "forged-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "forged_client"
+path = "src/lib.rs"
+
+[dependencies]
+# Library crate: do NOT enable miette fancy feature
+miette = "7.6.0"
+thiserror = "1.0.50"
+tracing = "0.1.37"
+
+# Async / gRPC
+tokio = { version = "1.39", features = ["macros", "rt-multi-thread"] }
+tokio-stream = { version = "0.1" }
+tonic = { version = "0.11", features = ["transport"] }
+prost = "0.12"
+
+# Crypto helper for convenience when creating SignedMessage proofs
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+
+# Serialization (optional, used in docs/examples)
+serde = { version = "1.0", features = ["derive"] }
+
+[build-dependencies]
+tonic-build = "0.11"
+
+[package.metadata.docs.rs]
+all-features = true

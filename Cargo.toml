@@ -53,5 +53,4 @@ uuid = { version = "1.9.1", features = ["v4", "serde"] }
 chrono = "0.4.41"
 
 [profile.dev.package]
-insta.opt-level = 3
 similar.opt-level = 3

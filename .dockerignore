@@ -1,3 +1,12 @@
 target
+.git
+.github
+.vscode
+.idea
+**/*.rs.bk
+**/*.swp
+**/*.swo
+**/.DS_Store
+node_modules
 web/node_modules
-sample_data
+.tmp

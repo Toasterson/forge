@@ -1,0 +1,36 @@
+syntax = "proto3";
+package forged.api.v1;
+
+// Gate API definitions
+
+message GateId { string id = 1; }
+
+message ActorRef { string id = 1; string kind = 2; }
+
+message GateMember {
+  ActorRef actor = 1;
+  repeated string roles = 2;
+  repeated string permissions = 3; // string-encoded for simplicity
+}
+
+message Gate {
+  string id = 1;
+  string name = 2; // optional display name from base gate, if available
+  ActorRef owner = 3;
+  repeated GateMember members = 4;
+}
+
+message GetGateRequest { string id = 1; }
+message GetGateResponse { Gate gate = 1; }
+
+message CreateGateRequest { Gate gate = 1; }
+message CreateGateResponse { Gate gate = 1; }
+
+message ListGatesRequest { uint32 page_size = 1; string page_token = 2; }
+message ListGatesResponse { repeated Gate gates = 1; string next_page_token = 2; }
+
+service GateService {
+  rpc GetGate(GetGateRequest) returns (GetGateResponse);
+  rpc CreateGate(CreateGateRequest) returns (CreateGateResponse);
+  rpc ListGates(ListGatesRequest) returns (ListGatesResponse);
+}

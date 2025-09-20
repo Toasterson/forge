@@ -2,6 +2,8 @@
 Cargo.lock
 /testcredentials
 /sample_data/downloads/*
+/sample_data/forged
 /wks
 .idea
 .vagrant
+forged.toml

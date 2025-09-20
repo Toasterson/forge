@@ -3,14 +3,16 @@ use directories::ProjectDirs;
 use miette::Diagnostic;
 use thiserror::Error;
 
+pub mod api;
 pub mod args;
+pub mod auth;
 pub mod build;
 mod component;
+pub mod component_client;
 pub mod create;
-pub mod forge;
+pub mod gate_client;
 pub mod metadata;
 pub mod modify;
-pub mod openid;
 pub mod repo;
 pub mod sources;
 

@@ -1,0 +1,68 @@
+syntax = "proto3";
+package forged.api.v1;
+
+import "auth.proto"; // reuse ActorKind and SignedMessage
+
+// Git service to manage per-component repositories and publish versions.
+// BREAKING: Introduce SmartPush with authentication; remove legacy ReceivePack/UploadPack proxies.
+
+message CreateRepoRequest { string component_id = 1; }
+message CreateRepoResponse { bool created = 1; }
+
+message PutVersionRequest {
+  string component_id = 1;
+  string version = 2;         // semantic or arbitrary version string
+  bytes package_kdl = 3;      // contents of package.kdl for this version
+}
+message PutVersionResponse {
+  string commit_id = 1;       // commit SHA for the stored version
+}
+
+// New Smart Push API (stage 1): client authenticates and streams a packfile.
+// First message must be an `open` carrying auth & target repository info.
+message PushOpen {
+  string component_id = 1;
+  string actor_id = 2;
+  ActorKind actor_kind = 3;
+  string key_id = 4;          // which stored key to use
+  string algorithm = 5;       // expected: "ed25519"
+  SignedMessage proof = 6;    // signature over an application-defined message
+}
+
+message SmartPushRequest {
+  oneof payload {
+    PushOpen open = 1;
+    bytes packfile_chunk = 2; // raw pack bytes (no pkt-line)
+    bool done = 3;            // signal end of stream
+  }
+}
+
+message SmartPushResponse {
+  oneof payload {
+    string progress = 1;
+    bool accepted = 2;        // server accepted and stored the pack
+    string error = 3;
+  }
+}
+
+// Smart Fetch API (stage 1): client requests the latest pack for a repo.
+// This is a unary request with server-streaming response of raw packfile bytes.
+message SmartFetchRequest {
+  string component_id = 1;
+}
+
+message SmartFetchResponse {
+  oneof payload {
+    string progress = 1;
+    bytes packfile_chunk = 2; // raw pack bytes
+    bool done = 3;            // stream completed successfully
+    string error = 4;         // terminal error message
+  }
+}
+
+service GitService {
+  rpc CreateRepo(CreateRepoRequest) returns (CreateRepoResponse);
+  rpc PutVersion(PutVersionRequest) returns (PutVersionResponse);
+  rpc SmartPush(stream SmartPushRequest) returns (stream SmartPushResponse);
+  rpc SmartFetch(SmartFetchRequest) returns (stream SmartFetchResponse);
+}

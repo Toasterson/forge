@@ -1,0 +1,82 @@
+syntax = "proto3";
+package forged.api.v1;
+
+// Auth API definitions
+
+enum ActorKind {
+  ACTOR_KIND_UNSPECIFIED = 0;
+  ACTOR_KIND_USER = 1;
+  ACTOR_KIND_SERVICE = 2;
+}
+
+// Public key material associated with an actor
+message PublicKey {
+  string key_id = 1;            // client-provided identifier for key rotation
+  string algorithm = 2;         // e.g., "ed25519", "rsa-pss-sha256"
+  bytes public_key = 3;         // raw key bytes
+}
+
+// Signed message proof that the requester holds the private key
+message SignedMessage {
+  string algorithm = 1;         // signature algorithm
+  bytes message = 2;            // opaque challenge message (server-defined policy)
+  bytes signature = 3;          // signature over message
+  string key_id = 4;            // references a stored key; optional for registration, REQUIRED for updates (e.g., AddActorKey)
+}
+
+message IssueTokenRequest {
+  string subject = 1;                 // actor id
+  ActorKind actor_kind = 2;           // user or service
+  repeated string roles = 3;          // role names
+  repeated string permissions = 4;    // string-encoded permissions
+  uint32 ttl_seconds = 5;             // token lifetime
+  SignedMessage proof = 6;            // proof of possession for stored public key
+}
+
+message IssueTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  uint64 expires_at = 3;              // seconds since epoch
+}
+
+// Register a new actor along with their initial public key; requires proof
+message RegisterActorRequest {
+  // Actor identifier (username@domain), no longer assumed to be an email address
+  string actor_id = 1;
+  ActorKind actor_kind = 2;
+  PublicKey public_key = 3;
+  SignedMessage proof = 4;            // signature over registration message using public_key
+  // Email address to send registration confirmation envelope to
+  string email = 5;
+}
+message RegisterActorResponse {
+  bool created = 1;
+}
+
+// Add (attach) a new public key to an existing actor; requires proof signed by an EXISTING key on the actor (not the new key)
+message AddActorKeyRequest {
+  string actor_id = 1;
+  ActorKind actor_kind = 2;
+  PublicKey public_key = 3;
+  SignedMessage proof = 4;            // signature over add-key message using an existing stored key (proof.key_id REQUIRED)
+}
+message AddActorKeyResponse {
+  bool added = 1;
+}
+
+// Confirm a pending registration by sending back the JSON envelope received via email
+message RegistrationConfirmationRequest {
+  string actor_id = 1;
+  ActorKind actor_kind = 2;
+  bytes confirmation_envelope = 3; // the JSON message sent via email
+}
+message RegistrationConfirmationResponse {
+  bool confirmed = 1;
+}
+
+service AuthService {
+  rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
+  rpc RegisterActor(RegisterActorRequest) returns (RegisterActorResponse);
+  rpc RegistrationConfirmation(RegistrationConfirmationRequest) returns (RegistrationConfirmationResponse);
+  rpc AddActorKey(AddActorKeyRequest) returns (AddActorKeyResponse);
+}
