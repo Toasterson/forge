@@ -22,7 +22,7 @@ opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.17.0", features = ["grpc-tonic"] }
 
 # Async runtime
-tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "signal", "time"] }
+tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "signal", "time", "process", "io-util"] }
 
 # Storage
 surrealdb = { version = "1.5.4", features = ["kv-rocksdb", "protocol-ws"] }
@@ -48,6 +48,8 @@ kdl = "4.6"
 tonic = { version = "0.11", features = ["transport"] }
 prost = "0.12"
 tonic-health = "0.11"
+# Streaming helpers
+ tokio-stream = "0.1"
 
 # IDs
 uuid = { version = "1.8", features = ["v4", "serde"] }
@@ -61,11 +63,16 @@ rand = "0.8"
 
 # Crypto
 age = { version = "0.11", features = ["ssh"] }
-rage = "0.11"
 ssh-key = { version = "0.6", features = ["ed25519", "rand_core"] }
 
 # Email
 lettre = { version = "0.11", default-features = false, features = ["builder", "serde", "tokio1", "smtp-transport", "hostname", "rustls-tls", "tokio1-rustls-tls"] }
+
+# Pure-Rust Git implementation (gitoxide)
+# Note: We will progressively migrate wire-protocol handlers to use this in-process.
+gix = "0.60"
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+sha2 = "0.10"
 
 # Base gate model
 gate = { workspace = true }
@@ -73,3 +80,6 @@ component = { workspace = true }
 
 [build-dependencies]
 tonic-build = "0.11"
+
+[dev-dependencies]
+forged-client = { path = "../forged-client" }

@@ -1,9 +1,12 @@
 use crate::api::forged::api::v1::{
     auth_service_server::AuthServiceServer, component_service_server::ComponentServiceServer,
-    gate_service_server::GateServiceServer,
+    gate_service_server::GateServiceServer, git_service_server::GitServiceServer,
 };
-use crate::services::{AuthServiceImpl, ComponentServiceImpl, GateServiceImpl, SharedState};
+use crate::services::{
+    AuthServiceImpl, ComponentServiceImpl, GateServiceImpl, GitServiceImpl, SharedState,
+};
 use crate::settings::Settings;
+use crate::storage::git::RepoManager;
 use crate::storage::surreal as sdb;
 use lettre::{transport::smtp::authentication::Credentials, AsyncSmtpTransport, Tokio1Executor};
 use miette::{Context, IntoDiagnostic};
@@ -126,23 +129,29 @@ pub async fn start_grpc_server(addr: SocketAddr) -> miette::Result<()> {
         .wrap_err("connect surrealdb")?;
     let keys = load_or_init_server_settings_surreal(&db).await?;
 
+    // Build repo manager from settings
+    let repo_manager = RepoManager::new(settings.repos.clone());
+
     let shared = SharedState::new(
         db,
         keys.private_key_ssh,
         keys.public_key_ssh,
         mailer_opt,
         mail_from_opt,
+        repo_manager,
     );
 
     let gate_impl = GateServiceImpl::from_shared(shared.clone());
     let component_impl = ComponentServiceImpl::from_shared(shared.clone());
-    let auth_impl = AuthServiceImpl::from_shared(shared);
+    let auth_impl = AuthServiceImpl::from_shared(shared.clone());
+    let git_impl = GitServiceImpl::from_shared(shared);
 
     Server::builder()
         .add_service(health_service)
         .add_service(GateServiceServer::new(gate_impl))
         .add_service(ComponentServiceServer::new(component_impl))
         .add_service(AuthServiceServer::new(auth_impl))
+        .add_service(GitServiceServer::new(git_impl))
         .serve_with_shutdown(addr, shutdown_signal())
         .await
         .into_diagnostic()

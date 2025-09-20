@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use base64::Engine;
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -140,6 +141,81 @@ impl AuthClient {
         let _resp = client.registration_confirmation(Request::new(req)).await?;
         Ok(())
     }
+
+    /// Confirm registration using an age-encrypted envelope addressed to the actor's SSH key.
+    /// - `encrypted_b64`: Base64-URL (no padding preferred) encoded ciphertext from the email
+    /// - `identity_path`: path to your SSH private key (e.g., ~/.ssh/id_ed25519)
+    pub async fn confirm_registration_encrypted(
+        &self,
+        actor_id: String,
+        kind: ActorKind,
+        encrypted_b64: &str,
+        identity_path: &Path,
+    ) -> Result<()> {
+        use age::Decryptor;
+        use std::io::{BufReader, Cursor, Read};
+        // Decode Base64 (try URL-safe no pad, then URL-safe, then standard)
+        let cipher = decode_b64_any(encrypted_b64.as_bytes());
+        // Load SSH identity (unencrypted private key)
+        let ident_bytes = std::fs::read(identity_path).map_err(|e| {
+            info!(path=%identity_path.display(), error=?e, "failed to read identity");
+            e
+        })?;
+        let reader = BufReader::new(Cursor::new(ident_bytes));
+        let identity = age::ssh::Identity::from_buffer(reader, None)
+            .map_err(|e| {
+                info!(path=%identity_path.display(), error=?e, "invalid SSH identity (is it encrypted?)");
+                std::io::Error::new(std::io::ErrorKind::Other, "invalid SSH identity")
+            })?;
+        let decryptor = Decryptor::new(Cursor::new(cipher)).map_err(|e| {
+            info!(error=?e, "invalid age ciphertext for envelope");
+            std::io::Error::new(std::io::ErrorKind::Other, "invalid age ciphertext")
+        })?;
+        let mut r = decryptor
+            .decrypt(std::iter::once(&identity as &dyn age::Identity))
+            .map_err(|e| {
+                info!(error=?e, "failed to decrypt envelope with provided identity");
+                std::io::Error::new(std::io::ErrorKind::Other, "decrypt failed")
+            })?;
+        let mut envelope_bytes = Vec::new();
+        r.read_to_end(&mut envelope_bytes)?;
+
+        // Send the decrypted raw JSON envelope
+        let req = api::RegistrationConfirmationRequest {
+            actor_id,
+            actor_kind: api::ActorKind::from(kind) as i32,
+            confirmation_envelope: envelope_bytes,
+        };
+        let mut client = self.client();
+        let _resp = client.registration_confirmation(Request::new(req)).await?;
+        Ok(())
+    }
+}
+
+fn decode_b64_any(input: &[u8]) -> Vec<u8> {
+    if let Ok(d) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(input) {
+        return d;
+    }
+    if let Ok(d) = base64::engine::general_purpose::URL_SAFE.decode(input) {
+        return d;
+    }
+    if let Ok(d) = base64::engine::general_purpose::STANDARD.decode(input) {
+        return d;
+    }
+    // Fallback: treat as UTF-8, trim and retry
+    if let Ok(s) = std::str::from_utf8(input) {
+        let t = s.trim();
+        if let Ok(d) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(t.as_bytes()) {
+            return d;
+        }
+        if let Ok(d) = base64::engine::general_purpose::URL_SAFE.decode(t.as_bytes()) {
+            return d;
+        }
+        if let Ok(d) = base64::engine::general_purpose::STANDARD.decode(t.as_bytes()) {
+            return d;
+        }
+    }
+    input.to_vec()
 }
 
 fn guess_ssh_algorithm(key_bytes: &[u8]) -> String {

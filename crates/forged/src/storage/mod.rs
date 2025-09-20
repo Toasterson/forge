@@ -2,6 +2,7 @@ use crate::component::ComponentRecord;
 use crate::gate::GateRecord;
 use crate::types::{ComponentId, GateId};
 
+pub mod git;
 pub mod surreal;
 
 /// Repository trait for storing and retrieving Gate records.

@@ -256,7 +256,7 @@ pub enum AuthCmd {
         #[arg(long)]
         algorithm: Option<String>,
     },
-    /// Confirm a pending registration with the envelope content
+    /// Confirm a pending registration using the age-encrypted envelope from the email
     Confirm {
         #[arg(long)]
         host: String,
@@ -264,9 +264,12 @@ pub enum AuthCmd {
         actor_id: String,
         #[arg(long, value_enum, default_value_t = ActorKind::User)]
         kind: ActorKind,
-        /// Envelope content you received via email (Base64-URL or raw JSON)
+        /// Age-encrypted envelope ciphertext (Base64-URL, no padding) from the email
         #[arg(long)]
         envelope: String,
+        /// Path to your SSH private key for decrypting --envelope (defaults to ~/.ssh/id_ed25519)
+        #[arg(long)]
+        identity: Option<PathBuf>,
         /// After confirming, record a local login for this host/actor
         #[arg(long)]
         login: bool,
@@ -383,6 +386,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 actor_id,
                 kind,
                 envelope,
+                identity,
                 login,
                 select,
             } => {
@@ -390,10 +394,21 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 let client = AuthClient::connect(url)
                     .await
                     .wrap_err("failed to connect to forge host")?;
+
+                let identity_path = identity.unwrap_or_else(|| {
+                    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                    PathBuf::from(format!("{}/.ssh/id_ed25519", home))
+                });
                 client
-                    .confirm_registration(actor_id.clone(), kind, &envelope)
+                    .confirm_registration_encrypted(
+                        actor_id.clone(),
+                        kind,
+                        &envelope,
+                        &identity_path,
+                    )
                     .await
-                    .wrap_err("confirmation RPC failed")?;
+                    .wrap_err("confirmation RPC failed (decrypt)")?;
+
                 // Optionally record login and select context
                 if login || select {
                     let path = default_auth_state_path();

@@ -6,9 +6,6 @@ license.workspace = true
 repository.workspace = true
 description = "Package development utility to interact and use package kdl metadata"
 
-[build-dependencies]
-# Generate gRPC client from proto
-tonic-build = "0.11"
 
 [dependencies]
 component.workspace = true
@@ -42,9 +39,13 @@ libips = { git = "https://github.com/OpenFlowLabs/ips.git", optional = true }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 cargo_metadata = "0.22"
-# gRPC client
+# Use shared forged-client crate instead of generating protos here
+forged-client = { path = "../forged-client" }
+# keep tonic for Request types and client usage
 tonic = { version = "0.11", features = ["transport"] }
-prost = "0.12"
+# Decryption support for age-encrypted envelopes
+age = { version = "0.11", features = ["ssh"] }
+base64 = "0.22"
 
 [features]
 default = ["libips"]

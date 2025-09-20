@@ -86,6 +86,7 @@ fn now_sec() -> u64 {
 mod tests {
     use super::*;
     use crate::rbac::Permission;
+    use crate::types::{ActorId, ActorKind};
 
     #[test]
     fn serialize_roundtrip() {

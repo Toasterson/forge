@@ -130,6 +130,50 @@ pub async fn delete_pending_registration(db: &Db, id: &str) -> miette::Result<()
     Ok(())
 }
 
+// ---- Actor key storage ----
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct ActorKeyRec {
+    #[serde(rename = "id", skip_serializing, default, skip_deserializing)]
+    pub id: String,
+    pub actor_id: String,
+    pub key_id: String,
+    pub algorithm: String,
+    pub public_key: Vec<u8>,
+}
+
+pub async fn upsert_actor_key(db: &Db, rec: &ActorKeyRec) -> miette::Result<()> {
+    let key: surrealdb::sql::Thing = (
+        "actor_keys".to_string(),
+        format!("{}::{}", rec.actor_id, rec.key_id),
+    )
+        .into();
+    let _res: Option<ActorKeyRec> = db
+        .update(key)
+        .content(rec)
+        .await
+        .into_diagnostic()
+        .wrap_err("upsert actor key")?;
+    Ok(())
+}
+
+pub async fn get_actor_key(
+    db: &Db,
+    actor_id: &str,
+    key_id: &str,
+) -> miette::Result<Option<ActorKeyRec>> {
+    let key: surrealdb::sql::Thing = (
+        "actor_keys".to_string(),
+        format!("{}::{}", actor_id, key_id),
+    )
+        .into();
+    let res: Option<ActorKeyRec> = db
+        .select(key)
+        .await
+        .into_diagnostic()
+        .wrap_err("get actor key")?;
+    Ok(res)
+}
+
 // Gate and Component storage helpers
 // Internal row shape returned by Surreal when selecting from 'gates' includes an 'id' Thing.
 #[derive(Deserialize)]

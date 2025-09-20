@@ -6,6 +6,7 @@ use base64::Engine;
 use lettre::AsyncTransport;
 use lettre::{message::Mailbox, AsyncSmtpTransport, Message, Tokio1Executor};
 // SurrealDB storage
+use crate::storage::git::RepoManager;
 use crate::storage::surreal as sdb;
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
@@ -57,6 +58,7 @@ impl SharedState {
         public_ssh: String,
         mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
         mail_from: Option<String>,
+        repo_manager: RepoManager,
     ) -> Self {
         let mut state = State::default();
         state.surreal = Some(db);
@@ -64,6 +66,7 @@ impl SharedState {
         state.server_public_ssh = public_ssh;
         state.mailer = mailer;
         state.mail_from = mail_from;
+        state.repo_manager = Some(repo_manager);
         SharedState(Arc::new(state))
     }
 }
@@ -84,7 +87,363 @@ impl ComponentServiceImpl {
     }
 }
 
+#[tonic::async_trait]
+impl api::git_service_server::GitService for GitServiceImpl {
+    type SmartPushStream =
+        tokio_stream::wrappers::ReceiverStream<Result<api::SmartPushResponse, Status>>;
+    type SmartFetchStream =
+        tokio_stream::wrappers::ReceiverStream<Result<api::SmartFetchResponse, Status>>;
+
+    async fn create_repo(
+        &self,
+        request: Request<api::CreateRepoRequest>,
+    ) -> Result<Response<api::CreateRepoResponse>, Status> {
+        let Some(repo) = &self.state.repo_manager else {
+            return Err(Status::failed_precondition("repo manager not available"));
+        };
+        let req = request.into_inner();
+        if req.component_id.is_empty() {
+            return Err(Status::invalid_argument("component_id is required"));
+        }
+        match repo.ensure_repo(&req.component_id) {
+            Ok(created) => Ok(Response::new(api::CreateRepoResponse { created })),
+            Err(e) => {
+                error!(component_id=%req.component_id, error=?e, "ensure repo failed");
+                Err(Status::internal("create repo failed"))
+            }
+        }
+    }
+
+    async fn put_version(
+        &self,
+        request: Request<api::PutVersionRequest>,
+    ) -> Result<Response<api::PutVersionResponse>, Status> {
+        let req = request.into_inner();
+        if req.component_id.is_empty() {
+            return Err(Status::invalid_argument("component_id is required"));
+        }
+        if req.version.is_empty() {
+            return Err(Status::invalid_argument("version is required"));
+        }
+        let Some(repo) = &self.state.repo_manager else {
+            return Err(Status::failed_precondition("repo manager not available"));
+        };
+        // Commit package.kdl to the component repo
+        let commit_id = repo
+            .put_version_package_kdl(&req.component_id, &req.version, &req.package_kdl)
+            .map_err(|e| {
+                error!(component_id=%req.component_id, version=%req.version, error=?e, "put version failed");
+                Status::internal("put version failed")
+            })?;
+
+        // Update SurrealDB: set current package.kdl contents as latest in metadata
+        if let Some(db) = &self.state.surreal {
+            let comp_id = crate::types::ComponentId(req.component_id.clone());
+            match sdb::get_component(db, &comp_id).await {
+                Ok(Some(mut rec)) => {
+                    // Store KDL as plain string under metadata.package_kdl
+                    let kdl_str = String::from_utf8_lossy(&req.package_kdl).to_string();
+                    let mut meta = rec.metadata.take().unwrap_or_else(|| serde_json::json!({}));
+                    if let Some(obj) = meta.as_object_mut() {
+                        obj.insert("package_kdl".into(), serde_json::Value::String(kdl_str));
+                        obj.insert(
+                            "current_version".into(),
+                            serde_json::Value::String(req.version.clone()),
+                        );
+                    }
+                    rec.metadata = Some(meta);
+                    rec.touch();
+                    if let Err(e) = sdb::put_component(db, &rec).await {
+                        error!(component_id=%req.component_id, error=?e, "update component current package.kdl failed");
+                    }
+                }
+                Ok(None) => {
+                    warn!(component_id=%req.component_id, "component not found when updating current package.kdl");
+                }
+                Err(e) => {
+                    error!(component_id=%req.component_id, error=?e, "surreal get component failed");
+                }
+            }
+        }
+
+        Ok(Response::new(api::PutVersionResponse { commit_id }))
+    }
+
+    async fn smart_push(
+        &self,
+        request: Request<tonic::Streaming<api::SmartPushRequest>>,
+    ) -> Result<Response<Self::SmartPushStream>, Status> {
+        use tokio::io::AsyncWriteExt;
+        use tokio::sync::mpsc;
+
+        let Some(repo_mgr) = &self.state.repo_manager else {
+            return Err(Status::failed_precondition("repo manager not available"));
+        };
+
+        // Receive first message and validate it's an `open` with auth
+        let mut inbound = request.into_inner();
+        let first = inbound
+            .message()
+            .await
+            .map_err(|e| Status::internal(format!("receive stream error: {e}")))?;
+        let Some(first_msg) = first else {
+            return Err(Status::invalid_argument("empty stream"));
+        };
+        let open = match first_msg.payload {
+            Some(api::smart_push_request::Payload::Open(o)) => o,
+            _ => return Err(Status::invalid_argument("first message must be `open`")),
+        };
+        if open.component_id.is_empty() || open.actor_id.is_empty() || open.key_id.is_empty() {
+            return Err(Status::invalid_argument(
+                "open.component_id, actor_id and key_id are required",
+            ));
+        }
+
+        // Authenticate using stored actor key
+        let db = self
+            .state
+            .surreal
+            .as_ref()
+            .ok_or_else(|| Status::failed_precondition("database not available for auth"))?;
+        let key = sdb::get_actor_key(db, &open.actor_id, &open.key_id)
+            .await
+            .map_err(|e| {
+                error!(actor_id=%open.actor_id, key_id=%open.key_id, error=?e, "get actor key failed");
+                Status::internal("auth lookup failed")
+            })?
+            .ok_or_else(|| Status::unauthenticated("actor key not found"))?;
+        // ed25519 verification (if algorithm matches)
+        if open.algorithm.to_ascii_lowercase() == "ed25519" {
+            if let Some(proof) = open.proof {
+                if !crate::services::verify_ed25519(
+                    &key.public_key,
+                    &proof.message,
+                    &proof.signature,
+                ) {
+                    return Err(Status::unauthenticated("signature verification failed"));
+                }
+            } else {
+                return Err(Status::unauthenticated("missing proof"));
+            }
+        } else {
+            return Err(Status::unauthenticated("unsupported key algorithm"));
+        }
+
+        // Ensure a bare repository exists for push ingestion
+        if let Err(e) = repo_mgr.ensure_bare_repo(&open.component_id) {
+            error!(component_id=%open.component_id, error=?e, "ensure bare repo failed");
+            return Err(Status::internal("failed to ensure bare repository"));
+        }
+        let bare_dir = repo_mgr.repo_bare_dir(&open.component_id);
+
+        // Prepare incoming pack sink path
+        let pack_dir = bare_dir.join("objects").join("pack");
+        if let Err(e) = std::fs::create_dir_all(&pack_dir) {
+            error!(dir=%pack_dir.display(), error=?e, "create pack dir failed");
+            return Err(Status::internal("failed to prepare pack directory"));
+        }
+        let ts = now_sec();
+        let pack_path = pack_dir.join(format!("incoming-{ts}.pack"));
+        let file = match tokio::fs::File::create(&pack_path).await {
+            Ok(f) => f,
+            Err(e) => {
+                error!(path=%pack_path.display(), error=?e, "create pack file failed");
+                return Err(Status::internal("failed to create pack file"));
+            }
+        };
+        let file = tokio::sync::Mutex::new(file);
+
+        let (tx, rx) = mpsc::channel(16);
+        let mut tx_progress = tx.clone();
+
+        // clone inputs needed in the writer task
+        let repo_mgr2 = repo_mgr.clone();
+        let component_id = open.component_id.clone();
+        let pack_path2 = pack_path.clone();
+
+        // Writer task: append all packfile chunks to the file
+        tokio::spawn(async move {
+            let mut wrote: u64 = 0;
+
+            // Process remaining messages
+            while let Ok(maybe) = inbound.message().await {
+                let Some(msg) = maybe else {
+                    break;
+                };
+                match msg.payload {
+                    Some(api::smart_push_request::Payload::PackfileChunk(bytes)) => {
+                        let mut guard = file.lock().await;
+                        if let Err(e) = guard.write_all(&bytes).await {
+                            let _ = tx_progress
+                                .send(Err(Status::internal(format!("pack write failed: {e}"))))
+                                .await;
+                            return;
+                        }
+                        wrote += bytes.len() as u64;
+                        let _ = tx_progress
+                            .send(Ok(api::SmartPushResponse {
+                                payload: Some(api::smart_push_response::Payload::Progress(
+                                    format!("received {} bytes", wrote),
+                                )),
+                            }))
+                            .await;
+                    }
+                    Some(api::smart_push_request::Payload::Done(true)) => break,
+                    _ => {}
+                }
+            }
+
+            // Flush and close the file before finalization
+            {
+                let mut guard = file.lock().await;
+                if let Err(e) = guard.flush().await {
+                    let _ = tx_progress
+                        .send(Err(Status::internal(format!("flush pack failed: {e}"))))
+                        .await;
+                    return;
+                }
+            }
+
+            // Finalize: rename incoming pack to canonical pack-<hash>.pack
+            match repo_mgr2.finalize_incoming_pack(&component_id, &pack_path2) {
+                Ok(final_path) => {
+                    let _ = tx_progress
+                        .send(Ok(api::SmartPushResponse {
+                            payload: Some(api::smart_push_response::Payload::Progress(format!(
+                                "stored pack as {}",
+                                final_path
+                                    .file_name()
+                                    .and_then(|s| s.to_str())
+                                    .unwrap_or("(unknown)")
+                            ))),
+                        }))
+                        .await;
+                    let _ = tx_progress
+                        .send(Ok(api::SmartPushResponse {
+                            payload: Some(api::smart_push_response::Payload::Accepted(true)),
+                        }))
+                        .await;
+                }
+                Err(e) => {
+                    let _ = tx_progress
+                        .send(Err(Status::internal(format!("finalize pack failed: {e}"))))
+                        .await;
+                }
+            }
+        });
+
+        Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(
+            rx,
+        )))
+    }
+
+    async fn smart_fetch(
+        &self,
+        request: Request<api::SmartFetchRequest>,
+    ) -> Result<Response<Self::SmartFetchStream>, Status> {
+        use tokio::io::AsyncReadExt;
+        use tokio::sync::mpsc;
+
+        let req = request.into_inner();
+        if req.component_id.is_empty() {
+            return Err(Status::invalid_argument("component_id is required"));
+        }
+        let Some(repo_mgr) = &self.state.repo_manager else {
+            return Err(Status::failed_precondition("repo manager not available"));
+        };
+
+        // Try to find the latest pack file in the bare repository
+        let pack_path = match repo_mgr.latest_pack_path(&req.component_id) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!(component_id=%req.component_id, error=?e, "no pack available for fetch");
+                return Err(Status::not_found("no pack available for repository"));
+            }
+        };
+
+        // Open file for async reading
+        let file = match tokio::fs::File::open(&pack_path).await {
+            Ok(f) => f,
+            Err(e) => {
+                error!(path=%pack_path.display(), error=?e, "open pack for fetch failed");
+                return Err(Status::internal("failed to open pack"));
+            }
+        };
+        let mut reader = file;
+
+        let (tx, rx) = mpsc::channel(16);
+        let path_str = pack_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("pack.pack")
+            .to_string();
+
+        tokio::spawn(async move {
+            let mut sent: u64 = 0;
+            // Send initial progress
+            let _ = tx
+                .send(Ok(api::SmartFetchResponse {
+                    payload: Some(api::smart_fetch_response::Payload::Progress(format!(
+                        "streaming {}",
+                        path_str
+                    ))),
+                }))
+                .await;
+
+            let mut buf = vec![0u8; 64 * 1024];
+            loop {
+                match reader.read(&mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        sent += n as u64;
+                        let _ = tx
+                            .send(Ok(api::SmartFetchResponse {
+                                payload: Some(api::smart_fetch_response::Payload::PackfileChunk(
+                                    buf[..n].to_vec(),
+                                )),
+                            }))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = tx
+                            .send(Ok(api::SmartFetchResponse {
+                                payload: Some(api::smart_fetch_response::Payload::Error(format!(
+                                    "read error: {}",
+                                    e
+                                ))),
+                            }))
+                            .await;
+                        return;
+                    }
+                }
+            }
+            let _ = tx
+                .send(Ok(api::SmartFetchResponse {
+                    payload: Some(api::smart_fetch_response::Payload::Done(true)),
+                }))
+                .await;
+        });
+
+        Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(
+            rx,
+        )))
+    }
+}
+
 impl AuthServiceImpl {
+    pub fn from_shared(shared: SharedState) -> Self {
+        Self {
+            state: shared.0.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GitServiceImpl {
+    state: Arc<State>,
+}
+
+impl GitServiceImpl {
     pub fn from_shared(shared: SharedState) -> Self {
         Self {
             state: shared.0.clone(),
@@ -153,6 +512,7 @@ struct State {
     server_public_ssh: String,
     mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
     mail_from: Option<String>,
+    repo_manager: Option<RepoManager>,
 }
 
 impl Default for State {
@@ -173,6 +533,7 @@ impl Default for State {
             server_private_ssh: private_key_ssh,
             server_public_ssh: public_key_ssh,
             mailer: None,
+            repo_manager: None,
             mail_from: None,
         }
     }
@@ -343,6 +704,24 @@ fn normalize_envelope_bytes(raw: &[u8]) -> Vec<u8> {
     }
     // Fallback to raw bytes when nothing matched
     raw.to_vec()
+}
+
+// Verify an ed25519 signature using raw 32-byte public key.
+pub(crate) fn verify_ed25519(pubkey: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    let pk_bytes: [u8; 32] = match pubkey.try_into() {
+        Ok(arr) => arr,
+        Err(_) => return false,
+    };
+    let vk = match VerifyingKey::from_bytes(&pk_bytes) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    let sig = match Signature::from_slice(signature) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    vk.verify(message, &sig).is_ok()
 }
 
 const REGISTRATION_TTL_SECS: u64 = 4 * 60 * 60; // 4 hours
@@ -570,9 +949,63 @@ impl api::component_service_server::ComponentService for ComponentServiceImpl {
 impl api::auth_service_server::AuthService for AuthServiceImpl {
     async fn issue_token(
         &self,
-        _request: Request<api::IssueTokenRequest>,
+        request: Request<api::IssueTokenRequest>,
     ) -> Result<Response<api::IssueTokenResponse>, Status> {
-        Err(Status::unimplemented("IssueToken not implemented"))
+        #[derive(Serialize, Deserialize)]
+        struct Claims {
+            sub: String,
+            actor_kind: String,
+            roles: Vec<String>,
+            permissions: Vec<String>,
+            exp: usize,
+            iat: usize,
+            iss: String,
+            jti: String,
+        }
+        let req = request.into_inner();
+        if req.subject.is_empty() {
+            return Err(Status::invalid_argument("subject is required"));
+        }
+        // Default TTL to 1 hour if not provided
+        let ttl = if req.ttl_seconds == 0 {
+            3600
+        } else {
+            req.ttl_seconds
+        } as u64;
+        let now = now_sec() as usize;
+        let exp = (now_sec() + ttl) as usize;
+        let actor_kind = match api::ActorKind::try_from(req.actor_kind) {
+            Ok(k) => format!("{:?}", k),
+            Err(_) => return Err(Status::invalid_argument("invalid actor_kind")),
+        };
+        let claims = Claims {
+            sub: req.subject.clone(),
+            actor_kind,
+            roles: req.roles.clone(),
+            permissions: req.permissions.clone(),
+            exp,
+            iat: now,
+            iss: "forged".to_string(),
+            jti: uuid::Uuid::new_v4().to_string(),
+        };
+        let secret = self.state.server_private_ssh.as_bytes();
+        let token = match jsonwebtoken::encode(
+            &jsonwebtoken::Header::default(),
+            &claims,
+            &jsonwebtoken::EncodingKey::from_secret(secret),
+        ) {
+            Ok(t) => t,
+            Err(e) => {
+                error!(error=?e, "jwt encode failed");
+                return Err(Status::internal("token generation failed"));
+            }
+        };
+        let refresh = uuid::Uuid::new_v4().to_string();
+        Ok(Response::new(api::IssueTokenResponse {
+            access_token: token,
+            refresh_token: refresh,
+            expires_at: exp as u64,
+        }))
     }
 
     async fn register_actor(
@@ -648,6 +1081,9 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
             serde_json::to_vec(&envelope).map_err(|_| Status::internal("serialize envelope"))?;
 
         // Attempt to encrypt the envelope for the actor using their SSH public key (best-effort)
+        // If successful, we include the Base64-URL (no padding) ciphertext in the email for
+        // users to decrypt locally with age/rage CLI.
+        let mut actor_encrypted_b64: Option<String> = None;
         if let Some(pk) = &public_key {
             if let Ok(actor_pub_str) = std::str::from_utf8(&pk.public_key) {
                 if let Ok(actor_recipient) = age::ssh::Recipient::from_str(actor_pub_str) {
@@ -660,6 +1096,8 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
                         let mut writer = encryptor.wrap_output(&mut sink).map_err(|_| ())?;
                         writer.write_all(&envelope_bytes).map_err(|_| ())?;
                         writer.finish().map_err(|_| ())?;
+                        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&sink);
+                        actor_encrypted_b64 = Some(b64);
                         info!(
                             cipher_len = sink.len(),
                             "envelope encrypted for actor using age/ssh"
@@ -723,6 +1161,24 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
             // Encode the envelope using URL-safe Base64 without padding for easy copy/paste and CLI usage
             let envelope_text =
                 base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&envelope_bytes);
+            let actor_section = if let Some(cipher) = actor_encrypted_b64.as_deref() {
+                format!(
+                    concat!(
+                        "\n\n",
+                        "For your convenience, the envelope is also encrypted to your SSH public key using age.\n",
+                        "You can decrypt it locally with:\n",
+                        "  echo '{{cipher}}' | base64 -d | rage -d -i ~/.ssh/id_ed25519 > envelope.json\n",
+                        "or using age (if installed) similarly.\n\n",
+                        "--- BEGIN AGE-ENCRYPTED ENVELOPE (Base64-URL, no padding) ---\n",
+                        "{cipher}\n",
+                        "--- END AGE-ENCRYPTED ENVELOPE ---\n"
+                    ),
+                    cipher = cipher
+                )
+            } else {
+                String::new()
+            };
+
             let body = format!(
                 concat!(
                     "Hello,\n\n",
@@ -733,11 +1189,13 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
                     "Do not share this envelope with anyone. It expires at UNIX time: {expires}.\n\n",
                     "--- BEGIN REGISTRATION ENVELOPE ---\n",
                     "{envelope}\n",
-                    "--- END REGISTRATION ENVELOPE ---\n\n",
-                    "If you did not initiate this request, you can ignore this email."
+                    "--- END REGISTRATION ENVELOPE ---\n",
+                    "{actor_section}",
+                    "\nIf you did not initiate this request, you can ignore this email."
                 ),
                 expires = expires_at,
-                envelope = envelope_text
+                envelope = envelope_text,
+                actor_section = actor_section
             );
 
             // Build the message
@@ -889,9 +1347,43 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
 
     async fn add_actor_key(
         &self,
-        _request: Request<api::AddActorKeyRequest>,
+        request: Request<api::AddActorKeyRequest>,
     ) -> Result<Response<api::AddActorKeyResponse>, Status> {
-        Err(Status::unimplemented("AddActorKey not implemented"))
+        let req = request.into_inner();
+        if req.actor_id.is_empty() {
+            return Err(Status::invalid_argument("actor_id is required"));
+        }
+        let _kind = api::ActorKind::try_from(req.actor_kind)
+            .map_err(|_| Status::invalid_argument("invalid actor_kind"))?;
+        let Some(pk) = req.public_key else {
+            return Err(Status::invalid_argument("public_key is required"));
+        };
+        if pk.algorithm.is_empty() {
+            return Err(Status::invalid_argument("public_key.algorithm is required"));
+        }
+        if pk.public_key.is_empty() {
+            return Err(Status::invalid_argument(
+                "public_key.public_key is required",
+            ));
+        }
+        // Persist in SurrealDB if available
+        if let Some(db) = &self.state.surreal {
+            let rec = sdb::ActorKeyRec {
+                id: String::new(),
+                actor_id: req.actor_id.clone(),
+                key_id: pk.key_id.clone(),
+                algorithm: pk.algorithm.clone(),
+                public_key: pk.public_key.clone(),
+            };
+            if let Err(e) = sdb::upsert_actor_key(db, &rec).await {
+                error!(actor_id=%req.actor_id, key_id=%pk.key_id, error=?e, "persist actor key failed");
+                return Err(Status::internal("persist actor key failed"));
+            }
+            info!(actor_id=%req.actor_id, key_id=%pk.key_id, algorithm=%pk.algorithm, "actor key persisted");
+        } else {
+            info!(actor_id=%req.actor_id, key_id=%pk.key_id, algorithm=%pk.algorithm, "AddActorKey accepted (no DB configured)");
+        }
+        Ok(Response::new(api::AddActorKeyResponse { added: true }))
     }
 }
 

@@ -32,6 +32,24 @@ pub struct SmtpConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GitS3Config {
+    pub bucket: Option<String>,
+    pub prefix: Option<String>,
+    pub region: Option<String>,
+    pub endpoint: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GitStorageConfig {
+    /// One of: "fs" or "s3". Default: "fs".
+    pub mode: Option<String>,
+    /// Root path on filesystem when mode == "fs". Default: ./data/repos
+    pub root: Option<String>,
+    /// S3 settings when mode == "s3"
+    pub s3: Option<GitS3Config>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Settings {
     #[serde(default)]
     pub server: ServerConfig,
@@ -39,6 +57,8 @@ pub struct Settings {
     pub surreal: SurrealConfig,
     #[serde(default)]
     pub smtp: Option<SmtpConfig>,
+    #[serde(default)]
+    pub repos: GitStorageConfig,
 }
 
 impl Settings {
