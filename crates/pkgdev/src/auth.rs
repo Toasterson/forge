@@ -78,6 +78,7 @@ impl AuthClient {
     pub async fn register_actor(
         &self,
         actor_id: String,
+        email: String,
         kind: ActorKind,
         public_key_path: &Path,
         algorithm_hint: Option<String>,
@@ -114,6 +115,7 @@ impl AuthClient {
             actor_kind: api::ActorKind::from(kind) as i32,
             public_key: Some(pk),
             proof: Some(proof),
+            email,
         };
 
         let mut client = self.client();

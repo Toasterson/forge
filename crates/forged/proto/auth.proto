@@ -41,10 +41,13 @@ message IssueTokenResponse {
 
 // Register a new actor along with their initial public key; requires proof
 message RegisterActorRequest {
+  // Actor identifier (username@domain), no longer assumed to be an email address
   string actor_id = 1;
   ActorKind actor_kind = 2;
   PublicKey public_key = 3;
   SignedMessage proof = 4;            // signature over registration message using public_key
+  // Email address to send registration confirmation envelope to
+  string email = 5;
 }
 message RegisterActorResponse {
   bool created = 1;

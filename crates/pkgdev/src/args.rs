@@ -240,9 +240,12 @@ pub enum AuthCmd {
         /// Forge hostname (or hostname:port) to talk to (gRPC)
         #[arg(long)]
         host: String,
-        /// Actor identifier (e.g., email for users)
+        /// Actor identifier (username@domain)
         #[arg(long)]
         actor_id: String,
+        /// Email address to receive the registration confirmation envelope
+        #[arg(long)]
+        email: String,
         /// Actor kind
         #[arg(long, value_enum, default_value_t = ActorKind::User)]
         kind: ActorKind,
@@ -293,7 +296,7 @@ pub enum AuthCmd {
         /// Forge hostname (or hostname:port)
         #[arg(long)]
         host: String,
-        /// Actor identifier (e.g., email for users)
+        /// Actor identifier (username@domain)
         #[arg(long)]
         actor_id: String,
         /// Actor kind
@@ -359,6 +362,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
             AuthCmd::Register {
                 host,
                 actor_id,
+                email,
                 kind,
                 public_key,
                 algorithm,
@@ -368,7 +372,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     .await
                     .wrap_err("failed to connect to forge host")?;
                 client
-                    .register_actor(actor_id, kind, &public_key, algorithm)
+                    .register_actor(actor_id, email, kind, &public_key, algorithm)
                     .await
                     .wrap_err("registration RPC failed")?;
                 println!("registration submitted on {}", host);

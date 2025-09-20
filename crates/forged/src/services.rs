@@ -584,6 +584,10 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
         if actor_id.is_empty() {
             return Err(Status::invalid_argument("actor_id is required"));
         }
+        let email = req.email.clone();
+        if email.is_empty() {
+            return Err(Status::invalid_argument("email is required"));
+        }
         let Ok(actor_kind) = api::ActorKind::try_from(req.actor_kind) else {
             return Err(Status::invalid_argument("invalid actor_kind"));
         };
@@ -705,10 +709,10 @@ impl api::auth_service_server::AuthService for AuthServiceImpl {
 
         // Send email if SMTP configured; otherwise just log
         if let (Some(mailer), Some(from_addr)) = (&self.state.mailer, &self.state.mail_from) {
-            // Validate recipient address (actor_id)
-            let to_mb = actor_id
+            // Validate recipient address (email)
+            let to_mb = email
                 .parse::<Mailbox>()
-                .map_err(|_| Status::invalid_argument("actor_id is not a valid email address"))?;
+                .map_err(|_| Status::invalid_argument("email is not a valid email address"))?;
 
             // Validate configured from address
             let from_mb = from_addr
@@ -911,7 +915,7 @@ mod tests {
     #[tokio::test]
     async fn registration_flow_success() {
         let svc = AuthServiceImpl::default();
-        let actor_id = "user@example.com".to_string();
+        let actor_id = "alice@forge.local".to_string();
         let actor_kind = api::ActorKind::User; // note: this is the enum type, prost::Enumeration; as i32 when placed in messages
         let req = api::RegisterActorRequest {
             actor_id: actor_id.clone(),
@@ -922,6 +926,7 @@ mod tests {
                 public_key: vec![1, 2, 3],
             }),
             proof: None,
+            email: "alice@example.com".to_string(),
         };
         let _ = svc
             .register_actor(Request::new(req))
@@ -950,7 +955,7 @@ mod tests {
     #[tokio::test]
     async fn registration_flow_expired() {
         let svc = AuthServiceImpl::default();
-        let actor_id = "user2@example.com".to_string();
+        let actor_id = "bob@forge.local".to_string();
         let actor_kind = api::ActorKind::User;
         let req = api::RegisterActorRequest {
             actor_id: actor_id.clone(),
@@ -961,6 +966,7 @@ mod tests {
                 public_key: vec![4, 5, 6],
             }),
             proof: None,
+            email: "bob@example.com".to_string(),
         };
         let _ = svc
             .register_actor(Request::new(req))
