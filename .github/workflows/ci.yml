@@ -75,7 +75,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository_owner }}/forged
+            ghcr.io/${{ github.repository_owner }}/forge
           tags: |
             type=raw,value=${{ github.sha }}
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}

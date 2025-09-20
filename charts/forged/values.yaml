@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/OWNER/forged
+  repository: ghcr.io/toasterson/forge
   tag: latest
   pullPolicy: IfNotPresent
 
