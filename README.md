@@ -58,6 +58,7 @@ See docs/DEPLOYMENT.md for more options including Kubernetes (Helm) and systemd.
 
 Prerequisites:
 - Rust toolchain (stable), Cargo
+- System libraries: libarchive-dev (for pkgdev via compress-tools), pkg-config, OpenSSL headers (libssl-dev)
 - Optional: Node.js for the web UI dev workflow
 
 Build everything:
