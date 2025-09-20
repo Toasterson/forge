@@ -208,7 +208,7 @@ fn build_change_request(
     Ok(ChangeRequest {
         id: public_id,
         title: shared.pull_request.title,
-        body: shared.pull_request.body.unwrap_or(String::new()),
+        body: shared.pull_request.body.unwrap_or_default(),
         changes: vec![],
         external_ref: forge::ExternalReference::GitHub {
             pull_request: format!("{}/{}", &shared.repository.full_name, &shared.number),
@@ -257,7 +257,7 @@ fn build_change_request(
 #[instrument(level = "trace", skip_all)]
 async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest) -> Result<()> {
     debug!("Received Webhook: {}", req.get_kind());
-    let gate_id = state.gate_id.clone();
+    let gate_id = state.gate_id;
     match req.get_event()? {
         GitHubEvent::PullRequest(event) => {
             let span = span!(Level::DEBUG, "PullRequest match arm");
@@ -266,7 +266,7 @@ async fn handle_webhook(State(state): State<AppState>, req: GitHubWebhookRequest
             let from_actor: Url = build_public_id(IdKind::Actor, &state.base_url, "", "github")?;
             let to_actor: Url = build_public_id(IdKind::Actor, &state.base_url, "", "forge")?;
 
-            let (payload, job_payload) = match event {
+            let (payload, job_payload) = match *event {
                 github::PullRequestPayload::Assigned { .. } => {
                     info!("No need to check assignees at the moment. Ignoring");
                     (None, None)

@@ -36,6 +36,22 @@ jobs:
       - name: tests (unit/integration; e2e ignored by default)
         run: cargo test --workspace --locked -- --nocapture
 
+  cross-illumos:
+    name: Cross build for illumos (x86_64-unknown-illumos)
+    needs: [lint-build-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - name: Cross build forged + pkgdev (debug)
+        run: cross build --target x86_64-unknown-illumos -p forged -p pkgdev --locked
+      - name: Cross build forged + pkgdev (release)
+        run: cross build --target x86_64-unknown-illumos -p forged -p pkgdev --locked --release
+
   e2e:
     name: End-to-end tests (main only)
     needs: [lint-build-test]

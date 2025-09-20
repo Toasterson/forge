@@ -162,6 +162,18 @@ It covers:
 - The server’s logging uses `tracing`. Control verbosity with `RUST_LOG`, e.g.:
   `RUST_LOG=forged=debug,forged::services=trace`
 
+### Cross-compiling for illumos (x86_64)
+
+This repository includes a Cross.toml to build for illumos using the cross tool.
+
+Steps:
+- Install cross: `cargo install cross` (or use the `taiki-e/install-action` in CI)
+- Build forged and pkgdev for illumos:
+  - Debug: `cross build --target x86_64-unknown-illumos -p forged -p pkgdev`
+  - Release: `cross build --target x86_64-unknown-illumos -p forged -p pkgdev --release`
+
+The configuration uses the cross-rs Docker image for illumos and requires Docker on the host.
+
 ## License
 
 MPL-2.0

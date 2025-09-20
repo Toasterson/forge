@@ -51,13 +51,13 @@ pub struct ForgeToken {
     pub expires_in: Option<u64>,
 }
 
-impl Into<ValueKind> for ForgeToken {
-    fn into(self) -> ValueKind {
+impl From<ForgeToken> for ValueKind {
+    fn from(val: ForgeToken) -> Self {
         ValueKind::Table(config::Map::from([
-            ("access_token".to_string(), Value::from(self.access_token)),
-            ("refresh_token".to_string(), Value::from(self.refresh_token)),
-            ("scope".to_string(), Value::from(self.scope)),
-            ("expires_in".to_string(), Value::from(self.expires_in)),
+            ("access_token".to_string(), Value::from(val.access_token)),
+            ("refresh_token".to_string(), Value::from(val.refresh_token)),
+            ("scope".to_string(), Value::from(val.scope)),
+            ("expires_in".to_string(), Value::from(val.expires_in)),
         ]))
     }
 }
@@ -202,7 +202,7 @@ impl Settings {
             };
 
             WorkspaceConfig {
-                path: PathBuf::from(base_path).join(DEFAULT_WORKSPACE_DIR),
+                path: base_path.join(DEFAULT_WORKSPACE_DIR),
             }
         };
 
@@ -212,7 +212,6 @@ impl Settings {
     pub fn list_workspaces() -> Result<Vec<String>> {
         let data_dir = Self::get_or_create_data_dir()?;
         let workspaces = std::fs::read_dir(&data_dir)?
-            .into_iter()
             .map(|e| {
                 e.unwrap()
                     .path()
@@ -222,7 +221,7 @@ impl Settings {
                     .to_string()
             })
             .collect::<Vec<String>>();
-        if workspaces.len() == 0 {
+        if workspaces.is_empty() {
             Ok(vec![String::from(DEFAULT_WORKSPACE_DIR)])
         } else {
             Ok(workspaces)

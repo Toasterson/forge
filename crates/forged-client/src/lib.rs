@@ -83,6 +83,7 @@ impl From<AuthKind> for pb::ActorKind {
 /// High-level client wrapping tonic-generated service clients.
 #[derive(Clone)]
 pub struct ForgedClient {
+    #[allow(dead_code)]
     channel: Channel,
     pub gate: GateServiceClient<Channel>,
     pub component: ComponentServiceClient<Channel>,
@@ -181,6 +182,7 @@ impl ForgedClient {
     /// - `private_key_seed32`: 32-byte seed used to sign the `proof_message`
     /// - `proof_message`: arbitrary message that the server verifies
     /// - `reader`: async reader that yields raw packfile bytes
+    #[allow(clippy::too_many_arguments)]
     pub async fn push_pack_ed25519<R: tokio::io::AsyncRead + Unpin>(
         &mut self,
         component_id: &str,

@@ -41,7 +41,7 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub fn from_str(root_dir: &str) -> Result<Self> {
+    pub fn from_path_str(root_dir: &str) -> Result<Self> {
         let expanded_root_dir = shellexpand::full(root_dir)
             .map_err(|e| WorkspaceError::VariableLookupError(format!("{}", e.cause)))?
             .to_string();
@@ -231,5 +231,12 @@ impl Write for DownloadFile {
 
     fn flush(&mut self) -> io::Result<()> {
         self.handle.flush()
+    }
+}
+
+impl std::str::FromStr for Workspace {
+    type Err = WorkspaceError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Workspace::from_path_str(s)
     }
 }

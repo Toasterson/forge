@@ -52,13 +52,14 @@ jobs:
           cp target/release/forged ./dist/forged
           tar -C dist -czf pkgdev-${{ steps.ver.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz pkgdev
           tar -C dist -czf forged-${{ steps.ver.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz forged
-      - name: Try build illumos (x86_64-unknown-illumos)
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - name: Cross build illumos (x86_64-unknown-illumos)
         continue-on-error: true
         run: |
-          rustup target add x86_64-unknown-illumos || true
-          # Some crates may not support illumos cross-compile; try best-effort
-          cargo build -p pkgdev --release --target x86_64-unknown-illumos --locked || true
-          cargo build -p forged --release --target x86_64-unknown-illumos --locked || true
+          cross build --target x86_64-unknown-illumos -p pkgdev -p forged --locked --release || true
           if [ -f target/x86_64-unknown-illumos/release/pkgdev ]; then
             tar -C target/x86_64-unknown-illumos/release -czf pkgdev-${{ steps.ver.outputs.version }}-x86_64-unknown-illumos.tar.gz pkgdev
           fi

@@ -131,20 +131,23 @@ impl GitHubWebhookRequest {
         trace!("Parsing github event {}", self.event_kind);
         match self.event_kind {
             Event::Ping => Ok(GitHubEvent::Ping(serde_json::from_slice(&self.body)?)),
-            Event::Push => Ok(GitHubEvent::Push(serde_json::from_slice(&self.body)?)),
-            Event::PullRequest => Ok(GitHubEvent::PullRequest(serde_json::from_slice(
+            Event::Push => Ok(GitHubEvent::Push(Box::new(serde_json::from_slice(
                 &self.body,
-            )?)),
+            )?))),
+            Event::PullRequest => Ok(GitHubEvent::PullRequest(Box::new(serde_json::from_slice(
+                &self.body,
+            )?))),
         }
     }
 }
 
 pub enum GitHubEvent {
-    PullRequest(PullRequestPayload),
+    // Box large variants to avoid clippy::large-enum-variant
+    PullRequest(Box<PullRequestPayload>),
     Issue(Issue),
     IssueComment(IssueComment),
     Status(Status),
-    Push(Push),
+    Push(Box<Push>),
     Ping(Ping),
 }
 

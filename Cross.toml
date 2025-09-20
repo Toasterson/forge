@@ -1,0 +1,10 @@
+# Cross configuration for building to illumos on x86_64
+# See: https://github.com/cross-rs/cross
+
+[target.x86_64-unknown-illumos]
+# Prefer the maintained cross-rs image for illumos; it includes required toolchains and OpenSSL.
+# If you need a different tag (e.g., edge), update below.
+image = "ghcr.io/cross-rs/x86_64-unknown-illumos:edge"
+
+# Some crates may try to run build scripts; ensure pkg-config works when needed.
+# environment = { }
