@@ -1,11 +1,11 @@
 use std::fs;
-use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use base64::Engine;
 use clap::{Parser, Subcommand};
 use miette::{Context, IntoDiagnostic};
 use serde::{Deserialize, Serialize};
@@ -180,6 +180,7 @@ fn wait_for_server(addr: &str, timeout: Duration) -> miette::Result<()> {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct PendingRegistrationRec {
     actor_id: String,
     actor_kind: i32,

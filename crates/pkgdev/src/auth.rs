@@ -64,7 +64,7 @@ impl AuthClient {
         let server = server.into();
         // tonic expects http/https scheme
         if !server.starts_with("http://") && !server.starts_with("https://") {
-            return Err(AuthClientError::InvalidServerUrl(server).into());
+            return Err(AuthClientError::InvalidServerUrl(server));
         }
         let endpoint = Channel::from_shared(server.clone())
             .map_err(|_| AuthClientError::InvalidServerUrl(server.clone()))?;
@@ -165,17 +165,17 @@ impl AuthClient {
         let identity = age::ssh::Identity::from_buffer(reader, None)
             .map_err(|e| {
                 info!(path=%identity_path.display(), error=?e, "invalid SSH identity (is it encrypted?)");
-                std::io::Error::new(std::io::ErrorKind::Other, "invalid SSH identity")
+                std::io::Error::other("invalid SSH identity")
             })?;
         let decryptor = Decryptor::new(Cursor::new(cipher)).map_err(|e| {
             info!(error=?e, "invalid age ciphertext for envelope");
-            std::io::Error::new(std::io::ErrorKind::Other, "invalid age ciphertext")
+            std::io::Error::other("invalid age ciphertext")
         })?;
         let mut r = decryptor
             .decrypt(std::iter::once(&identity as &dyn age::Identity))
             .map_err(|e| {
                 info!(error=?e, "failed to decrypt envelope with provided identity");
-                std::io::Error::new(std::io::ErrorKind::Other, "decrypt failed")
+                std::io::Error::other("decrypt failed")
             })?;
         let mut envelope_bytes = Vec::new();
         r.read_to_end(&mut envelope_bytes)?;

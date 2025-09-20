@@ -447,25 +447,22 @@ fn get_component_patches<P: AsRef<Path> + std::fmt::Debug>(
     let mut files = vec![];
     for src in &recipe.sources {
         for s in &src.sources {
-            match s {
-                SourceNode::Patch(patch) => {
-                    let patch_path = patch.get_bundle_path(&patch_base_path);
-                    let Ok(mut f) = std::fs::File::open(patch_path) else {
-                        error!("Open file error in patch {patch} skipping");
-                        continue;
-                    };
-                    let mut buf = vec![];
-                    if f.read_to_end(&mut buf).is_err() {
-                        error!("Read error in patch {patch} skipping");
-                        continue;
-                    }
-                    let pf = PatchFile {
-                        name: patch.to_string(),
-                        content: base64::engine::general_purpose::STANDARD.encode(buf),
-                    };
-                    files.push(pf);
+            if let SourceNode::Patch(patch) = s {
+                let patch_path = patch.get_bundle_path(&patch_base_path);
+                let Ok(mut f) = std::fs::File::open(patch_path) else {
+                    error!("Open file error in patch {patch} skipping");
+                    continue;
+                };
+                let mut buf = vec![];
+                if f.read_to_end(&mut buf).is_err() {
+                    error!("Read error in patch {patch} skipping");
+                    continue;
                 }
-                _ => {}
+                let pf = PatchFile {
+                    name: patch.to_string(),
+                    content: base64::engine::general_purpose::STANDARD.encode(buf),
+                };
+                files.push(pf);
             }
         }
     }
@@ -542,7 +539,7 @@ fn clone_repo<P: AsRef<Path> + std::fmt::Debug>(
     );
     let mut git_cmd = Command::new("git");
     git_cmd.arg("clone");
-    git_cmd.arg(&repository);
+    git_cmd.arg(repository);
     git_cmd.arg(ws.as_ref().as_os_str());
     let out = git_cmd.output()?;
     if !out.status.success() {
@@ -621,7 +618,7 @@ fn read_manifest<P: AsRef<Path> + std::fmt::Debug>(ws: P) -> Result<ForgeIntegra
             .starts_with("manifest")
         {
             debug!("found manifest file {}", &file.path().display());
-            return Ok(read_forge_manifest(&file.path())?);
+            return Ok(read_forge_manifest(file.path())?);
         }
     }
 

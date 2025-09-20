@@ -15,3 +15,4 @@ portpicker = "0.1.1"
 surrealdb = { version = "1.5.4", features = ["kv-rocksdb", "kv-mem"] }
 tokio = { version = "1.37.0", features = ["full"] }
 base64 = "0.22.1"
+uuid = { version = "1", features = ["v4"] }

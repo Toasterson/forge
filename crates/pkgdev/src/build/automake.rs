@@ -67,26 +67,32 @@ pub fn build_using_automake(
 
         if let Some(flag_name) = &flag.flag_name {
             let flag_name = flag_name.to_uppercase();
-            if env_flags.contains_key(&flag_name) {
-                let flag_ref = env_flags.get_mut(&flag_name).unwrap();
-                flag_ref.push_str(" ");
-                flag_ref.push_str(&flag_value);
-            } else {
-                env_flags.insert(flag_name, flag_value.clone());
+            use std::collections::hash_map::Entry;
+            match env_flags.entry(flag_name) {
+                Entry::Occupied(mut e) => {
+                    e.get_mut().push(' ');
+                    e.get_mut().push_str(&flag_value);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(flag_value.clone());
+                }
             }
         } else {
-            for flag_name in vec![
+            for flag_name in [
                 String::from("CFLAGS"),
                 String::from("CXXFLAGS"),
                 String::from("CPPFLAGS"),
                 String::from("FFLAGS"),
             ] {
-                if env_flags.contains_key(&flag_name) {
-                    let flag_ref = env_flags.get_mut(&flag_name).unwrap();
-                    flag_ref.push_str(" ");
-                    flag_ref.push_str(&flag_value);
-                } else {
-                    env_flags.insert(flag_name, flag_value.clone());
+                use std::collections::hash_map::Entry;
+                match env_flags.entry(flag_name) {
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().push(' ');
+                        e.get_mut().push_str(&flag_value);
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(flag_value.clone());
+                    }
                 }
             }
         }
@@ -95,12 +101,15 @@ pub fn build_using_automake(
     if build_section.enable_large_files {
         let flags = get_largefile_flag()?;
         for flag in flags {
-            if env_flags.contains_key("CFLAGS") {
-                let flag_ref = env_flags.get_mut("CFLAGS").unwrap();
-                flag_ref.push_str(" ");
-                flag_ref.push_str(&flag);
-            } else {
-                env_flags.insert("CFLAGS".to_owned(), flag.clone());
+            use std::collections::hash_map::Entry;
+            match env_flags.entry("CFLAGS".to_owned()) {
+                Entry::Occupied(mut e) => {
+                    e.get_mut().push(' ');
+                    e.get_mut().push_str(&flag);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(flag.clone());
+                }
             }
         }
     }
