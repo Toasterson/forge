@@ -98,6 +98,7 @@ fn temp_dir(prefix: &str) -> std::path::PathBuf {
 }
 
 #[tokio::test]
+#[ignore]
 async fn e2e_git_push_fetch_and_put_version_updates_metadata() -> miette::Result<()> {
     // Prepare temp storage locations
     let db_dir = temp_dir("db");

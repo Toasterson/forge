@@ -1,0 +1,39 @@
+image:
+  repository: ghcr.io/OWNER/forged
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 50051
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment settings for the forged server
+env:
+  FORGED__SERVER__LISTEN_ADDR: 0.0.0.0:50051
+  # Embedded SurrealDB path and repo storage root use an ephemeral emptyDir by default
+  FORGED__SURREAL__MODE: embedded
+  FORGED__SURREAL__PATH: /data/surreal
+  FORGED__REPOS__MODE: fs
+  FORGED__REPOS__ROOT: /data/repos
+  # SMTP settings (optional)
+  # FORGED__SMTP__HOST: ""
+  # FORGED__SMTP__PORT: ""
+  # FORGED__SMTP__USERNAME: ""
+  # FORGED__SMTP__PASSWORD: ""
+  # FORGED__SMTP__FROM: ""
+  # FORGED__SMTP__STARTTLS: "true"
+
+# Persistence options
+persistence:
+  enabled: false
+  size: 5Gi
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: ""
