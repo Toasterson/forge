@@ -16,3 +16,6 @@ surrealdb = { version = "1.5.4", features = ["kv-rocksdb", "kv-mem"] }
 tokio = { version = "1.37.0", features = ["full"] }
 base64 = "0.22.1"
 uuid = { version = "1", features = ["v4"] }
+libips = { git = "https://github.com/OpenFlowLabs/ips.git" }
+flate2 = "1.0"
+tar = "0.4"

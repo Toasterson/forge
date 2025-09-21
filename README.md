@@ -175,6 +175,47 @@ Steps:
 
 The configuration uses the cross-rs Docker image for illumos and requires Docker on the host.
 
+#### Using an illumos sysroot (with OpenSSL and libarchive)
+
+If you need a dedicated illumos sysroot that contains C libraries like OpenSSL and libarchive for linking build-dependencies, this repo includes a Linux-native flow based on the Rust libips crate (no pkg(5), no OmniOS container required).
+
+1) Generate a sysroot tarball (and extracted dir) using libips via xtask:
+
+```
+# Default: OmniOS CE r151052 + OpenSSL + libarchive + pkg-config
+bash scripts/mk-illumos-sysroot.sh
+
+# Or call xtask directly with custom repo or packages
+cargo run -p xtask -- sysroot \
+  --repo https://pkg.omnios.org/r151052/core \
+  --publisher omnios \
+  --packages library/security/openssl library/libarchive developer/pkg-config \
+  --out-dir ./sysroots \
+  --name omnios-r151052
+```
+
+This creates a tarball under ./sysroots/ and extracts it to ./sysroots/<name>/sysroot.
+
+2) Build with cross using that sysroot:
+
+```
+# Option A: Use the wrapper
+scripts/cross-illumos-with-sysroot.sh ./sysroots/illumos-sysroot-*/sysroot -- \
+  cross build --target x86_64-unknown-illumos -p forged -p pkgdev --release
+
+# Option B: Manually export env and run cross
+SYSROOT=$(pwd)/sysroots/illumos-sysroot-*/sysroot \
+PKG_CONFIG_ALLOW_CROSS=1 \
+PKG_CONFIG_SYSROOT_DIR="$SYSROOT" \
+PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/64/pkgconfig:$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig" \
+CFLAGS="--sysroot=$SYSROOT -I$SYSROOT/usr/include" \
+LDFLAGS="--sysroot=$SYSROOT -L$SYSROOT/usr/lib/64 -R/usr/lib/64" \
+OPENSSL_DIR="$SYSROOT/usr" OPENSSL_NO_VENDOR=1 \
+cross build --target x86_64-unknown-illumos -p forged -p pkgdev
+```
+
+Note: Cross.toml is configured to pass through these environment variables into the cross container, so the sysroot located under the repository directory is visible inside the container at the same path (mounted at /project).
+
 ## License
 
 MPL-2.0
