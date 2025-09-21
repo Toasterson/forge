@@ -28,9 +28,9 @@ fn is_executable(path: &Path) -> bool {
     }
 }
 
-fn gather_bin_targets_for_dir(
-    root: &Path,
-) -> miette::Result<(cargo_metadata::Metadata, Vec<(Package, Vec<String>)>)> {
+type MetadataAndBins = (cargo_metadata::Metadata, Vec<(Package, Vec<String>)>);
+
+fn gather_bin_targets_for_dir(root: &Path) -> miette::Result<MetadataAndBins> {
     let mut cmd = MetadataCommand::new();
     cmd.current_dir(root);
     let meta = cmd
@@ -56,7 +56,7 @@ fn gather_bin_targets_for_dir(
         let bin_names: Vec<String> = p
             .targets
             .iter()
-            .filter(|t| t.kind.iter().any(|k| *k == TargetKind::Bin))
+            .filter(|t| t.kind.contains(&TargetKind::Bin))
             .map(|t| t.name.clone())
             .collect();
         if !bin_names.is_empty() {

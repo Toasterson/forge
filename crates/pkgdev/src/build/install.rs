@@ -12,12 +12,13 @@ enum BuildTool {
     Ninja,
 }
 
-impl ToString for BuildTool {
-    fn to_string(&self) -> String {
-        match self {
-            BuildTool::Make => String::from("make"),
-            BuildTool::Ninja => String::from("ninja"),
-        }
+impl std::fmt::Display for BuildTool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            BuildTool::Make => "make",
+            BuildTool::Ninja => "ninja",
+        };
+        write!(f, "{}", s)
     }
 }
 

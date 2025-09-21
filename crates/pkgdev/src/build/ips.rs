@@ -492,8 +492,8 @@ pub fn generate_manifest_files(
             .clone()
             .ok_or_else(|| miette::miette!("no project_url specified"))?;
         // Derive a source_url; fall back to project_url if no sources are present
-        let source_url = if let Some(sec) = pkg.recipe.sources.get(0) {
-            if let Some(src) = sec.sources.get(0) {
+        let source_url = if let Some(sec) = pkg.recipe.sources.first() {
+            if let Some(src) = sec.sources.first() {
                 get_source_url(src).to_string()
             } else {
                 project_url.clone()
@@ -531,11 +531,11 @@ pub fn generate_manifest_files(
         builder.add_set("pkg.summary", &summary);
         builder.add_set(
             "info.classification",
-            &format!("org.opensolaris.category.2008:{classification}"),
+            format!("org.opensolaris.category.2008:{classification}"),
         );
         builder.add_set("info.upstream-url", &project_url);
         builder.add_set("info.source-url", &source_url);
-        if let (Some(ref lf), Some(ref ln)) = (license_file_name.as_ref(), license_name.as_ref()) {
+        if let (Some(lf), Some(ln)) = (license_file_name.as_ref(), license_name.as_ref()) {
             builder.add_license(lf.as_str(), ln.as_str());
         } else {
             tracing::warn!(target: "pkgdev::ips", "Skipping license action for {} (missing file and/or name)", pkg.get_name());

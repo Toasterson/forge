@@ -49,9 +49,9 @@ pub fn build_package_sources(wks: &Workspace, pkg: &Component, settings: &Settin
     for section in pkg.recipe.build_sections.iter() {
         if let Some(c) = section.configure.clone() {
             build_using_automake(wks, pkg, &c, settings)?;
-        } else if let Some(_) = section.cmake {
+        } else if section.cmake.is_some() {
             unimplemented!();
-        } else if let Some(_) = section.meson {
+        } else if section.meson.is_some() {
             unimplemented!();
         } else if let Some(script) = section.script.clone() {
             build_using_scripts(wks, pkg, &script, settings)?;
@@ -63,6 +63,7 @@ pub fn build_package_sources(wks: &Workspace, pkg: &Component, settings: &Settin
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_build(
     component: &Component,
     gate: &Option<Gate>,
@@ -127,7 +128,7 @@ pub async fn run_build(
         tracing::info!(target: "pkgdev::build", "[build] Skipping clean (no_clean=true)");
     }
 
-    ensure_packages_are_installed(wks, false, &component)?;
+    ensure_packages_are_installed(wks, false, component)?;
 
     tracing::info!(target: "pkgdev::build", "[build] Starting download step (archive_clean: {})", args.archive_clean);
     let sources: Vec<SourceSection> = component.recipe.sources.clone();
@@ -144,7 +145,7 @@ pub async fn run_build(
     }
 
     tracing::info!(target: "pkgdev::build", "[build] Starting unpack step");
-    unpack::unpack_sources(&component, &wks, sources.as_slice()).wrap_err("unpack step failed")?;
+    unpack::unpack_sources(component, wks, sources.as_slice()).wrap_err("unpack step failed")?;
     tracing::info!(target: "pkgdev::build", "[build] Unpack completed");
 
     if let Some(stop_on_step) = &args.stop_on_step {
@@ -154,7 +155,7 @@ pub async fn run_build(
     }
 
     tracing::info!(target: "pkgdev::build", "[build] Starting build/compile step");
-    build_package_sources(&wks, &component, &settings).wrap_err("configure step failed")?;
+    build_package_sources(wks, component, settings).wrap_err("configure step failed")?;
     tracing::info!(target: "pkgdev::build", "[build] Build/compile completed");
 
     if let Some(stop_on_step) = &args.stop_on_step {
@@ -180,7 +181,7 @@ pub async fn run_build(
 
     match distribution_type {
         gate::DistributionType::Tarbball => {
-            tarball::make_release_tarball(&wks, &component)?;
+            tarball::make_release_tarball(wks, component)?;
         }
         gate::DistributionType::IPS => {
             // Resolve repository path using the manager and CLI overrides
@@ -188,8 +189,8 @@ pub async fn run_build(
                 repo_mgr.resolve(repo_override_path.clone(), repo_override_context.clone())?;
             tracing::info!(target: "pkgdev::build", "[build] Repo resolved to: {} (override path: {:?}, override context: {:?})", repo_path.display(), repo_override_path.as_ref().map(|p| p.display().to_string()), repo_override_context);
             run_ips_actions(
-                &wks,
-                &component,
+                wks,
+                component,
                 gate,
                 transform_include_dir,
                 repo_path.as_path(),

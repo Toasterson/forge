@@ -39,7 +39,7 @@ pub fn copy_with_rsync<P: AsRef<Path>>(
             )
         })?;
     contents_file
-        .write_all(&mut file_list.as_bytes())
+        .write_all(file_list.as_bytes())
         .into_diagnostic()
         .wrap_err_with(|| {
             format!(
@@ -48,10 +48,7 @@ pub fn copy_with_rsync<P: AsRef<Path>>(
             )
         })?;
     drop(contents_file);
-    let contents_file_arg = format!(
-        "--files-from={}",
-        contents_file_path.to_string_lossy().to_string()
-    );
+    let contents_file_arg = format!("--files-from={}", contents_file_path.to_string_lossy());
 
     // point rsync command to it to copy over selected files
     let from_str = path_2_string(&from);

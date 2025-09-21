@@ -32,7 +32,6 @@ pub fn make_release_tarball(wks: &Workspace, pkg: &Component) -> miette::Result<
                 proto_dir.display()
             )
         })?
-        .into_iter()
         .map(|p| {
             p.unwrap()
                 .path()

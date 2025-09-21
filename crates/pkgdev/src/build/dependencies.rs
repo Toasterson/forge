@@ -63,7 +63,7 @@ pub fn ensure_packages_are_installed(
         return Ok(());
     }
 
-    if let Some(stat) = std::fs::metadata(wks.get_root_path().join(INSTALLED_PACKAGES_FILE)).ok() {
+    if let Ok(stat) = std::fs::metadata(wks.get_root_path().join(INSTALLED_PACKAGES_FILE)) {
         let mod_time = stat.modified().into_diagnostic()?;
         let elapsed = mod_time.elapsed().into_diagnostic()?;
         if elapsed.as_secs() > 240 || !force_refresh {
@@ -76,11 +76,9 @@ pub fn ensure_packages_are_installed(
     let package_list = read_installed_packages_file(wks)?;
     let mut run_install = false;
     for dep in pkg.recipe.dependencies.iter() {
-        if dep.dev {
-            if !package_list.contains(&dep.name) {
-                tracing::info!(target: "pkgdev::deps", "Package '{}' not installed", &dep.name);
-                run_install = true
-            }
+        if dep.dev && !package_list.contains(&dep.name) {
+            tracing::info!(target: "pkgdev::deps", "Package '{}' not installed", &dep.name);
+            run_install = true
         }
     }
 
