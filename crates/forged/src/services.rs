@@ -60,13 +60,15 @@ impl SharedState {
         mail_from: Option<String>,
         repo_manager: RepoManager,
     ) -> Self {
-        let mut state = State::default();
-        state.surreal = Some(db);
-        state.server_private_ssh = private_ssh;
-        state.server_public_ssh = public_ssh;
-        state.mailer = mailer;
-        state.mail_from = mail_from;
-        state.repo_manager = Some(repo_manager);
+        let state = State {
+            surreal: Some(db),
+            server_private_ssh: private_ssh,
+            server_public_ssh: public_ssh,
+            mailer,
+            mail_from,
+            repo_manager: Some(repo_manager),
+            ..Default::default()
+        };
         SharedState(Arc::new(state))
     }
 }
@@ -213,7 +215,7 @@ impl api::git_service_server::GitService for GitServiceImpl {
             })?
             .ok_or_else(|| Status::unauthenticated("actor key not found"))?;
         // ed25519 verification (if algorithm matches)
-        if open.algorithm.to_ascii_lowercase() == "ed25519" {
+        if open.algorithm.eq_ignore_ascii_case("ed25519") {
             if let Some(proof) = open.proof {
                 if !crate::services::verify_ed25519(
                     &key.public_key,
@@ -254,7 +256,7 @@ impl api::git_service_server::GitService for GitServiceImpl {
         let file = tokio::sync::Mutex::new(file);
 
         let (tx, rx) = mpsc::channel(16);
-        let mut tx_progress = tx.clone();
+        let tx_progress = tx.clone();
 
         // clone inputs needed in the writer task
         let repo_mgr2 = repo_mgr.clone();
@@ -379,7 +381,7 @@ impl api::git_service_server::GitService for GitServiceImpl {
             .to_string();
 
         tokio::spawn(async move {
-            let mut sent: u64 = 0;
+            let mut _sent: u64 = 0;
             // Send initial progress
             let _ = tx
                 .send(Ok(api::SmartFetchResponse {
@@ -395,7 +397,7 @@ impl api::git_service_server::GitService for GitServiceImpl {
                 match reader.read(&mut buf).await {
                     Ok(0) => break,
                     Ok(n) => {
-                        sent += n as u64;
+                        _sent += n as u64;
                         let _ = tx
                             .send(Ok(api::SmartFetchResponse {
                                 payload: Some(api::smart_fetch_response::Payload::PackfileChunk(
@@ -459,21 +461,25 @@ impl AuthServiceImpl {
         mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
         mail_from: Option<String>,
     ) -> Self {
-        let mut state = State::default();
-        state.surreal = Some(db);
-        state.server_private_ssh = private_ssh;
-        state.server_public_ssh = public_ssh;
-        state.mailer = mailer;
-        state.mail_from = mail_from;
+        let state = State {
+            surreal: Some(db),
+            server_private_ssh: private_ssh,
+            server_public_ssh: public_ssh,
+            mailer,
+            mail_from,
+            ..Default::default()
+        };
         Self {
             state: Arc::new(state),
         }
     }
 
     pub fn with_keys(private_ssh: String, public_ssh: String) -> Self {
-        let mut state = State::default();
-        state.server_private_ssh = private_ssh;
-        state.server_public_ssh = public_ssh;
+        let state = State {
+            server_private_ssh: private_ssh,
+            server_public_ssh: public_ssh,
+            ..Default::default()
+        };
         Self {
             state: Arc::new(state),
         }
@@ -485,11 +491,13 @@ impl AuthServiceImpl {
         mailer: Option<AsyncSmtpTransport<Tokio1Executor>>,
         mail_from: Option<String>,
     ) -> Self {
-        let mut state = State::default();
-        state.server_private_ssh = private_ssh;
-        state.server_public_ssh = public_ssh;
-        state.mailer = mailer;
-        state.mail_from = mail_from;
+        let state = State {
+            server_private_ssh: private_ssh,
+            server_public_ssh: public_ssh,
+            mailer,
+            mail_from,
+            ..Default::default()
+        };
         Self {
             state: Arc::new(state),
         }
@@ -640,6 +648,7 @@ fn gate_record_to_api(r: &crate::gate::GateRecord) -> api::Gate {
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn api_gate_to_record(g: api::Gate) -> Result<crate::gate::GateRecord, Status> {
     use crate::gate::GateRecord;
     let id = crate::types::GateId(g.id);
@@ -838,6 +847,7 @@ fn component_record_to_api(r: &crate::component::ComponentRecord) -> api::Compon
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn api_component_to_record(c: api::Component) -> Result<crate::component::ComponentRecord, Status> {
     use crate::component::ComponentRecord;
     let id = crate::types::ComponentId(c.id);

@@ -33,7 +33,7 @@ impl ComponentClient {
     pub async fn connect<S: Into<String>>(server: S) -> Result<Self> {
         let server = server.into();
         if !server.starts_with("http://") && !server.starts_with("https://") {
-            return Err(ComponentClientError::InvalidServerUrl(server).into());
+            return Err(ComponentClientError::InvalidServerUrl(server));
         }
         let endpoint = Channel::from_shared(server.clone())
             .map_err(|_| ComponentClientError::InvalidServerUrl(server.clone()))?;

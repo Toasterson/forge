@@ -30,7 +30,7 @@ impl GateClient {
     pub async fn connect<S: Into<String>>(server: S) -> Result<Self> {
         let server = server.into();
         if !server.starts_with("http://") && !server.starts_with("https://") {
-            return Err(GateClientError::InvalidServerUrl(server).into());
+            return Err(GateClientError::InvalidServerUrl(server));
         }
         let endpoint = Channel::from_shared(server.clone())
             .map_err(|_| GateClientError::InvalidServerUrl(server.clone()))?;

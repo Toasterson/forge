@@ -4,6 +4,7 @@ use thiserror::Error;
 use component::{Component, SourceNode};
 use repology::MetadataBuilder;
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug, Diagnostic)]
 pub enum RepologyError {
     #[error("component has no summary")]

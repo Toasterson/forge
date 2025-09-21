@@ -124,8 +124,6 @@ pub fn build_using_scripts(
                     .into_diagnostic()?;
                 println!("Creating target dir");
             }
-            let mut copy_options = fs_extra::file::CopyOptions::default();
-            copy_options.overwrite = true;
             let files = file_matcher::FilesNamed::regex(pattern)
                 .within(&src_full_path)
                 .find()

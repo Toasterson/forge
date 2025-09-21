@@ -160,11 +160,9 @@ pub async fn start_grpc_server(addr: SocketAddr) -> miette::Result<()> {
     Ok(())
 }
 
-fn shutdown_signal() -> impl std::future::Future<Output = ()> {
-    async {
-        let _ = tokio::signal::ctrl_c().await;
-        tracing::info!("shutdown signal received");
-    }
+async fn shutdown_signal() {
+    let _ = tokio::signal::ctrl_c().await;
+    tracing::info!("shutdown signal received");
 }
 
 #[cfg(feature = "quic")]

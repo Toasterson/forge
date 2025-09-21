@@ -177,9 +177,7 @@ fn make_git_archive(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
     let prefix_arg = format!("--prefix={}/", &repo_prefix);
     let output_arg = format!(
         "--output={}",
-        add_extension(&repo_prefix, "tar.gz")
-            .to_string_lossy()
-            .to_string()
+        add_extension(&repo_prefix, "tar.gz").to_string_lossy()
     );
     archive_cmd.arg(&prefix_arg);
     archive_cmd.arg(&output_arg);
@@ -204,9 +202,7 @@ fn git_archive_get(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
     let prefix_arg = format!("--prefix={}", &repo_prefix);
     let output_arg = format!(
         "--output={}",
-        add_extension(&repo_prefix, "tar.gz")
-            .to_string_lossy()
-            .to_string()
+        add_extension(&repo_prefix, "tar.gz").to_string_lossy()
     );
     let remote_arg = format!("--remote={}", &git.repository);
 

@@ -72,14 +72,14 @@ pub(crate) fn open_component_local<P: AsRef<std::path::Path>>(
     // If package.kdl exists, open as a traditional component. Otherwise, try Cargo.toml.
     let kdl_path = full_component_path.join("package.kdl");
     if kdl_path.exists() {
-        return Ok(Component::open_local(full_component_path.as_path())
+        return Component::open_local(full_component_path.as_path())
             .into_diagnostic()
             .wrap_err_with(|| {
                 format!(
                     "failed to open component at '{}': missing package.kdl or invalid component layout",
                     full_component_path.display()
                 )
-            })?);
+            });
     }
 
     let cargo_toml = full_component_path.join("Cargo.toml");
