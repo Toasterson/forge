@@ -22,7 +22,7 @@
 //! client.create_repo("com.example.zlib").await?;
 //!
 //! // Push a prebuilt pack file using an ed25519 key (32-byte seed) and arbitrary proof message
-//! let mut pack = tokio::fs::File::open("./zlib.pack").await?;
+//! let mut pack = tokio::io::empty(); // e.g., replace with tokio::fs::File::open("./zlib.pack").await
 //! let private_key_seed = [0u8; 32]; // load from secure storage
 //! let proof_msg = b"forge-push-proof-v1";
 //! client.push_pack_ed25519(
