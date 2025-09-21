@@ -203,10 +203,7 @@ pub fn components_from_cargo_dir(dir: &Path) -> miette::Result<Vec<CargoDerivedC
             continue;
         }
         // Only include packages that produce at least one binary target
-        let has_bin = p
-            .targets
-            .iter()
-            .any(|t| t.kind.iter().any(|k| *k == TargetKind::Bin));
+        let has_bin = p.targets.iter().any(|t| t.kind.contains(&TargetKind::Bin));
         if !has_bin {
             continue;
         }

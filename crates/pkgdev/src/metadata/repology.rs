@@ -7,43 +7,58 @@ use repology::MetadataBuilder;
 #[derive(Error, Debug, Diagnostic)]
 pub enum RepologyError {
     #[error("component has no summary")]
-    NoSummary,
+    MissingSummary,
     #[error("no project name in component")]
-    NoProjectName,
+    MissingProjectName,
     #[error("no project url set in the component")]
-    NoProjectUrl,
+    MissingProjectUrl,
     #[error("no license set in the component")]
-    NoLicense,
+    MissingLicense,
     #[error("no version set in the component")]
-    NoVersion,
+    MissingVersion,
     #[error("no category set in the component")]
-    NoCategory,
+    MissingCategory,
 }
 
 pub(crate) fn build_metadata(c: &Component) -> miette::Result<repology::Metadata> {
     let recipe = &c.recipe;
     let m = MetadataBuilder::default()
-        .summary(recipe.summary.clone().ok_or(RepologyError::NoSummary)?)
+        .summary(
+            recipe
+                .summary
+                .clone()
+                .ok_or(RepologyError::MissingSummary)?,
+        )
         .fmri(recipe.name.clone())
         .project_name(
             recipe
                 .project_name
                 .clone()
-                .ok_or(RepologyError::NoProjectName)?,
+                .ok_or(RepologyError::MissingProjectName)?,
         )
         .add_homepage(
             recipe
                 .project_url
                 .clone()
-                .ok_or(RepologyError::NoProjectUrl)?,
+                .ok_or(RepologyError::MissingProjectUrl)?,
         )
-        .add_license(recipe.license.clone().ok_or(RepologyError::NoLicense)?)
-        .version(recipe.version.clone().ok_or(RepologyError::NoVersion)?)
+        .add_license(
+            recipe
+                .license
+                .clone()
+                .ok_or(RepologyError::MissingLicense)?,
+        )
+        .version(
+            recipe
+                .version
+                .clone()
+                .ok_or(RepologyError::MissingVersion)?,
+        )
         .source_links(
             recipe
                 .sources
                 .iter()
-                .map(|s| {
+                .flat_map(|s| {
                     s.sources
                         .iter()
                         .filter_map(|so| match so {
@@ -56,14 +71,13 @@ pub(crate) fn build_metadata(c: &Component) -> miette::Result<repology::Metadata
                         })
                         .collect::<Vec<String>>()
                 })
-                .flatten()
                 .collect::<Vec<String>>(),
         )
         .add_category(
             recipe
                 .classification
                 .clone()
-                .ok_or(RepologyError::NoCategory)?,
+                .ok_or(RepologyError::MissingCategory)?,
         )
         .build()?;
     Ok(m)

@@ -28,13 +28,13 @@ pub async fn download_sources(
         for src in source.sources.iter() {
             if let SourceNode::Archive(ar) = src {
                 println!("Downloading archive: {}", &ar.src);
-                match download_archive(&wks, &ar, archive_clean).await {
+                match download_archive(wks, ar, archive_clean).await {
                     Ok(_) => println!("Download finished"),
                     Err(err) => println!("{}\nwill continue with other downloads", err),
                 }
             } else if let SourceNode::Git(g) = src {
                 println!("Downloading git repo: {}", &g.repository);
-                download_git(&wks, &g)?;
+                download_git(wks, g)?;
             }
         }
     }
@@ -78,9 +78,9 @@ async fn download_archive(
 }
 
 fn download_git(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
-    let git_prefix = &git.get_repo_prefix();
-    let git_repo_path = wks.get_or_create_download_dir()?.join(&git_prefix);
-    let archive_path = add_extension(&git_prefix, "tar.gz");
+    let git_prefix = git.get_repo_prefix();
+    let git_repo_path = wks.get_or_create_download_dir()?.join(git_prefix.clone());
+    let archive_path = add_extension(git_prefix, "tar.gz");
 
     // Remove file equivalent to rm -f
     std::fs::remove_file(&archive_path).ok();
@@ -88,18 +88,16 @@ fn download_git(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
     if !archive_path.exists() {
         if !git_repo_path.exists() {
             if git.archive.is_some() {
-                git_archive_get(wks, &git)?;
+                git_archive_get(wks, git)?;
             } else {
-                git_clone_get(wks, &git)?;
+                git_clone_get(wks, git)?;
             }
+        } else if git.must_stay_as_repo.is_some() {
+            println!("Creating Archive of full repo");
+            make_git_archive_with_tar(wks, git)?;
         } else {
-            if git.must_stay_as_repo.is_some() {
-                println!("Creating Archive of full repo");
-                make_git_archive_with_tar(wks, git)?;
-            } else {
-                println!("Creating git-archive based archive from git");
-                make_git_archive(wks, git)?;
-            }
+            println!("Creating git-archive based archive from git");
+            make_git_archive(wks, git)?;
         }
     }
     Ok(())
@@ -110,7 +108,7 @@ fn git_clone_get(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
 
     let repo_prefix = git.get_repo_prefix();
 
-    git_cmd.current_dir(&wks.get_or_create_download_dir()?);
+    git_cmd.current_dir(wks.get_or_create_download_dir()?);
     git_cmd.arg("clone");
     git_cmd.arg("--single-branch");
     if let Some(tag) = &git.tag {
@@ -146,7 +144,7 @@ fn make_git_archive_with_tar(wks: &Workspace, git: &GitSource) -> miette::Result
     let repo_prefix = git.get_repo_prefix();
 
     let mut archive_cmd = Command::new("gtar");
-    archive_cmd.current_dir(&wks.get_or_create_download_dir()?);
+    archive_cmd.current_dir(wks.get_or_create_download_dir()?);
     archive_cmd.arg("-czf");
     let archive_name_arg = add_extension(&repo_prefix, "tar.gz")
         .to_string_lossy()
@@ -173,7 +171,7 @@ fn make_git_archive(wks: &Workspace, git: &GitSource) -> miette::Result<()> {
     let repo_prefix = git.get_repo_prefix();
 
     let mut archive_cmd = Command::new("git");
-    archive_cmd.current_dir(&wks.get_or_create_download_dir()?.join(&repo_prefix));
+    archive_cmd.current_dir(wks.get_or_create_download_dir()?.join(&repo_prefix));
     archive_cmd.arg("archive");
     archive_cmd.arg("--format=tar.gz");
     let prefix_arg = format!("--prefix={}/", &repo_prefix);

@@ -19,7 +19,7 @@ pub fn unpack_sources(
     std::env::set_current_dir(&build_dir).into_diagnostic()?;
     let package_name = component.recipe.name.clone();
 
-    for (source_idx, source) in sources.into_iter().enumerate() {
+    for (source_idx, source) in sources.iter().enumerate() {
         let unpack_name = derive_source_name(package_name.clone());
         let unpack_path = build_dir.join(&unpack_name);
 
@@ -35,15 +35,13 @@ pub fn unpack_sources(
                     let archive_download_path = wks.get_or_create_download_dir()?.join(file_name);
                     if node_idx == 0 && source_idx == 0 {
                         archive_unpack(&archive_download_path, &unpack_path, &package_name)?;
+                    } else if let Some(unpack_name) = git_src.directory {
+                        let unpack_path = build_dir.join(unpack_name);
+                        archive_unpack(&archive_download_path, &unpack_path, &package_name)?;
                     } else {
-                        if let Some(unpack_name) = git_src.directory {
-                            let unpack_path = build_dir.join(unpack_name);
-                            archive_unpack(&archive_download_path, &unpack_path, &package_name)?;
-                        } else {
-                            return Err(miette::miette!(
-                                "directory property is only optional in the first git source"
-                            ));
-                        }
+                        return Err(miette::miette!(
+                            "directory property is only optional in the first git source"
+                        ));
                     }
                 }
                 component::SourceNode::File(file) => {
@@ -54,15 +52,15 @@ pub fn unpack_sources(
                         if !final_dir.exists() {
                             DirBuilder::new()
                                 .recursive(true)
-                                .create(&final_dir)
+                                .create(final_dir)
                                 .into_diagnostic()?;
                         }
                     }
 
                     println!(
                         "Copying file {} to {}",
-                        src_path.to_string_lossy().to_string(),
-                        final_path.to_string_lossy().to_string()
+                        src_path.display(),
+                        final_path.display()
                     );
 
                     std::fs::copy(src_path, final_path).into_diagnostic()?;
@@ -146,7 +144,7 @@ fn archive_unpack<P: AsRef<Path>>(local_file: P, final_path: P, name: &str) -> R
     if !tmp_dir_path.exists() {
         DirBuilder::new().create(tmp_dir_path).into_diagnostic()?;
     } else {
-        std::fs::remove_dir_all(&tmp_dir_path).into_diagnostic()?;
+        std::fs::remove_dir_all(tmp_dir_path).into_diagnostic()?;
         DirBuilder::new().create(tmp_dir_path).into_diagnostic()?;
     }
 
@@ -161,7 +159,6 @@ fn archive_unpack<P: AsRef<Path>>(local_file: P, final_path: P, name: &str) -> R
 
     let extracted_dirs = read_dir(tmp_dir_path)
         .into_diagnostic()?
-        .into_iter()
         .filter_map(|e| match e {
             Ok(e) => Some((e.file_name().to_string_lossy().to_string(), e.path())),
             Err(_) => None,
@@ -178,7 +175,6 @@ fn archive_unpack<P: AsRef<Path>>(local_file: P, final_path: P, name: &str) -> R
             .file_name()
             .ok_or(miette::miette!("No filename"))?
             .to_string_lossy()
-            .to_string()
     );
 
     std::fs::rename(&extracted_dir.1, final_path)

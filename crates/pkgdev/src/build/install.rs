@@ -70,7 +70,7 @@ pub fn run_install(wks: &Workspace, pkg: &Component, settings: &Settings) -> Res
     println!(
         "Running {} install; into DESTDIR={}; env=[{}]",
         //option_vec.join(" "),
-        build_tool.to_string(),
+        build_tool,
         &proto_dir_str,
         env_flags
             .into_iter()

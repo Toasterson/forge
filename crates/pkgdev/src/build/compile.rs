@@ -72,7 +72,7 @@ pub fn run_compile(wks: &Workspace, pkg: &Component, settings: &Settings) -> Res
     build_cmd.stdout(Stdio::inherit());
 
     tracing::info!(target: "pkgdev::build", "Running {}; env=[{}]",
-        build_tool.to_string(),
+        build_tool,
         env_flags
             .into_iter()
             .map(|(k, v)| format!("{}={}", k, v))
@@ -84,13 +84,10 @@ pub fn run_compile(wks: &Workspace, pkg: &Component, settings: &Settings) -> Res
         .ok()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "<unknown>".into());
-    let status = build_cmd.status().into_diagnostic().wrap_err_with(|| {
-        format!(
-            "failed to run build tool '{}' in cwd {}",
-            build_tool.to_string(),
-            cwd
-        )
-    })?;
+    let status = build_cmd
+        .status()
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to run build tool '{}' in cwd {}", build_tool, cwd))?;
     if status.success() {
         tracing::info!(target: "pkgdev::build", "Successfully built {}", pkg.get_name());
     } else {
