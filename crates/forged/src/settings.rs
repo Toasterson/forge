@@ -1,52 +1,109 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
-    pub listen_addr: Option<String>, // e.g. "127.0.0.1:50051"
+    #[serde(default = "default_listen_addr")]
+    pub listen_addr: String, // e.g. "0.0.0.0:50051"
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SurrealConfig {
-    /// Mode: "clustered" (remote) or "embedded" (rocksdb)
-    pub mode: Option<String>,
-    /// Remote endpoint, e.g. ws://127.0.0.1:8000
-    pub endpoint: Option<String>,
-    /// Credentials for remote mode
-    pub username: Option<String>,
-    pub password: Option<String>,
-    /// Namespace and database
-    pub namespace: Option<String>,
-    pub database: Option<String>,
-    /// Filesystem path for embedded RocksDB, e.g. ./data/surreal
-    pub path: Option<String>,
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            listen_addr: default_listen_addr(),
+        }
+    }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SmtpConfig {
-    pub host: Option<String>,
-    pub port: Option<u16>,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub from: Option<String>,
-    pub starttls: Option<bool>, // default true when host present
+fn default_listen_addr() -> String {
+    "0.0.0.0:50051".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GitS3Config {
-    pub bucket: Option<String>,
-    pub prefix: Option<String>,
-    pub region: Option<String>,
-    pub endpoint: Option<String>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostgresConfig {
+    #[serde(default = "default_postgres_url")]
+    pub url: String, // e.g. "postgresql://forged:forged@localhost/forged"
+    #[serde(default = "default_max_connections")]
+    pub max_connections: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GitStorageConfig {
-    /// One of: "fs" or "s3". Default: "fs".
-    pub mode: Option<String>,
-    /// Root path on filesystem when mode == "fs". Default: ./data/repos
-    pub root: Option<String>,
-    /// S3 settings when mode == "s3"
-    pub s3: Option<GitS3Config>,
+impl Default for PostgresConfig {
+    fn default() -> Self {
+        Self {
+            url: default_postgres_url(),
+            max_connections: default_max_connections(),
+        }
+    }
+}
+
+fn default_postgres_url() -> String {
+    "postgresql://forged:forged@localhost/forged".to_string()
+}
+
+fn default_max_connections() -> u32 {
+    20
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeaweedFsConfig {
+    #[serde(default = "default_seaweedfs_master_url")]
+    pub master_url: String, // e.g. "http://localhost:9333"
+    #[serde(default = "default_seaweedfs_namespace")]
+    pub namespace: String, // Default: "default"
+}
+
+impl Default for SeaweedFsConfig {
+    fn default() -> Self {
+        Self {
+            master_url: default_seaweedfs_master_url(),
+            namespace: default_seaweedfs_namespace(),
+        }
+    }
+}
+
+fn default_seaweedfs_master_url() -> String {
+    "http://localhost:9333".to_string()
+}
+
+fn default_seaweedfs_namespace() -> String {
+    "default".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JjReposConfig {
+    #[serde(default = "default_jj_repos_root")]
+    pub root: String, // e.g. "/var/lib/forged/jj-repos"
+}
+
+impl Default for JjReposConfig {
+    fn default() -> Self {
+        Self {
+            root: default_jj_repos_root(),
+        }
+    }
+}
+
+fn default_jj_repos_root() -> String {
+    "./data/jj-repos".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OidcConfig {
+    #[serde(default)]
+    pub issuer_url: String, // e.g. "https://auth.example.com"
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default)]
+    pub audience: String, // Expected audience claim in tokens
+}
+
+impl Default for OidcConfig {
+    fn default() -> Self {
+        Self {
+            issuer_url: String::new(),
+            client_id: String::new(),
+            audience: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -54,11 +111,13 @@ pub struct Settings {
     #[serde(default)]
     pub server: ServerConfig,
     #[serde(default)]
-    pub surreal: SurrealConfig,
+    pub postgres: PostgresConfig,
     #[serde(default)]
-    pub smtp: Option<SmtpConfig>,
+    pub seaweedfs: SeaweedFsConfig,
     #[serde(default)]
-    pub repos: GitStorageConfig,
+    pub jj_repos: JjReposConfig,
+    #[serde(default)]
+    pub oidc: OidcConfig,
 }
 
 impl Settings {
@@ -75,7 +134,9 @@ impl Settings {
         if let Ok(explicit_path) = std::env::var("FORGED_CONFIG") {
             if !std::path::Path::new(&explicit_path).exists() {
                 return Err(miette::miette!(
-                    "config file not found at path specified by FORGED_CONFIG: {explicit_path}"
+                    "Config file not found at path specified by FORGED_CONFIG: {}\n\
+                     Either create the file or unset the FORGED_CONFIG environment variable.",
+                    explicit_path
                 ));
             }
             builder = builder.add_source(config::File::with_name(&explicit_path));
@@ -99,6 +160,35 @@ impl Settings {
             .try_deserialize()
             .into_diagnostic()
             .wrap_err("deserialize config into Settings")?;
+
+        // Validate required fields
+        settings.validate()?;
+
         Ok(settings)
+    }
+
+    fn validate(&self) -> miette::Result<()> {
+        if self.postgres.url.is_empty() {
+            return Err(miette::miette!(
+                "PostgreSQL URL is required. \n\
+                 Set FORGED__POSTGRES__URL environment variable or add to forged.toml:\n\
+                 [postgres]\n\
+                 url = \"postgresql://user:password@host/database\""
+            ));
+        }
+
+        if self.seaweedfs.master_url.is_empty() {
+            return Err(miette::miette!(
+                "SeaweedFS master URL is required. \n\
+                 Set FORGED__SEAWEEDFS__MASTER_URL environment variable or add to forged.toml:\n\
+                 [seaweedfs]\n\
+                 master_url = \"http://localhost:9333\""
+            ));
+        }
+
+        // OIDC is optional for MVP (stub implementation)
+        // In production, these would be required
+
+        Ok(())
     }
 }

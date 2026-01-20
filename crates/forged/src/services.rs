@@ -1,9 +1,11 @@
-// TODO: This entire module needs to be rewritten for the new architecture (Phase 3)
-// The old V1 services will be replaced by services_v2 module with new gRPC implementations
-// Temporary stub to allow compilation
+pub mod blob_service;
+pub mod component_manager;
+pub mod gate_manager;
+pub mod oidc_service;
+pub mod rbac_service;
 
-// This file will be replaced with the new implementation that uses:
-// - JjRepoManager for VCS operations
-// - SeaORM repositories for database queries
-// - GateManager and ComponentManager for business logic
-// - gRPC API v2 with revision-aware operations
+pub use blob_service::BlobService;
+pub use component_manager::ComponentManager;
+pub use gate_manager::GateManager;
+pub use oidc_service::OidcService;
+pub use rbac_service::RbacService;

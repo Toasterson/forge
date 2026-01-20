@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: forged
+      POSTGRES_USER: forged
+      POSTGRES_PASSWORD: forged
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forged"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  seaweedfs-master:
+    image: chrislusf/seaweedfs:latest
+    command: master -ip=seaweedfs-master -port=9333
+    ports:
+      - "9333:9333"
+      - "19333:19333"
+    volumes:
+      - seaweedfs-master:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9333/cluster/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs:latest
+    command: volume -mserver=seaweedfs-master:9333 -port=8080
+    ports:
+      - "8080:8080"
+      - "18080:18080"
+    volumes:
+      - seaweedfs-volume:/data
+    depends_on:
+      seaweedfs-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  forged:
+    build:
+      context: ../../../
+      dockerfile: crates/forged/Dockerfile
+    environment:
+      FORGED__SERVER__LISTEN_ADDR: "0.0.0.0:50051"
+      FORGED__POSTGRES__URL: "postgresql://forged:forged@postgres/forged"
+      FORGED__SEAWEEDFS__MASTER_URL: "http://seaweedfs-master:9333"
+      FORGED__SEAWEEDFS__NAMESPACE: "default"
+      FORGED__JJ_REPOS__ROOT: "/data/jj-repos"
+      # OIDC configuration (optional for MVP)
+      # FORGED__OIDC__ISSUER_URL: "${OIDC_ISSUER_URL}"
+      # FORGED__OIDC__CLIENT_ID: "${OIDC_CLIENT_ID}"
+      # FORGED__OIDC__AUDIENCE: "${OIDC_AUDIENCE}"
+      RUST_LOG: "forged=info,tower_http=debug"
+    ports:
+      - "50051:50051"
+    volumes:
+      - jj-repos:/data/jj-repos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs-volume:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  seaweedfs-master:
+  seaweedfs-volume:
+  jj-repos:
