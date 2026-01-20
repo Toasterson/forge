@@ -16,6 +16,11 @@ tests/
 ├── service/            # Service layer tests
 │   ├── rbac_service_test.rs
 │   └── component_manager_test.rs
+├── grpc/               # gRPC transport tests
+│   ├── auth_service_test.rs
+│   ├── gate_service_test.rs
+│   ├── component_service_test.rs
+│   └── build_service_test.rs
 └── integration/        # Integration tests
     ├── e2e_workflow_test.rs
     ├── concurrent_operations_test.rs
@@ -181,6 +186,15 @@ Test business logic and RBAC:
 - Member management
 - Component operations
 - Manifest aggregation
+
+### gRPC Transport Tests
+
+Test gRPC service implementations:
+
+- **AuthService**: Authentication and actor creation
+- **GateService**: Gate CRUD, member management, component listing
+- **ComponentService**: Component CRUD operations
+- **BuildService**: Build manifest generation and blob streaming downloads
 
 ### Integration Tests
 
