@@ -1,0 +1,25 @@
+[package]
+name = "forged-migration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "migration"
+path = "src/lib.rs"
+
+[[bin]]
+name = "migration"
+path = "src/main.rs"
+
+[dependencies]
+async-trait = "0.1"
+tokio = { version = "1.39", features = ["macros", "rt-multi-thread"] }
+sea-orm-migration = { version = "1.1", features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+] }
+
+[dev-dependencies]

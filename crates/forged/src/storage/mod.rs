@@ -3,7 +3,11 @@ use crate::gate::GateRecord;
 use crate::types::{ComponentId, GateId};
 
 pub mod git;
-pub mod surreal;
+// TODO: Remove when migration complete
+// pub mod surreal;
+pub mod seaweedfs;
+pub mod jj_backend;
+pub mod jj_repos;
 
 /// Repository trait for storing and retrieving Gate records.
 pub trait GateStore: Send + Sync {

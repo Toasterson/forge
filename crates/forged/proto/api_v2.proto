@@ -1,0 +1,352 @@
+syntax = "proto3";
+
+package forged.api.v2;
+
+// ========== Common Types ==========
+
+message ContentHash {
+  string hex = 1; // SHA256 hash as hex string
+}
+
+message ActorRef {
+  string id = 1;
+  string kind = 2; // "user" or "service"
+}
+
+message GateId {
+  string id = 1;
+}
+
+message ComponentId {
+  string id = 1;
+}
+
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}
+
+// ========== Auth Service ==========
+
+service AuthService {
+  // Validates OIDC token and returns or creates actor
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+}
+
+message AuthenticateRequest {
+  string oidc_token = 1;
+}
+
+message AuthenticateResponse {
+  ActorRef actor = 1;
+  string display_name = 2;
+}
+
+// ========== Gate Service ==========
+
+service GateService {
+  // Create a new gate
+  rpc CreateGate(CreateGateRequest) returns (CreateGateResponse);
+
+  // Get gate details
+  rpc GetGate(GetGateRequest) returns (GetGateResponse);
+
+  // Update gate KDL
+  rpc UpdateGate(UpdateGateRequest) returns (UpdateGateResponse);
+
+  // Add a member to a gate
+  rpc AddMember(AddMemberRequest) returns (AddMemberResponse);
+
+  // Remove a member from a gate
+  rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
+
+  // List all members of a gate
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+
+  // List all components in a gate
+  rpc ListComponents(ListComponentsRequest) returns (ListComponentsResponse);
+
+  // List all gates (optionally filtered by owner)
+  rpc ListGates(ListGatesRequest) returns (ListGatesResponse);
+}
+
+message CreateGateRequest {
+  ActorRef actor = 1;
+  string name = 2;
+  string gate_kdl = 3;
+}
+
+message CreateGateResponse {
+  GateInfo gate = 1;
+}
+
+message GetGateRequest {
+  ActorRef actor = 1;
+  GateId gate_id = 2;
+}
+
+message GetGateResponse {
+  GateInfo gate = 1;
+}
+
+message UpdateGateRequest {
+  ActorRef actor = 1;
+  GateId gate_id = 2;
+  string gate_kdl = 3;
+}
+
+message UpdateGateResponse {
+  GateInfo gate = 1;
+}
+
+message AddMemberRequest {
+  ActorRef actor = 1;
+  GateId gate_id = 2;
+  string member_actor_id = 3;
+  repeated string roles = 4;
+  repeated string permissions = 5;
+}
+
+message AddMemberResponse {
+  GateMemberInfo member = 1;
+}
+
+message RemoveMemberRequest {
+  ActorRef actor = 1;
+  GateId gate_id = 2;
+  string member_actor_id = 3;
+}
+
+message RemoveMemberResponse {
+  bool success = 1;
+}
+
+message ListMembersRequest {
+  ActorRef actor = 1;
+  GateId gate_id = 2;
+}
+
+message ListMembersResponse {
+  repeated GateMemberInfo members = 1;
+}
+
+message ListComponentsRequest {
+  ActorRef actor = 1;
+  GateId gate_id = 2;
+}
+
+message ListComponentsResponse {
+  repeated ComponentInfo components = 1;
+}
+
+message ListGatesRequest {
+  ActorRef actor = 1;
+  optional string owner_id = 2; // Filter by owner
+}
+
+message ListGatesResponse {
+  repeated GateInfo gates = 1;
+}
+
+message GateInfo {
+  string id = 1;
+  string name = 2;
+  string gate_kdl = 3;
+  string owner_id = 4;
+  Timestamp created_at = 5;
+  Timestamp updated_at = 6;
+}
+
+message GateMemberInfo {
+  string gate_id = 1;
+  string actor_id = 2;
+  repeated string roles = 3;
+  repeated string permissions = 4;
+  Timestamp created_at = 5;
+}
+
+// ========== Component Service ==========
+
+service ComponentService {
+  // Create a new component
+  rpc CreateComponent(CreateComponentRequest) returns (CreateComponentResponse);
+
+  // Get component details
+  rpc GetComponent(GetComponentRequest) returns (GetComponentResponse);
+
+  // Update component recipe KDL
+  rpc UpdateComponent(UpdateComponentRequest) returns (UpdateComponentResponse);
+
+  // Upload a source archive
+  rpc UploadSourceArchive(stream UploadSourceArchiveRequest) returns (UploadSourceArchiveResponse);
+
+  // Upload a component file (patch, license, or script)
+  rpc UploadComponentFile(stream UploadComponentFileRequest) returns (UploadComponentFileResponse);
+
+  // List source archives for a component
+  rpc ListSourceArchives(ListSourceArchivesRequest) returns (ListSourceArchivesResponse);
+
+  // List component files
+  rpc ListComponentFiles(ListComponentFilesRequest) returns (ListComponentFilesResponse);
+}
+
+message CreateComponentRequest {
+  ActorRef actor = 1;
+  GateId gate_id = 2;
+  string name = 3;
+  string recipe_kdl = 4;
+}
+
+message CreateComponentResponse {
+  ComponentInfo component = 1;
+}
+
+message GetComponentRequest {
+  ActorRef actor = 1;
+  ComponentId component_id = 2;
+}
+
+message GetComponentResponse {
+  ComponentInfo component = 1;
+}
+
+message UpdateComponentRequest {
+  ActorRef actor = 1;
+  ComponentId component_id = 2;
+  string recipe_kdl = 3;
+}
+
+message UpdateComponentResponse {
+  ComponentInfo component = 1;
+}
+
+message UploadSourceArchiveRequest {
+  // First message contains metadata
+  oneof data {
+    ArchiveMetadata metadata = 1;
+    bytes chunk = 2; // Subsequent messages contain data chunks
+  }
+}
+
+message ArchiveMetadata {
+  ActorRef actor = 1;
+  ComponentId component_id = 2;
+  string filename = 3;
+  optional string url = 4; // Original URL if fetched from remote
+  int64 total_size = 5;
+}
+
+message UploadSourceArchiveResponse {
+  SourceArchiveInfo archive = 1;
+}
+
+message UploadComponentFileRequest {
+  // First message contains metadata
+  oneof data {
+    FileMetadata metadata = 1;
+    bytes chunk = 2; // Subsequent messages contain data chunks
+  }
+}
+
+message FileMetadata {
+  ActorRef actor = 1;
+  ComponentId component_id = 2;
+  string kind = 3; // "patch", "license", or "script"
+  string name = 4;
+  string rel_path = 5;
+  int64 total_size = 6;
+}
+
+message UploadComponentFileResponse {
+  ComponentFileInfo file = 1;
+}
+
+message ListSourceArchivesRequest {
+  ActorRef actor = 1;
+  ComponentId component_id = 2;
+}
+
+message ListSourceArchivesResponse {
+  repeated SourceArchiveInfo archives = 1;
+}
+
+message ListComponentFilesRequest {
+  ActorRef actor = 1;
+  ComponentId component_id = 2;
+  optional string kind = 3; // Filter by kind ("patch", "license", "script")
+}
+
+message ListComponentFilesResponse {
+  repeated ComponentFileInfo files = 1;
+}
+
+message ComponentInfo {
+  string id = 1;
+  string gate_id = 2;
+  string name = 3;
+  string recipe_kdl = 4;
+  Timestamp created_at = 5;
+  Timestamp updated_at = 6;
+}
+
+message SourceArchiveInfo {
+  int64 id = 1;
+  string component_id = 2;
+  string filename = 3;
+  optional string url = 4;
+  ContentHash hash = 5;
+  int64 size_bytes = 6;
+  Timestamp created_at = 7;
+}
+
+message ComponentFileInfo {
+  int64 id = 1;
+  string component_id = 2;
+  string kind = 3; // "patch", "license", "script"
+  string name = 4;
+  string rel_path = 5;
+  ContentHash hash = 6;
+  int64 size_bytes = 7;
+  Timestamp created_at = 8;
+}
+
+// ========== Build Service ==========
+
+service BuildService {
+  // Get build manifest for a component (all files needed to build)
+  rpc GetBuildManifest(GetBuildManifestRequest) returns (GetBuildManifestResponse);
+
+  // Download a blob by hash (streaming)
+  rpc DownloadBlob(DownloadBlobRequest) returns (stream DownloadBlobResponse);
+}
+
+message GetBuildManifestRequest {
+  ActorRef actor = 1;
+  ComponentId component_id = 2;
+}
+
+message GetBuildManifestResponse {
+  BuildManifest manifest = 1;
+}
+
+message BuildManifest {
+  ComponentId component_id = 1;
+  string component_name = 2;
+  string recipe_kdl = 3;
+  repeated SourceArchiveInfo source_archives = 4;
+  repeated ComponentFileInfo patches = 5;
+  repeated ComponentFileInfo licenses = 6;
+  repeated ComponentFileInfo scripts = 7;
+}
+
+message DownloadBlobRequest {
+  ActorRef actor = 1;
+  ContentHash hash = 2;
+  string blob_type = 3; // "source_archive", "patch", "license", "script"
+}
+
+message DownloadBlobResponse {
+  bytes chunk = 1; // 64KB chunks
+  int64 total_size = 2; // Only set in first response
+  int64 offset = 3; // Byte offset of this chunk
+}
