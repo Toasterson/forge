@@ -98,3 +98,5 @@ tonic-build = "0.11"
 
 [dev-dependencies]
 forged-client = { path = "../forged-client" }
+serial_test = "3.0"  # For tests that must run serially
+tokio-test = "0.4"  # Testing utilities for tokio

@@ -1,0 +1,84 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: forged_test
+          POSTGRES_USER: forged
+          POSTGRES_PASSWORD: forged
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      seaweedfs-master:
+        image: chrislusf/seaweedfs:latest
+        options: >-
+          --health-cmd "wget --quiet --tries=1 --spider http://localhost:9333/cluster/status || exit 1"
+        ports:
+          - 9333:9333
+
+      seaweedfs-volume:
+        image: chrislusf/seaweedfs:latest
+        options: >-
+          --health-cmd "wget --quiet --tries=1 --spider http://localhost:8080/status || exit 1"
+        ports:
+          - 8080:8080
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run migrations
+        working-directory: crates/forged
+        env:
+          DATABASE_URL: postgresql://forged:forged@localhost/forged_test
+        run: cargo run -p forged-migration
+
+      - name: Run tests with nextest
+        working-directory: crates/forged
+        env:
+          TEST_DATABASE_URL: postgresql://forged:forged@localhost/forged_test
+          TEST_SEAWEEDFS_URL: http://localhost:9333
+          RUST_LOG: info
+        run: cargo nextest run --profile ci --all-features
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextest-results
+          path: crates/forged/target/nextest/ci/junit.xml

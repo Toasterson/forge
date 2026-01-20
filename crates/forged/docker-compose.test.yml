@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: forged_test
+      POSTGRES_USER: forged
+      POSTGRES_PASSWORD: forged
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    tmpfs:
+      - /var/lib/postgresql/data  # Ephemeral for tests
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forged"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  seaweedfs-master-test:
+    image: chrislusf/seaweedfs:latest
+    command: master -ip=seaweedfs-master-test -port=9333
+    ports:
+      - "9334:9333"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9333/cluster/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  seaweedfs-volume-test:
+    image: chrislusf/seaweedfs:latest
+    command: volume -mserver=seaweedfs-master-test:9333 -port=8080
+    ports:
+      - "8081:8080"
+    tmpfs:
+      - /data
+    depends_on:
+      seaweedfs-master-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

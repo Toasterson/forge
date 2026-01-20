@@ -1,0 +1,17 @@
+[profile.default]
+retries = 0
+test-threads = 4  # Parallel execution within reason
+slow-timeout = { period = "60s", terminate-after = 3 }
+status-level = "all"
+
+[profile.ci]
+retries = 2  # Retry flaky tests in CI
+test-threads = 2
+slow-timeout = { period = "120s", terminate-after = 5 }
+failure-output = "immediate-final"
+success-output = "never"
+
+[profile.integration]
+# For integration tests that need more time
+test-threads = 1  # Sequential for database safety
+slow-timeout = { period = "300s" }
