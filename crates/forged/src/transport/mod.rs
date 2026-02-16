@@ -1,8 +1,8 @@
 pub mod grpc;
 
 pub use grpc::{
-    start_server as start_grpc_server, AuthServiceImpl, BuildServiceImpl, ComponentServiceImpl,
-    GateServiceImpl,
+    extract_actor, start_server as start_grpc_server, AuthServiceImpl, AuthenticatedActor,
+    BuildServiceImpl, ComponentServiceImpl, GateServiceImpl,
 };
 
 #[cfg(feature = "quic")]

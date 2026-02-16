@@ -106,6 +106,25 @@ impl Default for OidcConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmtpConfig {
+    /// Sender email address for outgoing emails (e.g. "forge@example.com")
+    #[serde(default)]
+    pub from: String,
+    /// SMTP relay URL (e.g. "smtp.example.com"). If empty, email sending is disabled.
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+impl Default for SmtpConfig {
+    fn default() -> Self {
+        Self {
+            from: String::new(),
+            url: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Settings {
     #[serde(default)]
@@ -118,6 +137,10 @@ pub struct Settings {
     pub jj_repos: JjReposConfig,
     #[serde(default)]
     pub oidc: OidcConfig,
+    #[serde(default)]
+    pub smtp: SmtpConfig,
+    #[serde(default)]
+    pub amqp: crate::services::AmqpConfig,
 }
 
 impl Settings {

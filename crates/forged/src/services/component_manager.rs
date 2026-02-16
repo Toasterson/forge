@@ -1,7 +1,5 @@
 use crate::entities::{component, component_file, source_archive};
-use crate::repositories::{
-    ApplicationBlobType, ComponentRepository, SourceArchiveRepository,
-};
+use crate::repositories::{ApplicationBlobType, ComponentRepository, SourceArchiveRepository};
 use crate::services::RbacService;
 use miette::{Context, Result};
 use std::sync::Arc;
@@ -44,7 +42,7 @@ impl ComponentManager {
         // For now, we'll proceed with creation and let database constraints enforce integrity
 
         // Validate recipe KDL
-        // TODO: Add KDL validation
+        validate_recipe_kdl(&name, &recipe_kdl)?;
 
         let component = self
             .component_repo
@@ -117,7 +115,7 @@ impl ComponentManager {
         }
 
         // Validate recipe KDL
-        // TODO: Add KDL validation
+        validate_recipe_kdl("package.kdl", &recipe_kdl)?;
 
         let component = self
             .component_repo
@@ -379,4 +377,22 @@ pub struct BuildManifest {
     pub patches: Vec<component_file::Model>,
     pub licenses: Vec<component_file::Model>,
     pub scripts: Vec<component_file::Model>,
+}
+
+/// Validate component recipe KDL by parsing it through the component crate's parser.
+fn validate_recipe_kdl(name: &str, kdl_content: &str) -> Result<()> {
+    knuffel::parse::<::component::Recipe>(name, kdl_content).map_err(|e| {
+        miette::miette!(
+            "Invalid component recipe KDL: {}\n\
+             Check the package.kdl syntax.\n\
+             Required field: name.\n\
+             Example:\n  \
+               name \"my-component\"\n  \
+               summary \"A brief description\"\n  \
+               license \"MIT\"\n  \
+               version \"1.0.0\"",
+            e
+        )
+    })?;
+    Ok(())
 }

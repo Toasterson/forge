@@ -95,16 +95,13 @@ impl GateRepository {
     /// Update a gate's KDL
     /// Also commits the change to the Jujutsu repository
     pub async fn update_gate(&self, gate_id: &str, gate_kdl: String) -> Result<gate::Model> {
-        let gate = self
-            .get_gate(gate_id)
-            .await?
-            .ok_or_else(|| {
-                miette::miette!(
-                    "Gate not found: id={}. \n\
+        let gate = self.get_gate(gate_id).await?.ok_or_else(|| {
+            miette::miette!(
+                "Gate not found: id={}. \n\
                      This gate may have been deleted or does not exist.",
-                    gate_id
-                )
-            })?;
+                gate_id
+            )
+        })?;
 
         // 1. Update database record
         let mut active: gate::ActiveModel = gate.into();
@@ -258,16 +255,13 @@ impl GateRepository {
         roles: Vec<String>,
         permissions: Vec<String>,
     ) -> Result<gate_member::Model> {
-        let member = self
-            .get_member(gate_id, actor_id)
-            .await?
-            .ok_or_else(|| {
-                miette::miette!(
-                    "Gate member not found: gate_id={}, actor_id={}",
-                    gate_id,
-                    actor_id
-                )
-            })?;
+        let member = self.get_member(gate_id, actor_id).await?.ok_or_else(|| {
+            miette::miette!(
+                "Gate member not found: gate_id={}, actor_id={}",
+                gate_id,
+                actor_id
+            )
+        })?;
 
         let mut active: gate_member::ActiveModel = member.into();
         active.roles = Set(json!(roles));
@@ -335,6 +329,21 @@ impl GateRepository {
         );
 
         Ok(())
+    }
+
+    /// List all gate memberships for an actor (across all gates)
+    pub async fn list_memberships_for_actor(
+        &self,
+        actor_id: &str,
+    ) -> Result<Vec<gate_member::Model>> {
+        let memberships = GateMember::find()
+            .filter(gate_member::Column::ActorId.eq(actor_id))
+            .all(&*self.db)
+            .await
+            .into_diagnostic()
+            .wrap_err("failed to list memberships for actor")?;
+
+        Ok(memberships)
     }
 
     /// Check if a gate exists

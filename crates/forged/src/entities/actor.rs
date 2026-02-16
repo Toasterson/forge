@@ -9,6 +9,9 @@ pub struct Model {
     pub kind: String,
     pub oidc_sub: Option<String>,
     pub display_name: String,
+    pub email: Option<String>,
+    pub confirmed: bool,
+    pub confirmation_challenge: Option<String>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }
@@ -21,6 +24,8 @@ pub enum Relation {
     GateMember,
     #[sea_orm(has_many = "super::operation::Entity")]
     Operation,
+    #[sea_orm(has_many = "super::actor_key::Entity")]
+    ActorKey,
 }
 
 impl Related<super::gate::Entity> for Entity {
@@ -38,6 +43,12 @@ impl Related<super::gate_member::Entity> for Entity {
 impl Related<super::operation::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Operation.def()
+    }
+}
+
+impl Related<super::actor_key::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ActorKey.def()
     }
 }
 

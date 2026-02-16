@@ -11,7 +11,6 @@ pub struct SeaweedFsConfig {
 #[derive(Clone, Debug)]
 pub struct SeaweedFsClient {
     master_url: String,
-    #[allow(dead_code)]
     http_client: reqwest::Client,
     /// Namespace prefix for blob keys to support multi-tenancy
     #[allow(dead_code)]
@@ -83,7 +82,10 @@ impl SeaweedFsClient {
         let fetch_url = if let Some(public_url) = lookup_resp.locations.first() {
             format!("http://{}/{}", public_url.public_url, fid)
         } else {
-            return Err(miette::miette!("no volume locations found for fid: {}", fid));
+            return Err(miette::miette!(
+                "no volume locations found for fid: {}",
+                fid
+            ));
         };
 
         let bytes = self

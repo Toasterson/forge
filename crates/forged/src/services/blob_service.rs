@@ -20,7 +20,11 @@ impl BlobService {
         blob_repo: Arc<BlobRepository>,
         rbac: Arc<RbacService>,
     ) -> Self {
-        Self { db, blob_repo, rbac }
+        Self {
+            db,
+            blob_repo,
+            rbac,
+        }
     }
 
     /// Download a blob by hash with access control

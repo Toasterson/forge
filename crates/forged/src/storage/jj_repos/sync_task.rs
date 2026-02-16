@@ -48,7 +48,10 @@ pub async fn run_sync_task(
             // Fetch and merge remote ops
             // Note: We need a mutable workspace for this, but we have an Arc
             // In the full implementation, we'd reload the workspace after fetching
-            if let Err(e) = sync.fetch_and_merge(&repo_id, &mut (*workspace.clone())).await {
+            if let Err(e) = sync
+                .fetch_and_merge(&repo_id, &mut (*workspace.clone()))
+                .await
+            {
                 tracing::error!(
                     repo_id = %repo_id,
                     error = ?e,

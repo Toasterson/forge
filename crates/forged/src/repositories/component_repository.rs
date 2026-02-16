@@ -78,9 +78,12 @@ impl ComponentRepository {
         });
 
         let manifest_path = workspace.workspace_root().join("manifest.json");
-        std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap())
-            .into_diagnostic()
-            .wrap_err("failed to write component manifest")?;
+        std::fs::write(
+            &manifest_path,
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .into_diagnostic()
+        .wrap_err("failed to write component manifest")?;
 
         // Write recipe as separate file
         let recipe_path = workspace.workspace_root().join("recipe.kdl");
@@ -125,16 +128,13 @@ impl ComponentRepository {
         component_id: &str,
         recipe_kdl: String,
     ) -> Result<component::Model> {
-        let component = self
-            .get_component(component_id)
-            .await?
-            .ok_or_else(|| {
-                miette::miette!(
-                    "Component not found: id={}. \n\
+        let component = self.get_component(component_id).await?.ok_or_else(|| {
+            miette::miette!(
+                "Component not found: id={}. \n\
                      This component may have been deleted or does not exist.",
-                    component_id
-                )
-            })?;
+                component_id
+            )
+        })?;
 
         // 1. Update database record
         let mut active: component::ActiveModel = component.clone().into();
@@ -169,9 +169,12 @@ impl ComponentRepository {
         });
 
         let manifest_path = workspace.workspace_root().join("manifest.json");
-        std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap())
-            .into_diagnostic()
-            .wrap_err("failed to write component manifest")?;
+        std::fs::write(
+            &manifest_path,
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .into_diagnostic()
+        .wrap_err("failed to write component manifest")?;
 
         // Update recipe file
         let recipe_path = workspace.workspace_root().join("recipe.kdl");
@@ -285,7 +288,8 @@ impl ComponentRepository {
         component_id: &str,
         kind: Option<ApplicationBlobType>,
     ) -> Result<Vec<component_file::Model>> {
-        let mut query = ComponentFile::find().filter(component_file::Column::ComponentId.eq(component_id));
+        let mut query =
+            ComponentFile::find().filter(component_file::Column::ComponentId.eq(component_id));
 
         if let Some(k) = kind {
             query = query.filter(component_file::Column::Kind.eq(k.to_string()));
@@ -313,18 +317,18 @@ impl ComponentRepository {
 
     /// Get component file data
     pub async fn get_component_file_data(&self, file_id: i64) -> Result<Vec<u8>> {
-        let file = self
-            .get_component_file(file_id)
-            .await?
-            .ok_or_else(|| {
-                miette::miette!(
-                    "Component file not found: id={}. \n\
+        let file = self.get_component_file(file_id).await?.ok_or_else(|| {
+            miette::miette!(
+                "Component file not found: id={}. \n\
                      This file may have been deleted or does not exist.",
-                    file_id
-                )
-            })?;
+                file_id
+            )
+        })?;
 
-        let kind: ApplicationBlobType = file.kind.parse().map_err(|e: String| miette::miette!("{}", e))?;
+        let kind: ApplicationBlobType = file
+            .kind
+            .parse()
+            .map_err(|e: String| miette::miette!("{}", e))?;
 
         let data = self
             .blob_repo
@@ -382,10 +386,7 @@ impl ComponentRepository {
     }
 
     /// Get all files for a component organized by kind
-    pub async fn get_all_component_files(
-        &self,
-        component_id: &str,
-    ) -> Result<ComponentFiles> {
+    pub async fn get_all_component_files(&self, component_id: &str) -> Result<ComponentFiles> {
         let all_files = self.list_component_files(component_id, None).await?;
 
         let mut patches = Vec::new();

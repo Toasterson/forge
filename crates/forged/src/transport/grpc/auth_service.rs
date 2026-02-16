@@ -1,40 +1,26 @@
 use super::proto::{
-    auth_service_server::AuthService, ActorRef, AuthenticateRequest, AuthenticateResponse,
+    auth_service_server::AuthService, ActorRef, AddActorKeyRequest, AddActorKeyResponse,
+    AuthenticateRequest, AuthenticateResponse, IssueTokenRequest, IssueTokenResponse,
+    RegisterActorRequest, RegisterActorResponse, RegistrationConfirmationRequest,
+    RegistrationConfirmationResponse,
 };
-use crate::repositories::ActorRepository;
+use crate::services::AuthService as AuthServiceLogic;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
-/// AuthService implementation
-/// Validates OIDC tokens and creates/updates actors
+/// AuthService gRPC implementation
+///
+/// Delegates to `services::AuthService` for business logic.
+/// OIDC token validation and SSH key registration/confirmation
+/// are handled at the service layer.
 #[derive(Clone)]
 pub struct AuthServiceImpl {
-    actor_repo: Arc<ActorRepository>,
-    // TODO: Add OidcService in Phase 4
+    auth: Arc<AuthServiceLogic>,
 }
 
 impl AuthServiceImpl {
-    pub fn new(actor_repo: Arc<ActorRepository>) -> Self {
-        Self { actor_repo }
-    }
-
-    /// Validate OIDC token and extract claims
-    /// TODO: Replace with actual OIDC validation in Phase 4
-    async fn validate_token(&self, token: &str) -> Result<(String, String), Status> {
-        // For now, this is a stub that will be replaced with real OIDC validation
-        // Expected format for testing: "oidc_sub:display_name"
-
-        if token.is_empty() {
-            return Err(Status::unauthenticated("OIDC token is required"));
-        }
-
-        // Stub implementation - parse test token
-        if let Some((sub, name)) = token.split_once(':') {
-            Ok((sub.to_string(), name.to_string()))
-        } else {
-            // For simple tokens, use the token as both sub and display name
-            Ok((token.to_string(), token.to_string()))
-        }
+    pub fn new(auth: Arc<AuthServiceLogic>) -> Self {
+        Self { auth }
     }
 }
 
@@ -46,40 +32,156 @@ impl AuthService for AuthServiceImpl {
     ) -> Result<Response<AuthenticateResponse>, Status> {
         let req = request.into_inner();
 
-        // 1. Validate OIDC token
-        let (oidc_sub, display_name) = self
-            .validate_token(&req.oidc_token)
-            .await
-            .map_err(|e| {
-                tracing::warn!(error = %e, "Failed to validate OIDC token");
-                e
-            })?;
-
-        // 2. Create or update actor
         let actor = self
-            .actor_repo
-            .create_or_update_from_oidc(oidc_sub, display_name.clone())
+            .auth
+            .authenticate_oidc(&req.oidc_token)
             .await
             .map_err(|e| {
-                tracing::error!(error = %e, "Failed to create/update actor");
-                Status::internal(format!("Failed to create/update actor: {}", e))
+                tracing::warn!(error = %e, "OIDC authentication failed");
+                Status::unauthenticated(format!("{}", e))
             })?;
 
         tracing::info!(
             actor_id = %actor.id,
-            display_name = %display_name,
-            "Actor authenticated"
+            display_name = %actor.display_name,
+            "Actor authenticated via OIDC"
         );
 
-        // 3. Return actor reference
-        let response = AuthenticateResponse {
+        Ok(Response::new(AuthenticateResponse {
             actor: Some(ActorRef {
                 id: actor.id,
                 kind: actor.kind,
             }),
             display_name: actor.display_name,
+        }))
+    }
+
+    async fn register_actor(
+        &self,
+        request: Request<RegisterActorRequest>,
+    ) -> Result<Response<RegisterActorResponse>, Status> {
+        let req = request.into_inner();
+
+        if req.display_name.is_empty() || req.email.is_empty() || req.public_key.is_empty() {
+            return Err(Status::invalid_argument(
+                "display_name, email, and public_key are required for registration.",
+            ));
+        }
+
+        let key_id = if req.key_id.is_empty() {
+            "default".to_string()
+        } else {
+            req.key_id
         };
 
-        Ok(Response::new(response))
+        let (actor, envelope) = self
+            .auth
+            .register_actor(req.display_name, req.email, &req.public_key, key_id)
+            .await
+            .map_err(|e| {
+                tracing::warn!(error = %e, "Actor registration failed");
+                Status::internal(format!("{}", e))
+            })?;
+
+        Ok(Response::new(RegisterActorResponse {
+            actor: Some(ActorRef {
+                id: actor.id,
+                kind: actor.kind,
+            }),
+            confirmation_envelope: envelope,
+        }))
+    }
+
+    async fn registration_confirmation(
+        &self,
+        request: Request<RegistrationConfirmationRequest>,
+    ) -> Result<Response<RegistrationConfirmationResponse>, Status> {
+        let req = request.into_inner();
+
+        if req.actor_id.is_empty() || req.decrypted_challenge.is_empty() {
+            return Err(Status::invalid_argument(
+                "actor_id and decrypted_challenge are required.",
+            ));
+        }
+
+        let actor = self
+            .auth
+            .confirm_registration(&req.actor_id, &req.decrypted_challenge)
+            .await
+            .map_err(|e| {
+                tracing::warn!(error = %e, "Registration confirmation failed");
+                Status::permission_denied(format!("{}", e))
+            })?;
+
+        Ok(Response::new(RegistrationConfirmationResponse {
+            confirmed: true,
+            display_name: actor.display_name,
+        }))
+    }
+
+    async fn add_actor_key(
+        &self,
+        request: Request<AddActorKeyRequest>,
+    ) -> Result<Response<AddActorKeyResponse>, Status> {
+        let req = request.into_inner();
+
+        let actor_ref = req
+            .actor
+            .ok_or_else(|| Status::invalid_argument("actor reference is required"))?;
+
+        if req.public_key.is_empty() || req.proof_signature.is_empty() {
+            return Err(Status::invalid_argument(
+                "public_key and proof_signature are required to add a new key.",
+            ));
+        }
+
+        let key_id = if req.key_id.is_empty() {
+            "default".to_string()
+        } else {
+            req.key_id
+        };
+
+        let proof_key_id = if req.proof_key_id.is_empty() {
+            "default"
+        } else {
+            &req.proof_key_id
+        };
+
+        use base64::Engine as _;
+        let proof_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&req.proof_signature)
+            .map_err(|e| {
+                Status::invalid_argument(format!("proof_signature must be base64-encoded: {}", e))
+            })?;
+
+        self.auth
+            .add_actor_key(
+                &actor_ref.id,
+                &req.public_key,
+                key_id.clone(),
+                &proof_bytes,
+                proof_key_id,
+            )
+            .await
+            .map_err(|e| {
+                tracing::warn!(error = %e, "Add actor key failed");
+                Status::permission_denied(format!("{}", e))
+            })?;
+
+        Ok(Response::new(AddActorKeyResponse {
+            success: true,
+            key_id,
+        }))
+    }
+
+    async fn issue_token(
+        &self,
+        _request: Request<IssueTokenRequest>,
+    ) -> Result<Response<IssueTokenResponse>, Status> {
+        Err(Status::unimplemented(
+            "Token issuance is handled by the OIDC provider, not by Forge.\n\
+             Configure your OIDC provider and obtain a token from it.\n\
+             See: https://forge.example.com/docs/auth for setup instructions.",
+        ))
     }
 }

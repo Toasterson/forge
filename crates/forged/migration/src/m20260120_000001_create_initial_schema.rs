@@ -12,12 +12,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Actor::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Actor::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Actor::Id).string().not_null().primary_key())
                     .col(ColumnDef::new(Actor::Kind).string().not_null())
                     .col(ColumnDef::new(Actor::OidcSub).string())
                     .col(ColumnDef::new(Actor::DisplayName).string().not_null())
@@ -68,7 +63,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(BlobMetadata::BlobType).string().not_null())
                     .col(ColumnDef::new(BlobMetadata::Namespace).string().not_null())
                     .col(ColumnDef::new(BlobMetadata::Fid).string().not_null())
-                    .col(ColumnDef::new(BlobMetadata::SizeBytes).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(BlobMetadata::SizeBytes)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(BlobMetadata::CreatedAt)
                             .timestamp_with_time_zone()
@@ -112,12 +111,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Gate::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Gate::Id)
-                            .string()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Gate::Id).string().not_null().primary_key())
                     .col(ColumnDef::new(Gate::Name).string().not_null())
                     .col(ColumnDef::new(Gate::GateKdl).text().not_null())
                     .col(ColumnDef::new(Gate::OwnerId).string().not_null())
@@ -320,11 +314,19 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(SourceArchive::ComponentId).string().not_null())
+                    .col(
+                        ColumnDef::new(SourceArchive::ComponentId)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(SourceArchive::Filename).string().not_null())
                     .col(ColumnDef::new(SourceArchive::Url).string())
                     .col(ColumnDef::new(SourceArchive::BlobHash).string().not_null())
-                    .col(ColumnDef::new(SourceArchive::SizeBytes).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(SourceArchive::SizeBytes)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(SourceArchive::CreatedAt)
                             .timestamp_with_time_zone()
@@ -380,12 +382,20 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(ComponentFile::ComponentId).string().not_null())
+                    .col(
+                        ColumnDef::new(ComponentFile::ComponentId)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(ComponentFile::Kind).string().not_null())
                     .col(ColumnDef::new(ComponentFile::Name).string().not_null())
                     .col(ColumnDef::new(ComponentFile::RelPath).string().not_null())
                     .col(ColumnDef::new(ComponentFile::BlobHash).string().not_null())
-                    .col(ColumnDef::new(ComponentFile::SizeBytes).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(ComponentFile::SizeBytes)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(ComponentFile::CreatedAt)
                             .timestamp_with_time_zone()

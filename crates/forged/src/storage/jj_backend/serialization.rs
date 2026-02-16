@@ -24,8 +24,16 @@ pub struct SerializableCommit {
 impl SerializableCommit {
     pub fn from_commit(commit: &Commit) -> Self {
         Self {
-            parents: commit.parents.iter().map(|p| p.as_bytes().to_vec()).collect(),
-            predecessors: commit.predecessors.iter().map(|p| p.as_bytes().to_vec()).collect(),
+            parents: commit
+                .parents
+                .iter()
+                .map(|p| p.as_bytes().to_vec())
+                .collect(),
+            predecessors: commit
+                .predecessors
+                .iter()
+                .map(|p| p.as_bytes().to_vec())
+                .collect(),
             root_tree: commit.root_tree.as_bytes().to_vec(),
             change_id: commit.change_id.as_bytes().to_vec(),
             description: commit.description.clone(),
@@ -114,7 +122,9 @@ impl SerializableTree {
                         id: id.to_bytes().to_vec(),
                         executable: *executable,
                     },
-                    TreeValue::Symlink(id) => SerializableTreeValue::Symlink(id.to_bytes().to_vec()),
+                    TreeValue::Symlink(id) => {
+                        SerializableTreeValue::Symlink(id.to_bytes().to_vec())
+                    }
                     TreeValue::Tree(id) => SerializableTreeValue::Tree(id.to_bytes().to_vec()),
                     TreeValue::GitSubmodule(id) => {
                         SerializableTreeValue::GitSubmodule(id.to_bytes().to_vec())
@@ -142,18 +152,14 @@ impl SerializableTree {
                     id: FileId::from_bytes(id),
                     executable: *executable,
                 },
-                SerializableTreeValue::Symlink(id) => TreeValue::Symlink(
-                    SymlinkId::from_bytes(id),
-                ),
-                SerializableTreeValue::Tree(id) => TreeValue::Tree(
-                    TreeId::from_bytes(id),
-                ),
-                SerializableTreeValue::GitSubmodule(id) => TreeValue::GitSubmodule(
-                    jj_lib::backend::CommitId::from_bytes(id),
-                ),
-                SerializableTreeValue::Conflict(id) => TreeValue::Conflict(
-                    ConflictId::from_bytes(id),
-                ),
+                SerializableTreeValue::Symlink(id) => TreeValue::Symlink(SymlinkId::from_bytes(id)),
+                SerializableTreeValue::Tree(id) => TreeValue::Tree(TreeId::from_bytes(id)),
+                SerializableTreeValue::GitSubmodule(id) => {
+                    TreeValue::GitSubmodule(jj_lib::backend::CommitId::from_bytes(id))
+                }
+                SerializableTreeValue::Conflict(id) => {
+                    TreeValue::Conflict(ConflictId::from_bytes(id))
+                }
             };
 
             tree.set_or_remove(name, value);

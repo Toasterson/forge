@@ -14,7 +14,11 @@ pub struct BlobRepository {
 }
 
 impl BlobRepository {
-    pub fn new(db: Arc<DatabaseConnection>, seaweedfs: Arc<SeaweedFsClient>, namespace: String) -> Self {
+    pub fn new(
+        db: Arc<DatabaseConnection>,
+        seaweedfs: Arc<SeaweedFsClient>,
+        namespace: String,
+    ) -> Self {
         Self {
             db,
             seaweedfs,
@@ -102,7 +106,9 @@ impl BlobRepository {
             .seaweedfs
             .read_blob_by_fid(&metadata.fid)
             .await
-            .wrap_err_with(|| format!("failed to read blob from SeaweedFS: fid={}", metadata.fid))?;
+            .wrap_err_with(|| {
+                format!("failed to read blob from SeaweedFS: fid={}", metadata.fid)
+            })?;
 
         tracing::debug!(
             hash = %hash,
@@ -148,7 +154,10 @@ impl BlobRepository {
     }
 
     /// List all blobs of a given type
-    pub async fn list_blobs(&self, blob_type: ApplicationBlobType) -> Result<Vec<blob_metadata::Model>> {
+    pub async fn list_blobs(
+        &self,
+        blob_type: ApplicationBlobType,
+    ) -> Result<Vec<blob_metadata::Model>> {
         let blobs = BlobMetadata::find()
             .filter(blob_metadata::Column::BlobType.eq(blob_type.to_string()))
             .filter(blob_metadata::Column::Namespace.eq(&self.namespace))
@@ -161,7 +170,10 @@ impl BlobRepository {
     }
 
     /// Get blob metadata by hash only (for ownership checks)
-    pub async fn get_blob_metadata_by_hash(&self, hash: &str) -> Result<Option<blob_metadata::Model>> {
+    pub async fn get_blob_metadata_by_hash(
+        &self,
+        hash: &str,
+    ) -> Result<Option<blob_metadata::Model>> {
         let metadata = BlobMetadata::find()
             .filter(blob_metadata::Column::Hash.eq(hash))
             .filter(blob_metadata::Column::Namespace.eq(&self.namespace))
@@ -226,7 +238,10 @@ mod tests {
 
     #[test]
     fn test_blob_type_conversion() {
-        assert_eq!(ApplicationBlobType::SourceArchive.as_str(), "source_archive");
+        assert_eq!(
+            ApplicationBlobType::SourceArchive.as_str(),
+            "source_archive"
+        );
         assert_eq!(ApplicationBlobType::Patch.as_str(), "patch");
         assert_eq!(ApplicationBlobType::License.as_str(), "license");
         assert_eq!(ApplicationBlobType::Script.as_str(), "script");

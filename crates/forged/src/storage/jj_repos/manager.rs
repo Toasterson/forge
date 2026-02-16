@@ -41,7 +41,10 @@ impl JjRepoManager {
     }
 
     /// Ensure a repository exists for a component
-    pub async fn ensure_component_repo(&self, component_id: &ComponentId) -> Result<Arc<Workspace>> {
+    pub async fn ensure_component_repo(
+        &self,
+        component_id: &ComponentId,
+    ) -> Result<Arc<Workspace>> {
         let repo_path = self.root.join("components").join(&component_id.0);
 
         if !repo_path.exists() {
@@ -79,7 +82,10 @@ impl JjRepoManager {
         };
 
         if !repo_path.exists() {
-            return Err(miette::miette!("repository does not exist: {:?}", repo_path));
+            return Err(miette::miette!(
+                "repository does not exist: {:?}",
+                repo_path
+            ));
         }
 
         self.load_workspace(&repo_path, repo_id.clone()).await

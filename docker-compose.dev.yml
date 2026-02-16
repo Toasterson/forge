@@ -1,6 +1,33 @@
-version: '3.9'
+services:
+  postgres:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: "forged"
+      POSTGRES_USER: "forged"
+      POSTGRES_DB: "forged"
+    volumes:
+      - "postgres:/var/lib/postgresql/data"
 
-services:  
+  seaweedfs-master:
+    image: chrislusf/seaweedfs:latest
+    ports:
+      - "9333:9333"
+    command: "master -ip=seaweedfs-master"
+    volumes:
+      - "seaweedfs-master:/data"
+
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs:latest
+    ports:
+      - "8080:8080"
+    command: "volume -mserver=seaweedfs-master:9333 -port=8080"
+    depends_on:
+      - seaweedfs-master
+    volumes:
+      - "seaweedfs-volume:/data"
+
   rabbitmq:
     image: rabbitmq:3.12-management
     environment:
@@ -13,32 +40,8 @@ services:
       - 15672:15672
       - 5672:5672
 
-  postgres:
-    image: postgres:16
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_PASSWORD: "forge"
-      POSTGRES_USER: "forge"
-      POSTGRES_DB: "forge"
-    volumes:
-      - "postgres:/var/lib/postgresql/data"
-
-  minio:
-    image: quay.io/minio/minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: miniodev
-      MINIO_ROOT_PASSWORD: devpasswordignore
-    volumes:
-      - "minio:/data"
-    command: ["server", "/data", "--console-address", ":9001"]
-
 volumes:
-  rabbitmq: {}
   postgres: {}
-  garage-meta: {}
-  garage-data: {}
-  minio: {}
+  seaweedfs-master: {}
+  seaweedfs-volume: {}
+  rabbitmq: {}

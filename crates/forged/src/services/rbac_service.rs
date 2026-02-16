@@ -1,3 +1,4 @@
+use crate::entities::gate_member::{Permission, Role};
 use crate::entities::{component, gate_member};
 use crate::repositories::{ComponentRepository, GateRepository};
 use miette::{Context, Result};
@@ -55,10 +56,7 @@ impl RbacService {
             let has_permission = m
                 .permissions
                 .as_array()
-                .map(|arr| {
-                    arr.iter()
-                        .any(|v| v.as_str() == Some(permission.as_str()))
-                })
+                .map(|arr| arr.iter().any(|v| v.as_str() == Some(permission.as_str())))
                 .unwrap_or(false);
 
             Ok(has_permission)
@@ -128,18 +126,11 @@ impl RbacService {
 
     /// Get all gates where actor has at least read permission
     pub async fn list_accessible_gates(&self, actor_id: &str) -> Result<Vec<gate_member::Model>> {
-        // Get all gates owned by actor
-        let owned_gates = self
-            .gate_repo
-            .list_by_owner(actor_id)
+        // Get all gate memberships for this actor
+        self.gate_repo
+            .list_memberships_for_actor(actor_id)
             .await
-            .wrap_err("failed to list owned gates")?;
-
-        // Get all gate memberships
-        // TODO: This requires a query across all gates - might need optimization
-        // For now, we return empty vec as this is not critical for MVP
-
-        Ok(Vec::new())
+            .wrap_err("failed to list gate memberships for actor")
     }
 
     /// Get all components in a gate where actor has at least read permission
@@ -196,5 +187,30 @@ impl ComponentPermission {
             ComponentPermission::Read => "read",
             ComponentPermission::Write => "write",
         }
+    }
+}
+
+/// Returns the default set of permissions for a given role.
+///
+/// Role defaults:
+/// - **Admin**: all permissions (gate_admin, gate_read, gate_write, component_read, component_write)
+/// - **Member**: read + write (gate_read, gate_write, component_read, component_write)
+/// - **Viewer**: read-only (gate_read, component_read)
+pub fn role_defaults(role: &Role) -> Vec<Permission> {
+    match role {
+        Role::Admin => vec![
+            Permission::GateAdmin,
+            Permission::GateRead,
+            Permission::GateWrite,
+            Permission::ComponentRead,
+            Permission::ComponentWrite,
+        ],
+        Role::Member => vec![
+            Permission::GateRead,
+            Permission::GateWrite,
+            Permission::ComponentRead,
+            Permission::ComponentWrite,
+        ],
+        Role::Viewer => vec![Permission::GateRead, Permission::ComponentRead],
     }
 }

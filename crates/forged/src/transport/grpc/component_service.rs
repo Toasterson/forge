@@ -1,5 +1,7 @@
+use super::middleware::extract_actor;
 use super::proto::{
-    component_service_server::ComponentService, upload_component_file_request, upload_source_archive_request, ComponentFileInfo, ComponentInfo, ContentHash,
+    component_service_server::ComponentService, upload_component_file_request,
+    upload_source_archive_request, ComponentFileInfo, ComponentInfo, ContentHash,
     CreateComponentRequest, CreateComponentResponse, GetComponentRequest, GetComponentResponse,
     ListComponentFilesRequest, ListComponentFilesResponse, ListSourceArchivesRequest,
     ListSourceArchivesResponse, SourceArchiveInfo, Timestamp, UpdateComponentRequest,
@@ -7,6 +9,7 @@ use super::proto::{
     UploadSourceArchiveRequest, UploadSourceArchiveResponse,
 };
 use crate::repositories::{ApplicationBlobType, ComponentRepository, SourceArchiveRepository};
+use crate::services::RbacService;
 use std::sync::Arc;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -16,17 +19,19 @@ use tonic::{Request, Response, Status, Streaming};
 pub struct ComponentServiceImpl {
     component_repo: Arc<ComponentRepository>,
     source_archive_repo: Arc<SourceArchiveRepository>,
-    // TODO: Add RbacService in Phase 4 for permission checking
+    rbac: Arc<RbacService>,
 }
 
 impl ComponentServiceImpl {
     pub fn new(
         component_repo: Arc<ComponentRepository>,
         source_archive_repo: Arc<SourceArchiveRepository>,
+        rbac: Arc<RbacService>,
     ) -> Self {
         Self {
             component_repo,
             source_archive_repo,
+            rbac,
         }
     }
 
@@ -46,17 +51,28 @@ impl ComponentService for ComponentServiceImpl {
         &self,
         request: Request<CreateComponentRequest>,
     ) -> Result<Response<CreateComponentResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has ComponentWrite permission for this gate
+        // Check actor has ComponentWrite permission for this gate
+        let has_perm = self
+            .rbac
+            .check_gate_permission(
+                &actor.actor_id,
+                &gate_id.id,
+                crate::services::GatePermission::ComponentWrite,
+            )
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have component write permission for this gate.",
+            ));
+        }
 
         let component = self
             .component_repo
@@ -85,17 +101,24 @@ impl ComponentService for ComponentServiceImpl {
         &self,
         request: Request<GetComponentRequest>,
     ) -> Result<Response<GetComponentResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let component_id = req
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has ComponentRead permission
+        // Check actor has ComponentRead permission
+        let has_perm = self
+            .rbac
+            .check_component_read(&actor.actor_id, &component_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have read permission for this component.",
+            ));
+        }
 
         let component = self
             .component_repo
@@ -105,7 +128,9 @@ impl ComponentService for ComponentServiceImpl {
                 tracing::error!(error = %e, "Failed to get component");
                 Status::internal(format!("Failed to get component: {}", e))
             })?
-            .ok_or_else(|| Status::not_found(format!("Component not found: {}", component_id.id)))?;
+            .ok_or_else(|| {
+                Status::not_found(format!("Component not found: {}", component_id.id))
+            })?;
 
         let response = GetComponentResponse {
             component: Some(ComponentInfo {
@@ -125,17 +150,24 @@ impl ComponentService for ComponentServiceImpl {
         &self,
         request: Request<UpdateComponentRequest>,
     ) -> Result<Response<UpdateComponentResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let component_id = req
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has ComponentWrite permission
+        // Check actor has ComponentWrite permission
+        let has_perm = self
+            .rbac
+            .check_component_write(&actor.actor_id, &component_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have write permission for this component.",
+            ));
+        }
 
         let component = self
             .component_repo
@@ -174,7 +206,11 @@ impl ComponentService for ComponentServiceImpl {
 
         let metadata = match first_msg.data {
             Some(upload_source_archive_request::Data::Metadata(m)) => m,
-            _ => return Err(Status::invalid_argument("first message must contain metadata")),
+            _ => {
+                return Err(Status::invalid_argument(
+                    "first message must contain metadata",
+                ))
+            }
         };
 
         let _actor = metadata
@@ -185,7 +221,19 @@ impl ComponentService for ComponentServiceImpl {
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has ComponentWrite permission
+        // Check actor has ComponentWrite permission
+        // For streaming RPCs, auth comes from the middleware (bearer token) or the proto actor field
+        // The middleware injects AuthenticatedActor into extensions before stream starts
+        let has_perm = self
+            .rbac
+            .check_component_write(&_actor.id, &component_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have write permission for this component.",
+            ));
+        }
 
         // Collect all chunks
         let mut data = Vec::with_capacity(metadata.total_size as usize);
@@ -253,7 +301,11 @@ impl ComponentService for ComponentServiceImpl {
 
         let metadata = match first_msg.data {
             Some(upload_component_file_request::Data::Metadata(m)) => m,
-            _ => return Err(Status::invalid_argument("first message must contain metadata")),
+            _ => {
+                return Err(Status::invalid_argument(
+                    "first message must contain metadata",
+                ))
+            }
         };
 
         let _actor = metadata
@@ -265,11 +317,22 @@ impl ComponentService for ComponentServiceImpl {
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
         // Parse kind
-        let kind: ApplicationBlobType = metadata.kind.parse().map_err(|e: String| {
-            Status::invalid_argument(format!("invalid file kind: {}", e))
-        })?;
+        let kind: ApplicationBlobType = metadata
+            .kind
+            .parse()
+            .map_err(|e: String| Status::invalid_argument(format!("invalid file kind: {}", e)))?;
 
-        // TODO: Phase 4 - Check actor has ComponentWrite permission
+        // Check actor has ComponentWrite permission
+        let has_perm = self
+            .rbac
+            .check_component_write(&_actor.id, &component_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have write permission for this component.",
+            ));
+        }
 
         // Collect all chunks
         let mut data = Vec::with_capacity(metadata.total_size as usize);
@@ -299,7 +362,13 @@ impl ComponentService for ComponentServiceImpl {
         // Store file
         let file = self
             .component_repo
-            .add_component_file(&component_id.id, kind, metadata.name, metadata.rel_path, &data)
+            .add_component_file(
+                &component_id.id,
+                kind,
+                metadata.name,
+                metadata.rel_path,
+                &data,
+            )
             .await
             .map_err(|e| {
                 tracing::error!(error = %e, "Failed to upload component file");
@@ -313,7 +382,9 @@ impl ComponentService for ComponentServiceImpl {
                 kind: file.kind,
                 name: file.name,
                 rel_path: file.rel_path,
-                hash: Some(ContentHash { hex: file.blob_hash }),
+                hash: Some(ContentHash {
+                    hex: file.blob_hash,
+                }),
                 size_bytes: file.size_bytes,
                 created_at: Self::to_proto_timestamp(&file.created_at),
             }),
@@ -326,17 +397,24 @@ impl ComponentService for ComponentServiceImpl {
         &self,
         request: Request<ListSourceArchivesRequest>,
     ) -> Result<Response<ListSourceArchivesResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let component_id = req
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has ComponentRead permission
+        // Check actor has ComponentRead permission
+        let has_perm = self
+            .rbac
+            .check_component_read(&actor.actor_id, &component_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have read permission for this component.",
+            ));
+        }
 
         let archives = self
             .source_archive_repo
@@ -369,11 +447,8 @@ impl ComponentService for ComponentServiceImpl {
         &self,
         request: Request<ListComponentFilesRequest>,
     ) -> Result<Response<ListComponentFilesResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let component_id = req
             .component_id
@@ -388,7 +463,17 @@ impl ComponentService for ComponentServiceImpl {
             None
         };
 
-        // TODO: Phase 4 - Check actor has ComponentRead permission
+        // Check actor has ComponentRead permission
+        let has_perm = self
+            .rbac
+            .check_component_read(&actor.actor_id, &component_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have read permission for this component.",
+            ));
+        }
 
         let files = self
             .component_repo

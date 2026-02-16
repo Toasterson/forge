@@ -1,5 +1,7 @@
 pub mod actor;
+pub mod actor_key;
 pub mod blob_metadata;
+pub mod build_job;
 pub mod component;
 pub mod component_file;
 pub mod gate;
@@ -8,7 +10,9 @@ pub mod operation;
 pub mod source_archive;
 
 pub use actor::Entity as Actor;
+pub use actor_key::Entity as ActorKey;
 pub use blob_metadata::Entity as BlobMetadata;
+pub use build_job::Entity as BuildJob;
 pub use component::Entity as Component;
 pub use component_file::Entity as ComponentFile;
 pub use gate::Entity as Gate;

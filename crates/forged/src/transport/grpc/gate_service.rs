@@ -1,3 +1,4 @@
+use super::middleware::extract_actor;
 use super::proto::{
     gate_service_server::GateService, AddMemberRequest, AddMemberResponse, ComponentInfo,
     CreateGateRequest, CreateGateResponse, GateInfo, GateMemberInfo, GetGateRequest,
@@ -6,6 +7,7 @@ use super::proto::{
     RemoveMemberResponse, Timestamp, UpdateGateRequest, UpdateGateResponse,
 };
 use crate::repositories::{ComponentRepository, GateRepository};
+use crate::services::RbacService;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
@@ -15,14 +17,19 @@ use tonic::{Request, Response, Status};
 pub struct GateServiceImpl {
     gate_repo: Arc<GateRepository>,
     component_repo: Arc<ComponentRepository>,
-    // TODO: Add RbacService in Phase 4 for permission checking
+    rbac: Arc<RbacService>,
 }
 
 impl GateServiceImpl {
-    pub fn new(gate_repo: Arc<GateRepository>, component_repo: Arc<ComponentRepository>) -> Self {
+    pub fn new(
+        gate_repo: Arc<GateRepository>,
+        component_repo: Arc<ComponentRepository>,
+        rbac: Arc<RbacService>,
+    ) -> Self {
         Self {
             gate_repo,
             component_repo,
+            rbac,
         }
     }
 
@@ -42,17 +49,13 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<CreateGateRequest>,
     ) -> Result<Response<CreateGateResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
 
-        let actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
-
-        // TODO: Phase 4 - Validate actor has permission to create gates
-
+        // Any authenticated user can create a gate (they become the owner)
         let gate = self
             .gate_repo
-            .create_gate(req.name, req.gate_kdl, actor.id)
+            .create_gate(req.name, req.gate_kdl, actor.actor_id)
             .await
             .map_err(|e| {
                 tracing::error!(error = %e, "Failed to create gate");
@@ -77,17 +80,25 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<GetGateRequest>,
     ) -> Result<Response<GetGateResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has permission to read gate
+        // Check actor has GateRead permission
+        let has_perm = self
+            .rbac
+            .check_gate_read(&actor.actor_id, &gate_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have read permission for this gate.",
+            ));
+        }
 
         let gate = self
             .gate_repo
@@ -117,17 +128,25 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<UpdateGateRequest>,
     ) -> Result<Response<UpdateGateResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has GateWrite permission
+        // Check actor has GateWrite permission
+        let has_perm = self
+            .rbac
+            .check_gate_write(&actor.actor_id, &gate_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have write permission for this gate.",
+            ));
+        }
 
         let gate = self
             .gate_repo
@@ -156,21 +175,35 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<AddMemberRequest>,
     ) -> Result<Response<AddMemberResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has GateAdmin permission
+        // Check actor has GateAdmin permission
+        let has_perm = self
+            .rbac
+            .check_gate_admin(&actor.actor_id, &gate_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have admin permission for this gate.\n\
+                 Only gate owners and admins can manage members.",
+            ));
+        }
 
         let member = self
             .gate_repo
-            .add_member(&gate_id.id, &req.member_actor_id, req.roles, req.permissions)
+            .add_member(
+                &gate_id.id,
+                &req.member_actor_id,
+                req.roles,
+                req.permissions,
+            )
             .await
             .map_err(|e| {
                 tracing::error!(error = %e, "Failed to add member");
@@ -210,17 +243,26 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<RemoveMemberRequest>,
     ) -> Result<Response<RemoveMemberResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has GateAdmin permission
+        // Check actor has GateAdmin permission
+        let has_perm = self
+            .rbac
+            .check_gate_admin(&actor.actor_id, &gate_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have admin permission for this gate.\n\
+                 Only gate owners and admins can manage members.",
+            ));
+        }
 
         self.gate_repo
             .remove_member(&gate_id.id, &req.member_actor_id)
@@ -239,17 +281,25 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<ListMembersRequest>,
     ) -> Result<Response<ListMembersResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has GateRead permission
+        // Check actor has GateRead permission
+        let has_perm = self
+            .rbac
+            .check_gate_read(&actor.actor_id, &gate_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have read permission for this gate.",
+            ));
+        }
 
         let members = self
             .gate_repo
@@ -296,17 +346,25 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<ListComponentsRequest>,
     ) -> Result<Response<ListComponentsResponse>, Status> {
+        let actor = extract_actor(&request)?;
         let req = request.into_inner();
-
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
 
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
-        // TODO: Phase 4 - Check actor has GateRead permission
+        // Check actor has GateRead permission
+        let has_perm = self
+            .rbac
+            .check_gate_read(&actor.actor_id, &gate_id.id)
+            .await
+            .map_err(|e| Status::internal(format!("Permission check failed: {}", e)))?;
+
+        if !has_perm {
+            return Err(Status::permission_denied(
+                "You do not have read permission for this gate.",
+            ));
+        }
 
         let components = self
             .component_repo
@@ -338,12 +396,11 @@ impl GateService for GateServiceImpl {
         &self,
         request: Request<ListGatesRequest>,
     ) -> Result<Response<ListGatesResponse>, Status> {
+        let _actor = extract_actor(&request)?;
         let req = request.into_inner();
 
-        let _actor = req
-            .actor
-            .ok_or_else(|| Status::invalid_argument("actor is required"))?;
-
+        // List gates: if owner_id specified, filter by owner.
+        // Otherwise list all gates the actor has access to.
         let gates = if let Some(owner_id) = req.owner_id {
             self.gate_repo.list_by_owner(&owner_id).await
         } else {

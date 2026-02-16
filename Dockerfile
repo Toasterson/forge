@@ -1,6 +1,6 @@
 # Multi-stage build for forged server container
 # Builder stage
-FROM rust:1.79-bullseye AS builder
+FROM rust:1.85-bookworm AS builder
 
 # Install build dependencies (protoc for tonic/prost, clang for rocksdb-sys, OpenSSL)
 RUN apt-get update \

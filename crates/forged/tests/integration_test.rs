@@ -33,7 +33,11 @@ async fn test_database_connection() {
 
     // This will run migrations
     let result = AppState::new(settings).await;
-    assert!(result.is_ok(), "Failed to initialize AppState: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to initialize AppState: {:?}",
+        result.err()
+    );
 
     let app_state = result.unwrap();
     app_state.shutdown().await.expect("Failed to shutdown");
@@ -48,10 +52,7 @@ async fn test_actor_creation() {
     // Create actor from OIDC claims
     let actor = app_state
         .actor_repo
-        .create_or_update_from_oidc(
-            "test_sub_123".to_string(),
-            "Test User".to_string(),
-        )
+        .create_or_update_from_oidc("test_sub_123".to_string(), "Test User".to_string())
         .await
         .expect("Failed to create actor");
 
@@ -260,7 +261,9 @@ async fn setup_test_app_state() -> AppState {
         server: Default::default(),
     };
 
-    AppState::new(settings).await.expect("Failed to create AppState")
+    AppState::new(settings)
+        .await
+        .expect("Failed to create AppState")
 }
 
 fn cleanup_test_data() {

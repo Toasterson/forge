@@ -31,6 +31,19 @@ message Timestamp {
 service AuthService {
   // Validates OIDC token and returns or creates actor
   rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+
+  // Register a new actor with an SSH public key
+  // Sends an age-encrypted confirmation envelope via email
+  rpc RegisterActor(RegisterActorRequest) returns (RegisterActorResponse);
+
+  // Confirm registration by decrypting the challenge envelope
+  rpc RegistrationConfirmation(RegistrationConfirmationRequest) returns (RegistrationConfirmationResponse);
+
+  // Add a new SSH key to an existing actor (requires proof signature)
+  rpc AddActorKey(AddActorKeyRequest) returns (AddActorKeyResponse);
+
+  // Token issuance is handled by the OIDC provider, not forged
+  rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
 }
 
 message AuthenticateRequest {
@@ -40,6 +53,49 @@ message AuthenticateRequest {
 message AuthenticateResponse {
   ActorRef actor = 1;
   string display_name = 2;
+}
+
+message RegisterActorRequest {
+  string display_name = 1;
+  string email = 2;
+  string public_key = 3;     // SSH public key (e.g. "ssh-ed25519 AAAA...")
+  string key_id = 4;         // Human-readable label for the key
+}
+
+message RegisterActorResponse {
+  ActorRef actor = 1;
+  string confirmation_envelope = 2; // age-encrypted challenge (also sent via email)
+}
+
+message RegistrationConfirmationRequest {
+  string actor_id = 1;
+  string decrypted_challenge = 2; // The decrypted challenge string
+}
+
+message RegistrationConfirmationResponse {
+  bool confirmed = 1;
+  string display_name = 2;
+}
+
+message AddActorKeyRequest {
+  ActorRef actor = 1;
+  string public_key = 2;     // New SSH public key
+  string key_id = 3;         // Human-readable label
+  string proof_signature = 4; // Signature of a challenge using an existing key
+  string proof_key_id = 5;   // key_id of the key used to sign the proof
+}
+
+message AddActorKeyResponse {
+  bool success = 1;
+  string key_id = 2;
+}
+
+message IssueTokenRequest {
+  // Intentionally empty — this RPC always returns UNIMPLEMENTED
+}
+
+message IssueTokenResponse {
+  // Intentionally empty — this RPC always returns UNIMPLEMENTED
 }
 
 // ========== Gate Service ==========
@@ -318,6 +374,18 @@ service BuildService {
 
   // Download a blob by hash (streaming)
   rpc DownloadBlob(DownloadBlobRequest) returns (stream DownloadBlobResponse);
+
+  // Submit a build for a component (dispatches to Solstice CI via AMQP)
+  rpc SubmitBuild(SubmitBuildRequest) returns (SubmitBuildResponse);
+
+  // Get build job status
+  rpc GetBuildStatus(GetBuildStatusRequest) returns (GetBuildStatusResponse);
+
+  // List builds for a component
+  rpc ListBuilds(ListBuildsRequest) returns (ListBuildsResponse);
+
+  // Cancel a build job
+  rpc CancelBuild(CancelBuildRequest) returns (CancelBuildResponse);
 }
 
 message GetBuildManifestRequest {
@@ -349,4 +417,52 @@ message DownloadBlobResponse {
   bytes chunk = 1; // 64KB chunks
   int64 total_size = 2; // Only set in first response
   int64 offset = 3; // Byte offset of this chunk
+}
+
+message SubmitBuildRequest {
+  ComponentId component_id = 1;
+  GateId gate_id = 2;
+}
+
+message SubmitBuildResponse {
+  BuildJobInfo job = 1;
+}
+
+message GetBuildStatusRequest {
+  string job_id = 1;
+}
+
+message GetBuildStatusResponse {
+  BuildJobInfo job = 1;
+}
+
+message ListBuildsRequest {
+  ComponentId component_id = 1;
+}
+
+message ListBuildsResponse {
+  repeated BuildJobInfo jobs = 1;
+}
+
+message CancelBuildRequest {
+  string job_id = 1;
+}
+
+message CancelBuildResponse {
+  BuildJobInfo job = 1;
+}
+
+message BuildJobInfo {
+  string id = 1;
+  string component_id = 2;
+  string gate_id = 3;
+  string actor_id = 4;
+  string request_id = 5;
+  string status = 6; // queued, running, success, failed, cancelled
+  optional int32 exit_code = 7;
+  optional string summary = 8;
+  optional string build_log_url = 9;
+  Timestamp created_at = 10;
+  Timestamp updated_at = 11;
+  optional Timestamp completed_at = 12;
 }

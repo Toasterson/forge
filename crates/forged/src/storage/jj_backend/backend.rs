@@ -13,7 +13,10 @@ use std::io::{Cursor, Read};
 use std::path::Path;
 use std::sync::Arc;
 
-use super::serialization::{deserialize_commit, deserialize_conflict, deserialize_tree, serialize_commit, serialize_conflict, serialize_tree};
+use super::serialization::{
+    deserialize_commit, deserialize_conflict, deserialize_tree, serialize_commit,
+    serialize_conflict, serialize_tree,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackendMetadata {
@@ -175,17 +178,12 @@ impl Backend for SeaweedFsBackend {
         let cache_path = format!(".seaweedfs_cache/{}.fid", blob_key.hash.hex());
 
         let fid = std::fs::read_to_string(&cache_path).map_err(|e| {
-            jj_lib::backend::BackendError::Other(format!(
-                "failed to read fid from cache: {}",
-                e
-            ))
+            jj_lib::backend::BackendError::Other(format!("failed to read fid from cache: {}", e))
         })?;
 
-        let bytes = self
-            .client
-            .read_blob_by_fid(&fid)
-            .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e)))?;
+        let bytes = self.client.read_blob_by_fid(&fid).await.map_err(|e| {
+            jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e))
+        })?;
 
         deserialize_commit(&bytes).map_err(|e| {
             jj_lib::backend::BackendError::Other(format!("failed to deserialize commit: {}", e))
@@ -212,7 +210,9 @@ impl Backend for SeaweedFsBackend {
             .client
             .write_blob(&blob_key, &bytes)
             .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e)))?;
+            .map_err(|e| {
+                jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e))
+            })?;
 
         // 4. Cache the fid locally (in full implementation, store in PostgreSQL)
         let cache_dir = ".seaweedfs_cache";
@@ -228,17 +228,12 @@ impl Backend for SeaweedFsBackend {
 
         let cache_path = format!(".seaweedfs_cache/{}.fid", blob_key.hash.hex());
         let fid = std::fs::read_to_string(&cache_path).map_err(|e| {
-            jj_lib::backend::BackendError::Other(format!(
-                "failed to read fid from cache: {}",
-                e
-            ))
+            jj_lib::backend::BackendError::Other(format!("failed to read fid from cache: {}", e))
         })?;
 
-        let bytes = self
-            .client
-            .read_blob_by_fid(&fid)
-            .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e)))?;
+        let bytes = self.client.read_blob_by_fid(&fid).await.map_err(|e| {
+            jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e))
+        })?;
 
         deserialize_tree(&bytes).map_err(|e| {
             jj_lib::backend::BackendError::Other(format!("failed to deserialize tree: {}", e))
@@ -258,7 +253,9 @@ impl Backend for SeaweedFsBackend {
             .client
             .write_blob(&blob_key, &bytes)
             .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e)))?;
+            .map_err(|e| {
+                jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e))
+            })?;
 
         let cache_dir = ".seaweedfs_cache";
         std::fs::create_dir_all(cache_dir).ok();
@@ -273,17 +270,12 @@ impl Backend for SeaweedFsBackend {
 
         let cache_path = format!(".seaweedfs_cache/{}.fid", blob_key.hash.hex());
         let fid = std::fs::read_to_string(&cache_path).map_err(|e| {
-            jj_lib::backend::BackendError::Other(format!(
-                "failed to read fid from cache: {}",
-                e
-            ))
+            jj_lib::backend::BackendError::Other(format!("failed to read fid from cache: {}", e))
         })?;
 
-        let bytes = self
-            .client
-            .read_blob_by_fid(&fid)
-            .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e)))?;
+        let bytes = self.client.read_blob_by_fid(&fid).await.map_err(|e| {
+            jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e))
+        })?;
 
         Ok(Box::new(Cursor::new(bytes)))
     }
@@ -294,9 +286,9 @@ impl Backend for SeaweedFsBackend {
         contents: &mut (dyn Read + Send),
     ) -> BackendResult<FileId> {
         let mut bytes = Vec::new();
-        contents
-            .read_to_end(&mut bytes)
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to read file: {}", e)))?;
+        contents.read_to_end(&mut bytes).map_err(|e| {
+            jj_lib::backend::BackendError::Other(format!("failed to read file: {}", e))
+        })?;
 
         let hash = ContentHash::from_bytes(&bytes);
         let file_id = FileId::from_bytes(hash.as_bytes());
@@ -306,7 +298,9 @@ impl Backend for SeaweedFsBackend {
             .client
             .write_blob(&blob_key, &bytes)
             .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e)))?;
+            .map_err(|e| {
+                jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e))
+            })?;
 
         let cache_dir = ".seaweedfs_cache";
         std::fs::create_dir_all(cache_dir).ok();
@@ -321,17 +315,12 @@ impl Backend for SeaweedFsBackend {
 
         let cache_path = format!(".seaweedfs_cache/{}.fid", blob_key.hash.hex());
         let fid = std::fs::read_to_string(&cache_path).map_err(|e| {
-            jj_lib::backend::BackendError::Other(format!(
-                "failed to read fid from cache: {}",
-                e
-            ))
+            jj_lib::backend::BackendError::Other(format!("failed to read fid from cache: {}", e))
         })?;
 
-        let bytes = self
-            .client
-            .read_blob_by_fid(&fid)
-            .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e)))?;
+        let bytes = self.client.read_blob_by_fid(&fid).await.map_err(|e| {
+            jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e))
+        })?;
 
         String::from_utf8(bytes).map_err(|e| {
             jj_lib::backend::BackendError::Other(format!("invalid UTF-8 in symlink: {}", e))
@@ -348,7 +337,9 @@ impl Backend for SeaweedFsBackend {
             .client
             .write_blob(&blob_key, bytes)
             .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e)))?;
+            .map_err(|e| {
+                jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e))
+            })?;
 
         let cache_dir = ".seaweedfs_cache";
         std::fs::create_dir_all(cache_dir).ok();
@@ -358,22 +349,21 @@ impl Backend for SeaweedFsBackend {
         Ok(symlink_id)
     }
 
-    async fn read_conflict<'a>(&self, _path: &RepoPath, id: &'a ConflictId) -> BackendResult<Conflict> {
+    async fn read_conflict<'a>(
+        &self,
+        _path: &RepoPath,
+        id: &'a ConflictId,
+    ) -> BackendResult<Conflict> {
         let blob_key = self.conflict_id_to_blob_key(id);
 
         let cache_path = format!(".seaweedfs_cache/{}.fid", blob_key.hash.hex());
         let fid = std::fs::read_to_string(&cache_path).map_err(|e| {
-            jj_lib::backend::BackendError::Other(format!(
-                "failed to read fid from cache: {}",
-                e
-            ))
+            jj_lib::backend::BackendError::Other(format!("failed to read fid from cache: {}", e))
         })?;
 
-        let bytes = self
-            .client
-            .read_blob_by_fid(&fid)
-            .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e)))?;
+        let bytes = self.client.read_blob_by_fid(&fid).await.map_err(|e| {
+            jj_lib::backend::BackendError::Other(format!("failed to read blob: {}", e))
+        })?;
 
         deserialize_conflict(&bytes).map_err(|e| {
             jj_lib::backend::BackendError::Other(format!("failed to deserialize conflict: {}", e))
@@ -397,7 +387,9 @@ impl Backend for SeaweedFsBackend {
             .client
             .write_blob(&blob_key, &bytes)
             .await
-            .map_err(|e| jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e)))?;
+            .map_err(|e| {
+                jj_lib::backend::BackendError::Other(format!("failed to write blob: {}", e))
+            })?;
 
         let cache_dir = ".seaweedfs_cache";
         std::fs::create_dir_all(cache_dir).ok();
@@ -435,9 +427,8 @@ impl Backend for SeaweedFsBackend {
     ) -> BackendResult<
         std::pin::Pin<
             Box<
-                dyn futures::stream::Stream<
-                        Item = BackendResult<jj_lib::backend::CopyRecord>,
-                    > + Send,
+                dyn futures::stream::Stream<Item = BackendResult<jj_lib::backend::CopyRecord>>
+                    + Send,
             >,
         >,
     > {

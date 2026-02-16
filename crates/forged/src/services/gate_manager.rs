@@ -34,7 +34,7 @@ impl GateManager {
         gate_kdl: String,
     ) -> Result<gate::Model> {
         // Validate gate KDL before creating
-        // TODO: Add KDL validation
+        validate_gate_kdl(&name, &gate_kdl)?;
 
         let gate = self
             .gate_repo
@@ -93,7 +93,7 @@ impl GateManager {
         }
 
         // Validate gate KDL
-        // TODO: Add KDL validation
+        validate_gate_kdl("gate.kdl", &gate_kdl)?;
 
         let gate = self
             .gate_repo
@@ -280,11 +280,25 @@ impl GateManager {
     fn is_valid_permission(perm: &str) -> bool {
         matches!(
             perm,
-            "gate_admin"
-                | "gate_read"
-                | "gate_write"
-                | "component_read"
-                | "component_write"
+            "gate_admin" | "gate_read" | "gate_write" | "component_read" | "component_write"
         )
     }
+}
+
+/// Validate gate KDL by parsing it through the gate crate's parser.
+fn validate_gate_kdl(name: &str, kdl_content: &str) -> Result<()> {
+    knuffel::parse::<::gate::Gate>(name, kdl_content).map_err(|e| {
+        miette::miette!(
+            "Invalid gate KDL: {}\n\
+             Check the gate definition syntax.\n\
+             Required fields: name, version, branch, publisher.\n\
+             Example:\n  \
+               name \"my-gate\"\n  \
+               version \"0.5.11\"\n  \
+               branch \"2024.0.0\"\n  \
+               publisher \"myorg\"",
+            e
+        )
+    })?;
+    Ok(())
 }
