@@ -55,20 +55,9 @@ impl ComponentRepository {
             .into_diagnostic()
             .wrap_err("failed to insert component")?;
 
-        // 2. Create Jujutsu repository
+        // 2. Create Jujutsu repository and commit initial files
         let repo_id = RepoId::Component(ComponentId(component_id.clone()));
-        let workspace = self
-            .jj_manager
-            .ensure_repo(&repo_id)
-            .await
-            .wrap_err("failed to create Jujutsu repository for component")?;
 
-        // 3. Write initial manifest to Jj repo
-        let mut tx = workspace
-            .start_transaction("Initialize component")
-            .map_err(|e| miette::miette!("failed to start jj transaction: {}", e))?;
-
-        // Create manifest JSON
         let manifest = json!({
             "component_id": component_id,
             "name": name,
@@ -77,28 +66,22 @@ impl ComponentRepository {
             "created_at": component.created_at.to_string(),
         });
 
-        let manifest_path = workspace.workspace_root().join("manifest.json");
-        std::fs::write(
-            &manifest_path,
-            serde_json::to_string_pretty(&manifest).unwrap(),
-        )
-        .into_diagnostic()
-        .wrap_err("failed to write component manifest")?;
-
-        // Write recipe as separate file
-        let recipe_path = workspace.workspace_root().join("recipe.kdl");
-        std::fs::write(&recipe_path, &recipe_kdl)
-            .into_diagnostic()
-            .wrap_err("failed to write component recipe")?;
-
-        tx.commit("Initialize component")
-            .map_err(|e| miette::miette!("failed to commit to jj: {}", e))?;
-
-        // 4. Reload workspace
         self.jj_manager
-            .reload_workspace(&repo_id)
+            .ensure_and_commit(
+                &repo_id,
+                vec![
+                    (
+                        "manifest.json".to_string(),
+                        serde_json::to_string_pretty(&manifest)
+                            .unwrap()
+                            .into_bytes(),
+                    ),
+                    ("recipe.kdl".to_string(), recipe_kdl.into_bytes()),
+                ],
+                "Initialize component".to_string(),
+            )
             .await
-            .wrap_err("failed to reload workspace after component creation")?;
+            .wrap_err("failed to create Jujutsu repository for component")?;
 
         tracing::info!(
             component_id = %component_id,
@@ -149,17 +132,7 @@ impl ComponentRepository {
 
         // 2. Update Jujutsu repository
         let repo_id = RepoId::Component(ComponentId(component_id.to_string()));
-        let workspace = self
-            .jj_manager
-            .ensure_repo(&repo_id)
-            .await
-            .wrap_err("failed to get Jujutsu workspace for component")?;
 
-        let mut tx = workspace
-            .start_transaction("Update component recipe")
-            .map_err(|e| miette::miette!("failed to start jj transaction: {}", e))?;
-
-        // Update manifest
         let manifest = json!({
             "component_id": component_id,
             "name": component.name,
@@ -168,27 +141,22 @@ impl ComponentRepository {
             "updated_at": updated.updated_at.to_string(),
         });
 
-        let manifest_path = workspace.workspace_root().join("manifest.json");
-        std::fs::write(
-            &manifest_path,
-            serde_json::to_string_pretty(&manifest).unwrap(),
-        )
-        .into_diagnostic()
-        .wrap_err("failed to write component manifest")?;
-
-        // Update recipe file
-        let recipe_path = workspace.workspace_root().join("recipe.kdl");
-        std::fs::write(&recipe_path, &recipe_kdl)
-            .into_diagnostic()
-            .wrap_err("failed to write component recipe")?;
-
-        tx.commit("Update component recipe")
-            .map_err(|e| miette::miette!("failed to commit to jj: {}", e))?;
-
         self.jj_manager
-            .reload_workspace(&repo_id)
+            .ensure_and_commit(
+                &repo_id,
+                vec![
+                    (
+                        "manifest.json".to_string(),
+                        serde_json::to_string_pretty(&manifest)
+                            .unwrap()
+                            .into_bytes(),
+                    ),
+                    ("recipe.kdl".to_string(), recipe_kdl.into_bytes()),
+                ],
+                "Update component recipe".to_string(),
+            )
             .await
-            .wrap_err("failed to reload workspace after component update")?;
+            .wrap_err("failed to update Jujutsu repository for component")?;
 
         tracing::info!(
             component_id = %component_id,
@@ -242,34 +210,16 @@ impl ComponentRepository {
 
         // 3. Commit to Jujutsu repository
         let repo_id = RepoId::Component(ComponentId(component_id.to_string()));
-        let workspace = self
-            .jj_manager
-            .ensure_repo(&repo_id)
-            .await
-            .wrap_err("failed to get Jujutsu workspace for component")?;
-
-        let mut tx = workspace
-            .start_transaction(&format!("Add {} file: {}", kind, name))
-            .map_err(|e| miette::miette!("failed to start jj transaction: {}", e))?;
-
-        // Write file to appropriate subdirectory
-        let file_dir = workspace.workspace_root().join(kind.to_string());
-        std::fs::create_dir_all(&file_dir)
-            .into_diagnostic()
-            .wrap_err("failed to create component file directory")?;
-
-        let file_path = file_dir.join(&name);
-        std::fs::write(&file_path, data)
-            .into_diagnostic()
-            .wrap_err("failed to write component file")?;
-
-        tx.commit(&format!("Add {} file: {}", kind, name))
-            .map_err(|e| miette::miette!("failed to commit to jj: {}", e))?;
+        let jj_path = format!("{}/{}", kind, name);
 
         self.jj_manager
-            .reload_workspace(&repo_id)
+            .ensure_and_commit(
+                &repo_id,
+                vec![(jj_path, data.to_vec())],
+                format!("Add {} file: {}", kind, name),
+            )
             .await
-            .wrap_err("failed to reload workspace after adding file")?;
+            .wrap_err("failed to commit component file to Jujutsu")?;
 
         tracing::info!(
             component_id = %component_id,

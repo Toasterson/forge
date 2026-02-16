@@ -13,6 +13,7 @@ use crate::storage::{
 };
 use miette::{Context, IntoDiagnostic, Result};
 use sea_orm::{Database, DatabaseConnection};
+use sea_orm_migration::MigratorTrait;
 use std::sync::Arc;
 
 /// Application state with all dependencies wired together
@@ -80,10 +81,20 @@ impl AppState {
 
         // 4. Initialize JjRepoManager
         tracing::info!(root = %settings.jj_repos.root, "Initializing Jujutsu repository manager");
-        let jj_manager = Arc::new(JjRepoManager::new(&settings.jj_repos.root).wrap_err(
-            "Failed to initialize Jujutsu repository manager. \n\
-                          Ensure the jj_repos.root directory exists and is writable.",
-        )?);
+        let jj_seaweedfs_config = crate::storage::seaweedfs::SeaweedFsConfig {
+            master_url: settings.seaweedfs.master_url.clone(),
+            namespace: settings.seaweedfs.namespace.clone(),
+        };
+        let jj_manager = Arc::new(
+            JjRepoManager::new(
+                std::path::PathBuf::from(&settings.jj_repos.root),
+                jj_seaweedfs_config,
+            )
+            .wrap_err(
+                "Failed to initialize Jujutsu repository manager. \n\
+                 Ensure the jj_repos.root directory exists and is writable.",
+            )?,
+        );
 
         // 5. Create repositories
         tracing::debug!("Creating repository layer");
@@ -192,14 +203,7 @@ impl AppState {
     /// Graceful shutdown
     pub async fn shutdown(&self) -> Result<()> {
         tracing::info!("Shutting down application");
-
-        // Close database connection
-        self.db
-            .close()
-            .await
-            .into_diagnostic()
-            .wrap_err("Failed to close database connection")?;
-
+        // Database connection pool closes automatically when all Arc references are dropped.
         tracing::info!("Shutdown complete");
         Ok(())
     }

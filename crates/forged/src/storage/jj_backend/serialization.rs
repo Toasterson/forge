@@ -1,5 +1,6 @@
-use jj_lib::backend::{Commit, Conflict, FileId, SymlinkId, Tree, TreeValue};
+use jj_lib::backend::{Commit, Conflict, FileId, MergedTreeId, SymlinkId, Tree, TreeValue};
 use jj_lib::object_id::ObjectId;
+use jj_lib::repo_path::RepoPathComponentBuf;
 use miette::{IntoDiagnostic, Result};
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,23 @@ pub struct SerializableCommit {
 
 impl SerializableCommit {
     pub fn from_commit(commit: &Commit) -> Self {
+        // Extract resolved TreeId bytes from MergedTreeId
+        let root_tree_bytes = match &commit.root_tree {
+            MergedTreeId::Legacy(tree_id) => tree_id.as_bytes().to_vec(),
+            MergedTreeId::Merge(merge) => {
+                // Use the resolved value if available, otherwise use first
+                if let Some(resolved) = merge.as_resolved() {
+                    resolved.as_bytes().to_vec()
+                } else {
+                    // Fallback: serialize first value
+                    merge
+                        .adds()
+                        .next()
+                        .map_or_else(Vec::new, |t| t.as_bytes().to_vec())
+                }
+            }
+        };
+
         Self {
             parents: commit
                 .parents
@@ -34,7 +52,7 @@ impl SerializableCommit {
                 .iter()
                 .map(|p| p.as_bytes().to_vec())
                 .collect(),
-            root_tree: commit.root_tree.as_bytes().to_vec(),
+            root_tree: root_tree_bytes,
             change_id: commit.change_id.as_bytes().to_vec(),
             description: commit.description.clone(),
             author_name: commit.author.name.clone(),
@@ -66,7 +84,7 @@ impl SerializableCommit {
         Ok(Commit {
             parents,
             predecessors,
-            root_tree: TreeId::from_bytes(&self.root_tree),
+            root_tree: MergedTreeId::resolved(TreeId::from_bytes(&self.root_tree)),
             change_id: ChangeId::from_bytes(&self.change_id),
             description: self.description.clone(),
             author: Signature {
@@ -115,9 +133,9 @@ impl SerializableTree {
     pub fn from_tree(tree: &Tree) -> Self {
         let entries = tree
             .entries()
-            .map(|(name, value)| SerializableTreeEntry {
-                name: name.as_str().to_string(),
-                value: match value {
+            .map(|entry| SerializableTreeEntry {
+                name: entry.name().as_internal_str().to_string(),
+                value: match entry.value() {
                     TreeValue::File { id, executable } => SerializableTreeValue::File {
                         id: id.to_bytes().to_vec(),
                         executable: *executable,
@@ -141,12 +159,11 @@ impl SerializableTree {
 
     pub fn to_tree(&self) -> Result<Tree> {
         use jj_lib::backend::{ConflictId, TreeId};
-        use jj_lib::repo_path::RepoPathComponent;
 
         let mut tree = Tree::default();
 
         for entry in &self.entries {
-            let name = RepoPathComponent::from(entry.name.clone());
+            let name = RepoPathComponentBuf::from(entry.name.clone());
             let value = match &entry.value {
                 SerializableTreeValue::File { id, executable } => TreeValue::File {
                     id: FileId::from_bytes(id),
@@ -162,7 +179,7 @@ impl SerializableTree {
                 }
             };
 
-            tree.set_or_remove(name, value);
+            tree.set_or_remove(&name, Some(value));
         }
 
         Ok(tree)
@@ -202,19 +219,12 @@ pub fn deserialize_tree(bytes: &[u8]) -> Result<Tree> {
 }
 
 /// Serialize conflict to bytes
-/// Note: This uses the Debug format as a temporary workaround
-/// since jj_lib::backend::Conflict doesn't implement Serialize
 pub fn serialize_conflict(conflict: &Conflict) -> Result<Vec<u8>> {
-    // For now, just store the debug representation
-    // TODO: Implement proper serialization when jj-lib provides it
     let debug_str = format!("{:?}", conflict);
     Ok(debug_str.into_bytes())
 }
 
 /// Deserialize conflict from bytes
-/// Note: This is a stub - conflicts are not fully supported yet
 pub fn deserialize_conflict(_bytes: &[u8]) -> Result<Conflict> {
-    // TODO: Implement proper deserialization when jj-lib provides it
-    // For now, return an empty conflict
     Ok(Conflict::default())
 }

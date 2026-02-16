@@ -44,32 +44,16 @@ impl GateRepository {
             .into_diagnostic()
             .wrap_err("failed to insert gate")?;
 
-        // 2. Create Jujutsu repository
+        // 2. Create Jujutsu repository and commit initial manifest
         let repo_id = RepoId::Gate(GateId(gate_id.clone()));
-        let workspace = self
-            .jj_manager
-            .ensure_repo(&repo_id)
+        self.jj_manager
+            .ensure_and_commit(
+                &repo_id,
+                vec![("gate.kdl".to_string(), gate_kdl.into_bytes())],
+                "Initialize gate".to_string(),
+            )
             .await
             .wrap_err("failed to create Jujutsu repository for gate")?;
-
-        // 3. Write initial gate manifest to Jj repo
-        let mut tx = workspace
-            .start_transaction("Initialize gate")
-            .map_err(|e| miette::miette!("failed to start jj transaction: {}", e))?;
-
-        let manifest_path = workspace.workspace_root().join("gate.kdl");
-        std::fs::write(&manifest_path, &gate_kdl)
-            .into_diagnostic()
-            .wrap_err("failed to write gate manifest")?;
-
-        tx.commit("Initialize gate")
-            .map_err(|e| miette::miette!("failed to commit to jj: {}", e))?;
-
-        // 4. Reload workspace to pick up the commit
-        self.jj_manager
-            .reload_workspace(&repo_id)
-            .await
-            .wrap_err("failed to reload workspace after gate creation")?;
 
         tracing::info!(
             gate_id = %gate_id,
@@ -116,28 +100,14 @@ impl GateRepository {
 
         // 2. Update Jujutsu repository
         let repo_id = RepoId::Gate(GateId(gate_id.to_string()));
-        let workspace = self
-            .jj_manager
-            .ensure_repo(&repo_id)
-            .await
-            .wrap_err("failed to get Jujutsu workspace for gate")?;
-
-        let mut tx = workspace
-            .start_transaction("Update gate")
-            .map_err(|e| miette::miette!("failed to start jj transaction: {}", e))?;
-
-        let manifest_path = workspace.workspace_root().join("gate.kdl");
-        std::fs::write(&manifest_path, &gate_kdl)
-            .into_diagnostic()
-            .wrap_err("failed to write gate manifest")?;
-
-        tx.commit("Update gate")
-            .map_err(|e| miette::miette!("failed to commit to jj: {}", e))?;
-
         self.jj_manager
-            .reload_workspace(&repo_id)
+            .ensure_and_commit(
+                &repo_id,
+                vec![("gate.kdl".to_string(), gate_kdl.into_bytes())],
+                "Update gate".to_string(),
+            )
             .await
-            .wrap_err("failed to reload workspace after gate update")?;
+            .wrap_err("failed to update Jujutsu repository for gate")?;
 
         tracing::info!(
             gate_id = %gate_id,
@@ -187,7 +157,7 @@ impl GateRepository {
         })?;
 
         // Check if member already exists
-        if let Some(existing) = self.get_member(gate_id, actor_id).await? {
+        if let Some(_existing) = self.get_member(gate_id, actor_id).await? {
             return Err(miette::miette!(
                 "Actor {} is already a member of gate {}",
                 actor_id,

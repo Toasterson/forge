@@ -24,20 +24,8 @@ pub async fn run_sync_task(
         let repos = repo_manager.list_all_repos().await;
 
         for repo_id in repos {
-            let workspace = match repo_manager.get_workspace(&repo_id).await {
-                Ok(ws) => ws,
-                Err(e) => {
-                    tracing::error!(
-                        repo_id = %repo_id,
-                        error = ?e,
-                        "failed to load workspace"
-                    );
-                    continue;
-                }
-            };
-
             // Publish local ops
-            if let Err(e) = sync.publish_operations(&repo_id, &workspace).await {
+            if let Err(e) = sync.publish_operations(&repo_id).await {
                 tracing::error!(
                     repo_id = %repo_id,
                     error = ?e,
@@ -46,25 +34,11 @@ pub async fn run_sync_task(
             }
 
             // Fetch and merge remote ops
-            // Note: We need a mutable workspace for this, but we have an Arc
-            // In the full implementation, we'd reload the workspace after fetching
-            if let Err(e) = sync
-                .fetch_and_merge(&repo_id, &mut (*workspace.clone()))
-                .await
-            {
+            if let Err(e) = sync.fetch_and_merge(&repo_id).await {
                 tracing::error!(
                     repo_id = %repo_id,
                     error = ?e,
                     "failed to fetch and merge operations"
-                );
-            }
-
-            // Reload workspace to pick up merged operations
-            if let Err(e) = repo_manager.reload_workspace(&repo_id).await {
-                tracing::error!(
-                    repo_id = %repo_id,
-                    error = ?e,
-                    "failed to reload workspace after sync"
                 );
             }
         }
