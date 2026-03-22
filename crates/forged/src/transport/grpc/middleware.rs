@@ -2,6 +2,7 @@ use crate::repositories::ActorRepository;
 use crate::services::OidcService;
 use std::sync::Arc;
 use tonic::{Request, Status};
+use uuid::Uuid;
 
 /// Reference to an authenticated actor, injected into request extensions by the auth middleware.
 #[derive(Debug, Clone)]
@@ -116,6 +117,9 @@ pub mod tower_auth {
             Box::pin(async move {
                 let path = req.uri().path().to_string();
 
+                // Generate a unique request ID for tracing and response correlation
+                let request_id = Uuid::new_v4().to_string();
+
                 // Skip auth for public RPCs
                 if !is_unauthenticated_method(&path) {
                     // Try to extract and validate bearer token
@@ -155,7 +159,23 @@ pub mod tower_auth {
                     }
                 }
 
-                inner.call(req).await
+                let span = tracing::info_span!(
+                    "grpc_request",
+                    request_id = %request_id,
+                    path = %path,
+                );
+                let _enter = span.enter();
+
+                let mut response = inner.call(req).await?;
+
+                // Propagate request ID in response headers
+                response.headers_mut().insert(
+                    "x-request-id",
+                    http::HeaderValue::from_str(&request_id)
+                        .unwrap_or_else(|_| http::HeaderValue::from_static("unknown")),
+                );
+
+                Ok(response)
             })
         }
     }

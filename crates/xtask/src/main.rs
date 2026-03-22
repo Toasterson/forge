@@ -5,12 +5,9 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use base64::Engine;
 use clap::{Parser, Subcommand};
 use miette::{Context, IntoDiagnostic};
 use serde::{Deserialize, Serialize};
-use surrealdb::engine::any::{connect, Any};
-use surrealdb::Surreal;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Debug, Parser)]
@@ -23,7 +20,10 @@ pub struct Xtask {
 
 #[derive(Debug, Subcommand)]
 pub enum Cmd {
-    /// Start a forged server suitable for e2e tests and print JSON with connection details
+    /// Start a forged server suitable for e2e tests and print JSON with connection details.
+    ///
+    /// Requires a running PostgreSQL instance. Configure via TEST_DATABASE_URL
+    /// (default: postgresql://forged:forged@localhost/forged_test).
     SetupTestEnv {
         /// Optional directory to create under target/ for this env (default: random)
         #[arg(long)]
@@ -31,18 +31,12 @@ pub enum Cmd {
         /// Timeout to wait for server to accept connections (seconds)
         #[arg(long, default_value_t = 15)]
         timeout: u64,
-    },
-    /// Fetch the Base64-URL (no padding) registration envelope for a pending actor
-    PendingEnvelope {
-        /// Path to the embedded SurrealDB directory (the same value used by setup-test-env)
-        #[arg(long)]
-        surreal_path: PathBuf,
-        /// Actor id
-        #[arg(long)]
-        actor_id: String,
-        /// Actor kind: user or service
-        #[arg(long, value_parser = parse_actor_kind)]
-        kind: i32,
+        /// PostgreSQL connection URL for the test database
+        #[arg(
+            long,
+            default_value = "postgresql://forged:forged@localhost/forged_test"
+        )]
+        database_url: String,
     },
     /// Build an illumos sysroot on Linux by downloading packages from an OmniOS IPS repo (no pkg(5))
     Sysroot {
@@ -64,18 +58,10 @@ pub enum Cmd {
     },
 }
 
-fn parse_actor_kind(s: &str) -> Result<i32, String> {
-    match s {
-        "user" => Ok(0),
-        "service" => Ok(1),
-        _ => Err("must be 'user' or 'service'".to_string()),
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TestEnvInfo {
     pub addr: String,
-    pub surreal_path: String,
+    pub database_url: String,
     pub pid: u32,
     pub dir: String,
 }
@@ -86,26 +72,18 @@ fn main() -> miette::Result<()> {
 
     let xt = Xtask::parse();
     match xt.cmd {
-        Cmd::SetupTestEnv { name, timeout } => {
-            let info = setup_test_env(name.as_deref(), Duration::from_secs(timeout))
-                .wrap_err("setup test env failed")?;
-            println!("{}", serde_json::to_string_pretty(&info).into_diagnostic()?);
-            Ok(())
-        }
-        Cmd::PendingEnvelope {
-            surreal_path,
-            actor_id,
-            kind,
+        Cmd::SetupTestEnv {
+            name,
+            timeout,
+            database_url,
         } => {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .into_diagnostic()
-                .wrap_err("build tokio runtime")?;
-            let env = rt
-                .block_on(pending_envelope(&surreal_path, &actor_id, kind))
-                .wrap_err("fetch pending envelope failed")?;
-            println!("{}", env);
+            let info = setup_test_env(
+                name.as_deref(),
+                Duration::from_secs(timeout),
+                &database_url,
+            )
+            .wrap_err("setup test env failed")?;
+            println!("{}", serde_json::to_string_pretty(&info).into_diagnostic()?);
             Ok(())
         }
         Cmd::Sysroot {
@@ -121,7 +99,11 @@ fn main() -> miette::Result<()> {
     }
 }
 
-fn setup_test_env(name: Option<&str>, timeout: Duration) -> miette::Result<TestEnvInfo> {
+fn setup_test_env(
+    name: Option<&str>,
+    timeout: Duration,
+    database_url: &str,
+) -> miette::Result<TestEnvInfo> {
     // Directories under target
     let target_dir = PathBuf::from("target");
     fs::create_dir_all(&target_dir).into_diagnostic()?;
@@ -129,8 +111,7 @@ fn setup_test_env(name: Option<&str>, timeout: Duration) -> miette::Result<TestE
         .map(|s| s.to_string())
         .unwrap_or_else(|| format!("forged-test-{}", uuid::Uuid::new_v4()));
     let env_dir = target_dir.join(dir_name);
-    let surreal_path = env_dir.join("surreal");
-    fs::create_dir_all(&surreal_path).into_diagnostic()?;
+    fs::create_dir_all(&env_dir).into_diagnostic()?;
 
     // Pick a free port
     let port = portpicker::pick_unused_port().unwrap_or(50051);
@@ -142,9 +123,8 @@ fn setup_test_env(name: Option<&str>, timeout: Duration) -> miette::Result<TestE
         .arg("-p")
         .arg("forged")
         .arg("--quiet")
-        .env("FORGED_ADDR", &addr)
-        .env("FORGED__SURREAL__MODE", "embedded")
-        .env("FORGED__SURREAL__PATH", surreal_path.as_os_str())
+        .env("FORGED__SERVER__LISTEN_ADDR", &addr)
+        .env("FORGED__POSTGRES__URL", database_url)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -156,14 +136,13 @@ fn setup_test_env(name: Option<&str>, timeout: Duration) -> miette::Result<TestE
 
     let info = TestEnvInfo {
         addr: addr.clone(),
-        surreal_path: surreal_path.display().to_string(),
+        database_url: database_url.to_string(),
         pid: child.id(),
         dir: env_dir.display().to_string(),
     };
 
     // Write a small metadata file for convenience
     let meta_path = env_dir.join("env.json");
-    fs::create_dir_all(&env_dir).into_diagnostic()?;
     fs::write(
         &meta_path,
         serde_json::to_vec_pretty(&info).into_diagnostic()?,
@@ -208,46 +187,6 @@ fn wait_for_server(addr: &str, timeout: Duration) -> miette::Result<()> {
         }
         thread::sleep(Duration::from_millis(200));
     }
-}
-
-#[derive(Debug, serde::Deserialize)]
-#[allow(dead_code)]
-struct PendingRegistrationRec {
-    actor_id: String,
-    actor_kind: i32,
-    expires_at: u64,
-    envelope: Vec<u8>,
-}
-
-async fn pending_envelope(
-    surreal_path: &Path,
-    actor_id: &str,
-    kind: i32,
-) -> miette::Result<String> {
-    let uri = format!("rocksdb:{}", surreal_path.display());
-    let db: Surreal<Any> = connect(uri.as_str())
-        .await
-        .into_diagnostic()
-        .wrap_err_with(|| format!("connect surrealdb at {}", uri))?;
-    db.use_ns("forged")
-        .use_db("default")
-        .await
-        .into_diagnostic()
-        .wrap_err("select surreal ns/db")?;
-
-    let key = format!("pending_registrations:{}:{}", actor_id, kind);
-    let thing: surrealdb::sql::Thing = key.parse().unwrap();
-    let res: Option<PendingRegistrationRec> = db
-        .select(thing)
-        .await
-        .into_diagnostic()
-        .wrap_err("select pending registration")?;
-    let rec = res
-        .ok_or_else(|| miette::miette!("no pending registration for {} kind {}", actor_id, kind))?;
-
-    // Encode envelope bytes as Base64-URL (no padding) to match CLI expectations
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&rec.envelope);
-    Ok(b64)
 }
 
 // Default constants for sysroot builder (can be extended easily)
@@ -343,7 +282,7 @@ fn build_sysroot(
     }
 
     // Re-open the image handle for subsequent operations
-    let mut image = libips::image::Image::load(&sysroot_dir)
+    let image = libips::image::Image::load(&sysroot_dir)
         .into_diagnostic()
         .wrap_err_with(|| format!("load image at {}", sysroot_dir.display()))?;
 
@@ -366,10 +305,10 @@ fn build_sysroot(
             .collect()
     };
 
-    let mut stems = pkg_list.clone();
+    let stems = pkg_list.clone();
 
     // 4) Resolve and apply install plan
-    let mut plan = match libips::solver::resolve_install(&image, &build_constraints(&stems)) {
+    let plan = match libips::solver::resolve_install(&image, &build_constraints(&stems)) {
         Ok(p) => p,
         Err(e) => {
             let msg = format!("{}", e);

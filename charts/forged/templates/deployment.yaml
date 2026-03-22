@@ -1,23 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "forged.fullname" . }}
+  name: {{ .Release.Name }}-forged
   labels:
-    app.kubernetes.io/name: {{ include "forged.name" . }}
-    helm.sh/chart: {{ include "forged.chart" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app: forged
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "forged.name" . }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      app: forged
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "forged.name" . }}
-        app.kubernetes.io/instance: {{ .Release.Name }}
+        app: forged
     spec:
       containers:
         - name: forged
@@ -25,39 +20,24 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: grpc
-              containerPort: {{ .Values.service.port }}
+              containerPort: 50051
               protocol: TCP
           env:
-            {{- range $k, $v := .Values.env }}
-            - name: {{ $k }}
-              value: "{{ $v }}"
-            {{- end }}
-          volumeMounts:
-            - mountPath: /data
-              name: data
+            - name: FORGED__POSTGRES__URL
+              value: {{ .Values.postgres.url | quote }}
+            - name: FORGED__SEAWEEDFS__MASTER_URL
+              value: {{ .Values.seaweedfs.masterUrl | quote }}
+            - name: FORGED__AMQP__URL
+              value: {{ .Values.amqp.url | quote }}
+            - name: RUST_LOG
+              value: {{ .Values.env.RUST_LOG | quote }}
+          {{- with .Values.livenessProbe }}
           livenessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
           readinessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 3
-            periodSeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      volumes:
-        - name: data
-          {{- if .Values.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "forged.fullname" . }}
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
-      nodeSelector:
-        {{- toYaml .Values.nodeSelector | nindent 8 }}
-      affinity:
-        {{- toYaml .Values.affinity | nindent 8 }}
-      tolerations:
-        {{- toYaml .Values.tolerations | nindent 8 }}

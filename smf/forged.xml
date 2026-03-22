@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+    CDDL HEADER START
+
+    This file and its contents are supplied under the terms of the
+    Mozilla Public License, v. 2.0 (MPL-2.0).
+
+    CDDL HEADER END
+
+    SMF service manifest for forged - the Forge server daemon.
+-->
+<service_bundle type="manifest" name="forged">
+
+  <service name="application/forge/forged"
+           type="service"
+           version="1">
+
+    <create_default_instance enabled="true" />
+
+    <single_instance />
+
+    <!-- Wait for network to be available -->
+    <dependency name="network"
+                grouping="require_all"
+                restart_on="error"
+                type="service">
+      <service_fmri value="svc:/milestone/network:default" />
+    </dependency>
+
+    <!-- Wait for filesystem to be mounted -->
+    <dependency name="filesystem"
+                grouping="require_all"
+                restart_on="error"
+                type="service">
+      <service_fmri value="svc:/system/filesystem/local:default" />
+    </dependency>
+
+    <!-- Start method -->
+    <exec_method type="method"
+                 name="start"
+                 exec="/opt/forge/lib/svc/method/forged-method start"
+                 timeout_seconds="60">
+      <method_context>
+        <method_credential user="forged" group="forged" />
+        <method_environment>
+          <envvar name="FORGED_CONFIG" value="/etc/forged/forged.toml" />
+          <envvar name="RUST_LOG" value="forged=info,warn" />
+        </method_environment>
+      </method_context>
+    </exec_method>
+
+    <!-- Stop method -->
+    <exec_method type="method"
+                 name="stop"
+                 exec=":kill"
+                 timeout_seconds="30" />
+
+    <!-- Service-specific properties -->
+    <property_group name="application" type="application">
+      <propval name="config_file" type="astring"
+               value="/etc/forged/forged.toml" />
+    </property_group>
+
+    <!-- Authorization -->
+    <property_group name="general" type="framework">
+      <propval name="action_authorization" type="astring"
+               value="solaris.smf.manage.forge" />
+      <propval name="value_authorization" type="astring"
+               value="solaris.smf.value.forge" />
+    </property_group>
+
+    <!-- Stability -->
+    <stability value="Unstable" />
+
+    <template>
+      <common_name>
+        <loctext xml:lang="C">Forge Server (forged)</loctext>
+      </common_name>
+      <description>
+        <loctext xml:lang="C">
+          Forge is a service-oriented code forge and packaging platform.
+          This service runs the main forged gRPC server daemon.
+          Status: pre-alpha, stability is Unstable.
+        </loctext>
+      </description>
+    </template>
+
+  </service>
+
+</service_bundle>

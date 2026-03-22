@@ -76,6 +76,9 @@ impl AppState {
         let seaweedfs_config = ClientConfig {
             master_url: settings.seaweedfs.master_url.clone(),
             namespace: settings.seaweedfs.namespace.clone(),
+            connect_timeout_secs: settings.seaweedfs.connect_timeout_secs,
+            request_timeout_secs: settings.seaweedfs.request_timeout_secs,
+            max_retries: settings.seaweedfs.max_retries,
         };
         let seaweedfs = Arc::new(SeaweedFsClient::new(seaweedfs_config));
 
@@ -84,6 +87,9 @@ impl AppState {
         let jj_seaweedfs_config = crate::storage::seaweedfs::SeaweedFsConfig {
             master_url: settings.seaweedfs.master_url.clone(),
             namespace: settings.seaweedfs.namespace.clone(),
+            connect_timeout_secs: settings.seaweedfs.connect_timeout_secs,
+            request_timeout_secs: settings.seaweedfs.request_timeout_secs,
+            max_retries: settings.seaweedfs.max_retries,
         };
         let jj_manager = Arc::new(
             JjRepoManager::new(

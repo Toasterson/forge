@@ -22,7 +22,7 @@ RUN cargo build -p forged --release
 FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -35,12 +35,14 @@ COPY --from=builder /app/target/release/forged /usr/local/bin/forged
 VOLUME ["/data"]
 ENV RUST_LOG=info \
     FORGED__SERVER__LISTEN_ADDR=0.0.0.0:50051 \
-    FORGED__SURREAL__MODE=embedded \
-    FORGED__SURREAL__PATH=/data/surreal \
-    FORGED__REPOS__MODE=fs \
-    FORGED__REPOS__ROOT=/data/repos
+    FORGED__POSTGRES__URL=postgresql://forged:forged@localhost/forged \
+    FORGED__JJ_REPOS__ROOT=/data/jj-repos
 
 EXPOSE 50051
+
+# Health check: verify gRPC port is accepting connections
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD timeout 5 bash -c "echo > /dev/tcp/localhost/50051" || exit 1
 
 USER forged
 ENTRYPOINT ["/usr/local/bin/forged"]

@@ -1,0 +1,52 @@
+#!/sbin/sh
+#
+# This file and its contents are supplied under the terms of the
+# Mozilla Public License, v. 2.0 (MPL-2.0).
+#
+# SMF method script for the forged service.
+#
+
+. /lib/svc/share/smf_include.sh
+
+FORGED_BIN="/opt/forge/bin/forged"
+DEFAULT_CONFIG="/etc/forged/forged.toml"
+
+getproparg() {
+    val=$(svcprop -p "application/$1" "$SMF_FMRI" 2>/dev/null)
+    [ -n "$val" ] && echo "$val"
+}
+
+case "$1" in
+start)
+    # Read config path from SMF property, fall back to default
+    config=$(getproparg config_file)
+    if [ -z "$config" ]; then
+        config="$DEFAULT_CONFIG"
+    fi
+
+    if [ ! -f "$config" ]; then
+        echo "Configuration file not found: $config" >&2
+        exit "$SMF_EXIT_ERR_CONFIG"
+    fi
+
+    if [ ! -x "$FORGED_BIN" ]; then
+        echo "forged binary not found or not executable: $FORGED_BIN" >&2
+        exit "$SMF_EXIT_ERR_FATAL"
+    fi
+
+    FORGED_CONFIG="$config" exec "$FORGED_BIN" &
+    ;;
+
+stop)
+    smf_kill_contract "$2" TERM 1 30
+    ret=$?
+    [ "$ret" -ne 0 ] && exit 1
+    ;;
+
+*)
+    echo "Usage: $0 { start | stop }" >&2
+    exit "$SMF_EXIT_ERR_FATAL"
+    ;;
+esac
+
+exit "$SMF_EXIT_OK"

@@ -33,12 +33,17 @@ impl BuildReportConsumer {
     }
 
     /// Run the consumer loop. Returns when cancelled or on unrecoverable error.
+    ///
+    /// Uses exponential backoff (1s -> 2s -> 4s -> ... -> 60s max) between
+    /// reconnection attempts instead of a fixed interval.
     pub async fn run(self) -> Result<()> {
-        let mut retry_interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+        const INITIAL_BACKOFF_SECS: u64 = 1;
+        const MAX_BACKOFF_SECS: u64 = 60;
+        const BACKOFF_MULTIPLIER: u64 = 2;
+
+        let mut backoff_secs = INITIAL_BACKOFF_SECS;
 
         loop {
-            retry_interval.tick().await;
-
             if self.cancel.is_cancelled() {
                 tracing::info!("Build report consumer shutting down");
                 return Ok(());
@@ -51,7 +56,23 @@ impl BuildReportConsumer {
                     return Ok(());
                 }
                 Err(e) => {
-                    tracing::error!(error = %e, "Build report consumer error, retrying...");
+                    tracing::error!(
+                        error = %e,
+                        backoff_secs = backoff_secs,
+                        "Build report consumer error, retrying in {}s...",
+                        backoff_secs
+                    );
+
+                    tokio::select! {
+                        _ = self.cancel.cancelled() => {
+                            tracing::info!("Build report consumer shutting down during backoff");
+                            return Ok(());
+                        }
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)) => {}
+                    }
+
+                    // Exponential backoff with cap.
+                    backoff_secs = (backoff_secs * BACKOFF_MULTIPLIER).min(MAX_BACKOFF_SECS);
                 }
             }
         }

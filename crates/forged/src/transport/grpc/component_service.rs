@@ -13,6 +13,45 @@ use crate::services::RbacService;
 use std::sync::Arc;
 use tonic::{Request, Response, Status, Streaming};
 
+/// Maximum allowed length for a name field (256 characters).
+const MAX_NAME_LEN: usize = 256;
+
+/// Maximum allowed length for a KDL field (1 MiB).
+const MAX_KDL_LEN: usize = 1024 * 1024;
+
+/// Validate that a name field is non-empty and within the maximum length.
+fn validate_name(name: &str) -> Result<(), Status> {
+    if name.is_empty() {
+        return Err(Status::invalid_argument(
+            "name must not be empty.\n\
+             Provide a non-empty name for this resource.",
+        ));
+    }
+    if name.len() > MAX_NAME_LEN {
+        return Err(Status::invalid_argument(format!(
+            "name exceeds maximum length of {} characters (got {}).\n\
+             Shorten the name to at most {} characters.",
+            MAX_NAME_LEN,
+            name.len(),
+            MAX_NAME_LEN,
+        )));
+    }
+    Ok(())
+}
+
+/// Validate that a KDL content field is within the maximum length (1 MiB).
+fn validate_kdl(kdl: &str) -> Result<(), Status> {
+    if kdl.len() > MAX_KDL_LEN {
+        return Err(Status::invalid_argument(format!(
+            "KDL content exceeds maximum size of 1 MiB (got {} bytes).\n\
+             Reduce the KDL content size to at most {} bytes.",
+            kdl.len(),
+            MAX_KDL_LEN,
+        )));
+    }
+    Ok(())
+}
+
 /// ComponentService implementation
 /// Handles component CRUD and file uploads
 #[derive(Clone)]
@@ -20,6 +59,7 @@ pub struct ComponentServiceImpl {
     component_repo: Arc<ComponentRepository>,
     source_archive_repo: Arc<SourceArchiveRepository>,
     rbac: Arc<RbacService>,
+    max_upload_size: u64,
 }
 
 impl ComponentServiceImpl {
@@ -32,7 +72,13 @@ impl ComponentServiceImpl {
             component_repo,
             source_archive_repo,
             rbac,
+            max_upload_size: 2 * 1024 * 1024 * 1024, // 2 GiB default
         }
+    }
+
+    pub fn with_max_upload_size(mut self, max_upload_size: u64) -> Self {
+        self.max_upload_size = max_upload_size;
+        self
     }
 
     /// Convert entity timestamp to proto timestamp
@@ -57,6 +103,10 @@ impl ComponentService for ComponentServiceImpl {
         let gate_id = req
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
+
+        // Validate inputs
+        validate_name(&req.name)?;
+        validate_kdl(&req.recipe_kdl)?;
 
         // Check actor has ComponentWrite permission for this gate
         let has_perm = self
@@ -156,6 +206,9 @@ impl ComponentService for ComponentServiceImpl {
         let component_id = req
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
+
+        // Validate KDL content
+        validate_kdl(&req.recipe_kdl)?;
 
         // Check actor has ComponentWrite permission
         let has_perm = self

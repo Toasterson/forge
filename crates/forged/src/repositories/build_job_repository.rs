@@ -116,4 +116,23 @@ impl BuildJobRepository {
 
         Ok(result)
     }
+
+    /// Delete build jobs with terminal status older than the given cutoff.
+    /// Returns the number of deleted rows.
+    pub async fn delete_older_than(
+        &self,
+        cutoff: chrono::DateTime<chrono::FixedOffset>,
+    ) -> Result<u64> {
+        let result = build_job::Entity::delete_many()
+            .filter(build_job::Column::CreatedAt.lt(cutoff))
+            .filter(
+                build_job::Column::Status.is_in(["success", "failed", "cancelled"]),
+            )
+            .exec(&self.db)
+            .await
+            .into_diagnostic()
+            .wrap_err("failed to delete old build jobs")?;
+
+        Ok(result.rows_affected)
+    }
 }

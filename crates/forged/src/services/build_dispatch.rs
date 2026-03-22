@@ -279,12 +279,53 @@ impl BuildDispatchService {
             .await
             .wrap_err("failed to create build job record")?;
 
-        // Publish to AMQP
-        self.publish_job(&job_request).await.wrap_err(
-            "Failed to publish build job to message queue.\n\
-             The build job has been recorded but could not be dispatched.\n\
-             Check RabbitMQ connectivity.",
-        )?;
+        // Publish to AMQP with retry (3 attempts, 1s backoff).
+        // The request_id serves as an idempotency key — it is unique per job,
+        // so duplicate publishes are safe.
+        let mut last_err = None;
+        for attempt in 1..=3u32 {
+            match self.publish_job(&job_request).await {
+                Ok(()) => {
+                    last_err = None;
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        attempt,
+                        request_id = %job_request.request_id,
+                        error = ?e,
+                        "AMQP publish attempt failed, retrying"
+                    );
+                    last_err = Some(e);
+                    if attempt < 3 {
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    }
+                }
+            }
+        }
+
+        if let Some(publish_err) = last_err {
+            // All retries exhausted — mark the job as failed so it is not orphaned.
+            tracing::error!(
+                build_job_id = %build_job.id,
+                request_id = %job_request.request_id,
+                "All AMQP publish retries exhausted, marking job as failed"
+            );
+
+            let summary = format!(
+                "Build dispatch failed after 3 attempts: {:#}. \
+                 Re-submit the build once RabbitMQ connectivity is restored.",
+                publish_err
+            );
+
+            let failed_job = self
+                .build_job_repo
+                .update_status(&build_job.id, "failed", None, Some(&summary))
+                .await
+                .wrap_err("failed to mark orphaned build job as failed")?;
+
+            return Ok(failed_job);
+        }
 
         tracing::info!(
             build_job_id = %build_job.id,

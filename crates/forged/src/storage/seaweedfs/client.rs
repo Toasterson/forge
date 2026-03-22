@@ -1,11 +1,27 @@
 use crate::types::ContentHash;
 use miette::{Context, IntoDiagnostic, Result};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct SeaweedFsConfig {
     pub master_url: String,
     pub namespace: String,
+    pub connect_timeout_secs: u64,
+    pub request_timeout_secs: u64,
+    pub max_retries: u32,
+}
+
+impl Default for SeaweedFsConfig {
+    fn default() -> Self {
+        Self {
+            master_url: "http://localhost:9333".to_string(),
+            namespace: "default".to_string(),
+            connect_timeout_secs: 5,
+            request_timeout_secs: 30,
+            max_retries: 3,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -15,19 +31,95 @@ pub struct SeaweedFsClient {
     /// Namespace prefix for blob keys to support multi-tenancy
     #[allow(dead_code)]
     namespace: String,
+    max_retries: u32,
+}
+
+/// Retry a fallible async operation with exponential backoff.
+///
+/// Retries only on HTTP 5xx responses or connection/transport errors.
+/// Starts at 100ms delay with a backoff factor of 2.
+async fn retry_with_backoff<F, Fut, T>(f: F, max_retries: u32) -> Result<T>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    let mut attempt = 0u32;
+    loop {
+        match f().await {
+            Ok(val) => return Ok(val),
+            Err(err) if attempt < max_retries && is_retryable(&err) => {
+                attempt += 1;
+                let delay = Duration::from_millis(100 * 2u64.pow(attempt - 1));
+                tracing::warn!(
+                    attempt,
+                    max_retries,
+                    delay_ms = delay.as_millis() as u64,
+                    error = %err,
+                    "SeaweedFS request failed, retrying"
+                );
+                tokio::time::sleep(delay).await;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+/// Determine whether an error is retryable (5xx or connection failure).
+fn is_retryable(err: &miette::Report) -> bool {
+    let msg = format!("{err:?}");
+    // Connection/transport errors
+    if msg.contains("connection")
+        || msg.contains("Connection")
+        || msg.contains("timed out")
+        || msg.contains("dns error")
+        || msg.contains("broken pipe")
+    {
+        return true;
+    }
+    // HTTP 5xx status codes
+    if msg.contains("500 Internal Server Error")
+        || msg.contains("502 Bad Gateway")
+        || msg.contains("503 Service Unavailable")
+        || msg.contains("504 Gateway Timeout")
+    {
+        return true;
+    }
+    false
 }
 
 impl SeaweedFsClient {
     pub fn new(config: SeaweedFsConfig) -> Self {
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(config.connect_timeout_secs))
+            .timeout(Duration::from_secs(config.request_timeout_secs))
+            .build()
+            .expect("failed to build reqwest client for SeaweedFS");
+
         Self {
             master_url: config.master_url,
-            http_client: reqwest::Client::new(),
+            http_client,
             namespace: config.namespace,
+            max_retries: config.max_retries,
         }
     }
 
     /// Write blob with content-addressed key
     pub async fn write_blob(&self, key: &BlobKey, data: &[u8]) -> Result<BlobMetadata> {
+        let data = data.to_vec();
+        let key = key.clone();
+
+        retry_with_backoff(
+            || {
+                let data = data.clone();
+                let key = key.clone();
+                async move { self.write_blob_inner(&key, &data).await }
+            },
+            self.max_retries,
+        )
+        .await
+    }
+
+    async fn write_blob_inner(&self, key: &BlobKey, data: &[u8]) -> Result<BlobMetadata> {
         // 1. Request file assignment from master
         let assign_resp = self
             .assign_file_id()
@@ -63,6 +155,18 @@ impl SeaweedFsClient {
     /// Note: This requires looking up the fid from the key, which is done via PostgreSQL
     /// The actual implementation will need access to the database connection
     pub async fn read_blob_by_fid(&self, fid: &str) -> Result<Vec<u8>> {
+        let fid = fid.to_string();
+        retry_with_backoff(
+            || {
+                let fid = fid.clone();
+                async move { self.read_blob_by_fid_inner(&fid).await }
+            },
+            self.max_retries,
+        )
+        .await
+    }
+
+    async fn read_blob_by_fid_inner(&self, fid: &str) -> Result<Vec<u8>> {
         // Look up which volume server has this fid
         let lookup_url = format!("{}/dir/lookup?volumeId={}", self.master_url, fid);
 
@@ -118,6 +222,36 @@ impl SeaweedFsClient {
             .wrap_err("failed to parse assign response")?;
 
         Ok(resp)
+    }
+
+    /// Check whether the SeaweedFS master is reachable and healthy.
+    pub async fn health_check(&self) -> Result<()> {
+        let url = format!("{}/cluster/status", self.master_url);
+
+        let resp = self
+            .http_client
+            .get(&url)
+            .send()
+            .await
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "Failed to connect to SeaweedFS master at {}.\n\
+                     Ensure the SeaweedFS master is running and reachable.",
+                    self.master_url
+                )
+            })?;
+
+        if !resp.status().is_success() {
+            return Err(miette::miette!(
+                "SeaweedFS master health check returned HTTP {}.\n\
+                 The master at {} may be degraded or misconfigured.",
+                resp.status(),
+                self.master_url
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -183,21 +317,25 @@ pub struct BlobMetadata {
 #[derive(Debug, Deserialize)]
 struct AssignResponse {
     fid: String,
+    #[allow(dead_code)]
     url: String,
     #[serde(rename = "publicUrl")]
     public_url: String,
+    #[allow(dead_code)]
     count: u32,
 }
 
 #[derive(Debug, Deserialize)]
 struct LookupResponse {
     #[serde(rename = "volumeId")]
+    #[allow(dead_code)]
     volume_id: String,
     locations: Vec<LocationInfo>,
 }
 
 #[derive(Debug, Deserialize)]
 struct LocationInfo {
+    #[allow(dead_code)]
     url: String,
     #[serde(rename = "publicUrl")]
     public_url: String,

@@ -185,29 +185,30 @@ impl OidcService {
         }
     }
 
-    /// Find a JWK matching the given kid and algorithm
+    /// Find a JWK matching the given kid and algorithm.
+    /// If the kid is not found in the cache, forces a JWKS refresh before failing.
     async fn find_jwk(&self, kid: Option<&str>, alg: Algorithm) -> Result<JwkKey> {
         let keys = self.get_jwks().await?;
 
-        // Try to match by kid first
-        if let Some(kid) = kid {
-            if let Some(key) = keys.iter().find(|k| k.kid.as_deref() == Some(kid)) {
-                return Ok(key.clone());
+        if let Some(found) = Self::match_jwk(&keys, kid, alg) {
+            return Ok(found);
+        }
+
+        // Key not found — the provider may have rotated keys.
+        // Force a JWKS refresh and try once more.
+        if kid.is_some() {
+            tracing::info!(kid = ?kid, "JWK not found in cache, forcing JWKS refresh");
+            let fresh_keys = self.fetch_jwks().await?;
+            {
+                let mut cache = self.jwks_cache.write().await;
+                *cache = Some(JwksCache {
+                    keys: fresh_keys.clone(),
+                    fetched_at: std::time::Instant::now(),
+                });
             }
-        }
-
-        // Fall back to matching by algorithm and use=sig
-        let alg_str = format!("{:?}", alg);
-        if let Some(key) = keys.iter().find(|k| {
-            k.key_use.as_deref() == Some("sig")
-                && k.alg.as_deref().map(|a| a == alg_str).unwrap_or(true)
-        }) {
-            return Ok(key.clone());
-        }
-
-        // Last resort: first RSA key
-        if let Some(key) = keys.iter().find(|k| k.kty == "RSA") {
-            return Ok(key.clone());
+            if let Some(found) = Self::match_jwk(&fresh_keys, kid, alg) {
+                return Ok(found);
+            }
         }
 
         Err(miette::miette!(
@@ -218,6 +219,28 @@ impl OidcService {
             kid,
             alg
         ))
+    }
+
+    /// Try to find a matching JWK from a set of keys.
+    fn match_jwk(keys: &[JwkKey], kid: Option<&str>, alg: Algorithm) -> Option<JwkKey> {
+        // Match by kid first
+        if let Some(kid) = kid {
+            if let Some(key) = keys.iter().find(|k| k.kid.as_deref() == Some(kid)) {
+                return Some(key.clone());
+            }
+        }
+
+        // Fall back to matching by algorithm and use=sig
+        let alg_str = format!("{:?}", alg);
+        if let Some(key) = keys.iter().find(|k| {
+            k.key_use.as_deref() == Some("sig")
+                && k.alg.as_deref().map(|a| a == alg_str).unwrap_or(true)
+        }) {
+            return Some(key.clone());
+        }
+
+        // Last resort: first RSA key
+        keys.iter().find(|k| k.kty == "RSA").cloned()
     }
 
     /// Get JWKS keys, using cache if available and fresh (< 1 hour)

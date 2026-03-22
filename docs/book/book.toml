@@ -1,0 +1,16 @@
+[book]
+authors = ["The Forge Contributors"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Forge Documentation"
+description = "Documentation for the Forge code forge and packaging platform"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/OpenFlowLabs/forge"
+edit-url-template = "https://github.com/OpenFlowLabs/forge/edit/main/docs/book/{path}"
