@@ -281,9 +281,15 @@ impl ComponentService for ComponentServiceImpl {
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
+        // Reject uploads exceeding the configured maximum
+        if metadata.total_size as u64 > self.max_upload_size {
+            return Err(Status::resource_exhausted(format!(
+                "Upload size {} bytes exceeds maximum of {} bytes",
+                metadata.total_size, self.max_upload_size
+            )));
+        }
+
         // Check actor has ComponentWrite permission
-        // For streaming RPCs, auth comes from the middleware (bearer token) or the proto actor field
-        // The middleware injects AuthenticatedActor into extensions before stream starts
         let has_perm = self
             .rbac
             .check_component_write(&_actor.id, &component_id.id)

@@ -66,7 +66,7 @@ impl ComponentRepository {
             "created_at": component.created_at.to_string(),
         });
 
-        self.jj_manager
+        if let Err(e) = self.jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![
@@ -81,7 +81,9 @@ impl ComponentRepository {
                 "Initialize component".to_string(),
             )
             .await
-            .wrap_err("failed to create Jujutsu repository for component")?;
+        {
+            tracing::warn!(error = ?e, "Failed to create JJ repo for component (non-fatal)");
+        }
 
         tracing::info!(
             component_id = %component_id,
@@ -141,7 +143,7 @@ impl ComponentRepository {
             "updated_at": updated.updated_at.to_string(),
         });
 
-        self.jj_manager
+        if let Err(e) = self.jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![
@@ -156,7 +158,9 @@ impl ComponentRepository {
                 "Update component recipe".to_string(),
             )
             .await
-            .wrap_err("failed to update Jujutsu repository for component")?;
+        {
+            tracing::warn!(error = ?e, "Failed to update JJ repo for component (non-fatal)");
+        }
 
         tracing::info!(
             component_id = %component_id,
@@ -212,14 +216,16 @@ impl ComponentRepository {
         let repo_id = RepoId::Component(ComponentId(component_id.to_string()));
         let jj_path = format!("{}/{}", kind, name);
 
-        self.jj_manager
+        if let Err(e) = self.jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![(jj_path, data.to_vec())],
                 format!("Add {} file: {}", kind, name),
             )
             .await
-            .wrap_err("failed to commit component file to Jujutsu")?;
+        {
+            tracing::warn!(error = ?e, "Failed to commit component file to JJ (non-fatal)");
+        }
 
         tracing::info!(
             component_id = %component_id,

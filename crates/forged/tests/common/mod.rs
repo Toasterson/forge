@@ -22,6 +22,11 @@ impl TestContext {
         // Create test database
         Self::create_test_database(&test_db_name).await;
 
+        // Create JJ repos directory
+        let jj_repos_path = format!("./test_data/{}/jj-repos", test_db_name);
+        std::fs::create_dir_all(&jj_repos_path)
+            .expect("Failed to create test JJ repos directory");
+
         let settings = Settings {
             postgres: forged::settings::PostgresConfig {
                 url: std::env::var("TEST_DATABASE_URL")

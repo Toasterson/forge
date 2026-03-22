@@ -18,13 +18,12 @@ impl TestFixtures {
 
     /// Create test gate with owner
     pub async fn gate(ctx: &TestContext, owner: &actor::Model, name: &str) -> gate::Model {
+        let gate_kdl = format!(
+            "name \"{name}\"\nversion \"0.5.11\"\nbranch \"2024.0.0\"\npublisher \"test.example.com\""
+        );
         ctx.app_state
             .gate_manager
-            .create_gate(
-                &owner.id,
-                name.to_string(),
-                format!("gate {{ name = \"{}\" }}", name),
-            )
+            .create_gate(&owner.id, name.to_string(), gate_kdl)
             .await
             .expect("Failed to create test gate")
     }
@@ -42,7 +41,7 @@ impl TestFixtures {
                 &actor.id,
                 &gate.id,
                 name.to_string(),
-                format!("component {{ name = \"{}\" }}", name),
+                format!("name \"{name}\"\nsummary \"Test component\"\nversion \"1.0.0\""),
             )
             .await
             .expect("Failed to create test component")

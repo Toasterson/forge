@@ -22,7 +22,7 @@ services:
     image: chrislusf/seaweedfs:latest
     ports:
       - "8080:8080"
-    command: "volume -mserver=seaweedfs-master:9333 -port=8080"
+    command: "volume -mserver=seaweedfs-master:9333 -port=8080 -publicUrl=localhost:8080"
     depends_on:
       - seaweedfs-master
     volumes:

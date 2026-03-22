@@ -45,15 +45,24 @@ impl GateRepository {
             .wrap_err("failed to insert gate")?;
 
         // 2. Create Jujutsu repository and commit initial manifest
+        // JJ repo creation is best-effort — the gate metadata in PostgreSQL is the source
+        // of truth. JJ provides version history but is not required for core operations.
         let repo_id = RepoId::Gate(GateId(gate_id.clone()));
-        self.jj_manager
+        if let Err(e) = self
+            .jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![("gate.kdl".to_string(), gate_kdl.into_bytes())],
                 "Initialize gate".to_string(),
             )
             .await
-            .wrap_err("failed to create Jujutsu repository for gate")?;
+        {
+            tracing::warn!(
+                gate_id = %gate_id,
+                error = ?e,
+                "Failed to create Jujutsu repository for gate (non-fatal)"
+            );
+        }
 
         tracing::info!(
             gate_id = %gate_id,
@@ -98,16 +107,19 @@ impl GateRepository {
             .into_diagnostic()
             .wrap_err("failed to update gate")?;
 
-        // 2. Update Jujutsu repository
+        // 2. Update Jujutsu repository (best-effort)
         let repo_id = RepoId::Gate(GateId(gate_id.to_string()));
-        self.jj_manager
+        if let Err(e) = self
+            .jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![("gate.kdl".to_string(), gate_kdl.into_bytes())],
                 "Update gate".to_string(),
             )
             .await
-            .wrap_err("failed to update Jujutsu repository for gate")?;
+        {
+            tracing::warn!(gate_id = %gate_id, error = ?e, "Failed to update JJ repo for gate (non-fatal)");
+        }
 
         tracing::info!(
             gate_id = %gate_id,

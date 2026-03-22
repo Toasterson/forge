@@ -126,12 +126,15 @@ impl SeaweedFsClient {
             .await
             .wrap_err("failed to assign file id from SeaweedFS master")?;
 
-        // 2. Upload to assigned volume server
+        // 2. Upload to assigned volume server (multipart form, as SeaweedFS expects)
         let upload_url = format!("http://{}/{}", assign_resp.public_url, assign_resp.fid);
+
+        let part = reqwest::multipart::Part::bytes(data.to_vec()).file_name("blob");
+        let form = reqwest::multipart::Form::new().part("file", part);
 
         self.http_client
             .post(&upload_url)
-            .body(data.to_vec())
+            .multipart(form)
             .send()
             .await
             .into_diagnostic()
