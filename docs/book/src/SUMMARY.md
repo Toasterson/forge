@@ -45,6 +45,7 @@
 
 # Deployment
 
+- [OpenIndiana Setup Guide](./deployment/openindiana.md)
 - [Binary Deployment](./deployment/binary.md)
 - [Docker](./deployment/docker.md)
 - [Kubernetes](./deployment/kubernetes.md)
