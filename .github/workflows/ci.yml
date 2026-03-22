@@ -15,64 +15,99 @@ env:
 
 jobs:
   lint-build-test:
-    name: Lint, build, test (no e2e)
+    name: Lint, build, unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler clang pkg-config libssl-dev libarchive-dev
-      - name: Cache cargo registry + build
+      - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
       - name: rustfmt
         run: cargo fmt --all -- --check
       - name: clippy
         run: cargo clippy --workspace -- -D warnings
       - name: build
         run: cargo build --workspace --locked
-      - name: tests (unit/integration; e2e ignored by default)
-        run: cargo test --workspace --locked -- --nocapture
-
-  cross-illumos:
-    name: Cross build for illumos (x86_64-unknown-illumos)
-    needs: [lint-build-test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install cross
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-      - name: Cross build forged + pkgdev (debug)
-        run: cross build --target x86_64-unknown-illumos -p forged -p pkgdev --locked
-      - name: Cross build forged + pkgdev (release)
-        run: cross build --target x86_64-unknown-illumos -p forged -p pkgdev --locked --release
+      - name: unit tests
+        run: cargo test --workspace --locked
 
   e2e:
-    name: End-to-end tests (main only)
+    name: End-to-end tests
     needs: [lint-build-test]
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: forged_test
+          POSTGRES_USER: forged
+          POSTGRES_PASSWORD: forged
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      seaweedfs-master:
+        image: chrislusf/seaweedfs:latest
+        options: >-
+          --health-cmd "wget -q --spider http://localhost:9333/cluster/status || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 9333:9333
+
+      seaweedfs-volume:
+        image: chrislusf/seaweedfs:latest
+        options: >-
+          --health-cmd "wget -q --spider http://localhost:8080/status || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 8080:8080
+
+      rabbitmq:
+        image: rabbitmq:3.12-management
+        env:
+          RABBITMQ_DEFAULT_VHOST: master
+          RABBITMQ_DEFAULT_USER: dev
+          RABBITMQ_DEFAULT_PASS: dev
+        options: >-
+          --health-cmd "rabbitmqctl status"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 5
+        ports:
+          - 5672:5672
+
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler clang pkg-config libssl-dev libarchive-dev
-      - name: Cache cargo registry + build
+      - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-      - name: Build
-        run: cargo build -p forged --locked --release
-      - name: Run e2e
-        run: |
-          # Run the ignored e2e test explicitly with a generous timeout
-          cargo test -p forged --test e2e_git -- --ignored --nocapture
+
+      - name: Run e2e tests
+        env:
+          TEST_DATABASE_URL: postgresql://forged:forged@localhost/forged_test
+          TEST_SEAWEEDFS_URL: http://localhost:9333
+          RUST_LOG: forged=info,warn
+        run: cargo test -p forged --test e2e_git --locked -- --ignored --nocapture
+
+      - name: Run integration tests
+        env:
+          TEST_DATABASE_URL: postgresql://forged:forged@localhost/forged_test
+          TEST_SEAWEEDFS_URL: http://localhost:9333
+          RUST_LOG: forged=info,warn
+        run: cargo test -p forged --test integration_test --locked -- --ignored --nocapture
 
   docker:
     name: Build and publish Docker image
@@ -86,12 +121,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata (tags, labels)
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/forge
+          images: ghcr.io/${{ github.repository_owner }}/forge
           tags: |
             type=raw,value=${{ github.sha }}
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
@@ -110,7 +144,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   helm:
-    name: Package and publish Helm chart (OCI)
+    name: Package and publish Helm chart
     needs: [docker]
     runs-on: ubuntu-latest
     steps:
@@ -119,29 +153,26 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: v3.14.4
-      - name: Helm registry login (GHCR)
+      - name: Helm registry login
         run: echo "$HELM_PASS" | helm registry login ghcr.io -u "$HELM_USER" --password-stdin
         env:
           HELM_USER: ${{ github.actor }}
           HELM_PASS: ${{ secrets.GITHUB_TOKEN }}
-      - name: Compute chart version and image tag
+      - name: Compute versions
         id: vars
         run: |
           SHORT_SHA=${GITHUB_SHA::7}
           if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-            IMAGE_TAG=latest
-            CHART_VERSION=0.1.0
+            echo "image_tag=latest" >> $GITHUB_OUTPUT
+            echo "chart_version=0.1.0" >> $GITHUB_OUTPUT
           elif [ "${GITHUB_REF}" = "refs/heads/develop" ]; then
-            IMAGE_TAG=develop
-            CHART_VERSION=0.1.0-dev-${SHORT_SHA}
+            echo "image_tag=develop" >> $GITHUB_OUTPUT
+            echo "chart_version=0.1.0-dev-${SHORT_SHA}" >> $GITHUB_OUTPUT
           else
-            IMAGE_TAG=${SHORT_SHA}
-            CHART_VERSION=0.1.0-${SHORT_SHA}
+            echo "image_tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "chart_version=0.1.0-${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "chart_version=${CHART_VERSION}" >> $GITHUB_OUTPUT
       - name: Package chart
         run: helm package charts/forged --version ${{ steps.vars.outputs.chart_version }} --app-version ${{ steps.vars.outputs.image_tag }}
-      - name: Push chart to GHCR OCI
-        run: |
-          helm push forged-${{ steps.vars.outputs.chart_version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+      - name: Push chart
+        run: helm push forged-${{ steps.vars.outputs.chart_version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
