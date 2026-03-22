@@ -24,13 +24,14 @@ impl TestContext {
 
         // Create JJ repos directory
         let jj_repos_path = format!("./test_data/{}/jj-repos", test_db_name);
-        std::fs::create_dir_all(&jj_repos_path)
-            .expect("Failed to create test JJ repos directory");
+        std::fs::create_dir_all(&jj_repos_path).expect("Failed to create test JJ repos directory");
 
         let settings = Settings {
             postgres: forged::settings::PostgresConfig {
                 url: std::env::var("TEST_DATABASE_URL")
-                    .unwrap_or_else(|_| "postgresql://forged:forged@localhost/forged_test".to_string())
+                    .unwrap_or_else(|_| {
+                        "postgresql://forged:forged@localhost/forged_test".to_string()
+                    })
                     .replace("/forged_test", &format!("/{}", test_db_name)),
                 max_connections: 5,
                 ..Default::default()
@@ -47,7 +48,8 @@ impl TestContext {
             ..Default::default()
         };
 
-        let app_state = AppState::new(settings).await
+        let app_state = AppState::new(settings)
+            .await
             .expect("Failed to create test AppState");
 
         let db = app_state.db.clone();
@@ -66,13 +68,18 @@ impl TestContext {
             .unwrap_or_else(|_| "postgresql://forged:forged@localhost/forged_test".to_string());
         let admin_url = base_url.replace("/forged_test", "/postgres");
 
-        let admin_db = sea_orm::Database::connect(&admin_url).await
+        let admin_db = sea_orm::Database::connect(&admin_url)
+            .await
             .expect("Failed to connect to postgres database");
 
         // Drop if exists, then create
         use sea_orm::ConnectionTrait;
-        let _ = admin_db.execute_unprepared(&format!("DROP DATABASE IF EXISTS {}", db_name)).await;
-        admin_db.execute_unprepared(&format!("CREATE DATABASE {}", db_name)).await
+        let _ = admin_db
+            .execute_unprepared(&format!("DROP DATABASE IF EXISTS {}", db_name))
+            .await;
+        admin_db
+            .execute_unprepared(&format!("CREATE DATABASE {}", db_name))
+            .await
             .expect("Failed to create test database");
     }
 }
@@ -91,7 +98,9 @@ impl Drop for TestContext {
 
             if let Ok(admin_db) = sea_orm::Database::connect(&admin_url).await {
                 use sea_orm::ConnectionTrait;
-                let _ = admin_db.execute_unprepared(&format!("DROP DATABASE IF EXISTS {}", db_name)).await;
+                let _ = admin_db
+                    .execute_unprepared(&format!("DROP DATABASE IF EXISTS {}", db_name))
+                    .await;
             }
 
             // Remove Jujutsu repos

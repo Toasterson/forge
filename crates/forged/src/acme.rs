@@ -146,8 +146,7 @@ impl AcmeManager {
         drop(auths);
 
         // Wait for order to become ready
-        let retries = RetryPolicy::new()
-            .timeout(Duration::from_secs(120));
+        let retries = RetryPolicy::new().timeout(Duration::from_secs(120));
         order
             .poll_ready(&retries)
             .await
@@ -200,9 +199,8 @@ impl AcmeManager {
             let data = std::fs::read_to_string(&creds_path)
                 .into_diagnostic()
                 .wrap_err("Failed to read ACME account credentials from cache")?;
-            let creds: AccountCredentials = serde_json::from_str(&data)
-                .into_diagnostic()
-                .wrap_err(
+            let creds: AccountCredentials =
+                serde_json::from_str(&data).into_diagnostic().wrap_err(
                     "Failed to parse cached ACME account credentials.\n\
                      Try deleting the cache and re-running.",
                 )?;
@@ -411,10 +409,7 @@ fn parse_asn1_time(der: &[u8], pos: usize) -> Option<chrono::DateTime<chrono::Ut
 }
 
 /// Spawn a background task that renews the certificate before it expires.
-pub fn spawn_renewal_task(
-    manager: Arc<AcmeManager>,
-    cancel: tokio_util::sync::CancellationToken,
-) {
+pub fn spawn_renewal_task(manager: Arc<AcmeManager>, cancel: tokio_util::sync::CancellationToken) {
     tokio::spawn(async move {
         // Check every 12 hours
         let check_interval = Duration::from_secs(12 * 3600);

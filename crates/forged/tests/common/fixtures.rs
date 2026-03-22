@@ -8,10 +8,7 @@ impl TestFixtures {
     pub async fn actor(ctx: &TestContext, name: &str) -> actor::Model {
         ctx.app_state
             .actor_repo
-            .create_or_update_from_oidc(
-                format!("test_sub_{}", name),
-                format!("Test {}", name),
-            )
+            .create_or_update_from_oidc(format!("test_sub_{}", name), format!("Test {}", name))
             .await
             .expect("Failed to create test actor")
     }
@@ -50,7 +47,8 @@ impl TestFixtures {
     /// Create test blob (returns hash)
     pub async fn blob(ctx: &TestContext, data: &[u8]) -> String {
         use forged::repositories::ApplicationBlobType;
-        let (hash, _fid) = ctx.app_state
+        let (hash, _fid) = ctx
+            .app_state
             .blob_repo
             .store_blob(data, ApplicationBlobType::SourceArchive)
             .await

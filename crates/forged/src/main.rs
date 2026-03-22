@@ -37,7 +37,9 @@ async fn main() {
     let cancel = CancellationToken::new();
     let cancel_for_signal = cancel.clone();
     tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.expect("failed to listen for ctrl-c");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen for ctrl-c");
         info!("Received shutdown signal");
         cancel_for_signal.cancel();
     });
@@ -55,12 +57,17 @@ async fn main() {
         if settings.tls.acme.challenge_type == "http-01" {
             let http_addr: SocketAddr = match settings.tls.acme.http_listen_addr.parse() {
                 Ok(a) => a,
-                Err(e) => { error!(error = ?e, "Invalid ACME HTTP listen address"); std::process::exit(1); }
+                Err(e) => {
+                    error!(error = ?e, "Invalid ACME HTTP listen address");
+                    std::process::exit(1);
+                }
             };
             let tokens = acme_manager.challenge_tokens();
             let cancel_http = cancel.clone();
             tokio::spawn(async move {
-                if let Err(e) = acme::start_http01_challenge_server(http_addr, tokens, cancel_http).await {
+                if let Err(e) =
+                    acme::start_http01_challenge_server(http_addr, tokens, cancel_http).await
+                {
                     error!(error = ?e, "HTTP-01 challenge server error");
                 }
             });
@@ -91,31 +98,45 @@ async fn main() {
     // Create gRPC services
     let auth_service = transport::AuthServiceImpl::new(app_state.auth.clone());
     let gate_service = transport::GateServiceImpl::new(
-        app_state.gate_repo.clone(), app_state.component_repo.clone(), app_state.rbac.clone(),
+        app_state.gate_repo.clone(),
+        app_state.component_repo.clone(),
+        app_state.rbac.clone(),
     );
     let component_service = transport::ComponentServiceImpl::new(
-        app_state.component_repo.clone(), app_state.source_archive_repo.clone(), app_state.rbac.clone(),
-    ).with_max_upload_size(settings.server.max_upload_size);
+        app_state.component_repo.clone(),
+        app_state.source_archive_repo.clone(),
+        app_state.rbac.clone(),
+    )
+    .with_max_upload_size(settings.server.max_upload_size);
     let build_service = transport::BuildServiceImpl::new(
-        app_state.component_repo.clone(), app_state.source_archive_repo.clone(),
-        app_state.blob_repo.clone(), app_state.rbac.clone(), app_state.build_dispatch.clone(),
+        app_state.component_repo.clone(),
+        app_state.source_archive_repo.clone(),
+        app_state.blob_repo.clone(),
+        app_state.rbac.clone(),
+        app_state.build_dispatch.clone(),
     );
 
     // Spawn build report consumer
     let consumer = BuildReportConsumer::new(
-        app_state.build_job_repo.clone(), app_state.amqp_pool.clone(),
-        app_state.settings.amqp.clone(), cancel.clone(),
+        app_state.build_job_repo.clone(),
+        app_state.amqp_pool.clone(),
+        app_state.settings.amqp.clone(),
+        cancel.clone(),
     );
     let app_state_for_shutdown = app_state.clone();
     tokio::spawn(async move {
-        if let Err(e) = consumer.run().await { error!(error = ?e, "Build report consumer error"); }
+        if let Err(e) = consumer.run().await {
+            error!(error = ?e, "Build report consumer error");
+        }
     });
 
     // Graceful shutdown handler
     let cancel_for_shutdown = cancel.clone();
     tokio::spawn(async move {
         cancel_for_shutdown.cancelled().await;
-        if let Err(e) = app_state_for_shutdown.shutdown().await { error!(error = ?e, "Shutdown error"); }
+        if let Err(e) = app_state_for_shutdown.shutdown().await {
+            error!(error = ?e, "Shutdown error");
+        }
     });
 
     // Health check dependencies
@@ -128,11 +149,19 @@ async fn main() {
     // Start gRPC server
     info!(addr = %addr, "Starting gRPC server");
     if let Err(e) = transport::start_grpc_server(
-        addr, auth_service, gate_service, component_service, build_service,
-        app_state.oidc.clone(), app_state.actor_repo.clone(),
-        &settings.tls, Some(health_deps),
+        addr,
+        auth_service,
+        gate_service,
+        component_service,
+        build_service,
+        app_state.oidc.clone(),
+        app_state.actor_repo.clone(),
+        &settings.tls,
+        Some(health_deps),
         settings.server.rate_limit_requests as usize,
-    ).await {
+    )
+    .await
+    {
         error!(error = ?e, "gRPC server error");
         std::process::exit(1);
     }

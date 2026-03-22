@@ -505,10 +505,7 @@ impl ComponentService for ComponentServiceImpl {
         };
 
         let has_more = filtered.len() > page_size as usize;
-        let archives: Vec<_> = filtered
-            .into_iter()
-            .take(page_size as usize)
-            .collect();
+        let archives: Vec<_> = filtered.into_iter().take(page_size as usize).collect();
 
         let next_page_token = if has_more {
             archives
@@ -593,10 +590,7 @@ impl ComponentService for ComponentServiceImpl {
         };
 
         let has_more = filtered.len() > page_size as usize;
-        let files: Vec<_> = filtered
-            .into_iter()
-            .take(page_size as usize)
-            .collect();
+        let files: Vec<_> = filtered.into_iter().take(page_size as usize).collect();
 
         let next_page_token = if has_more {
             files

@@ -125,9 +125,7 @@ impl BuildJobRepository {
     ) -> Result<u64> {
         let result = build_job::Entity::delete_many()
             .filter(build_job::Column::CreatedAt.lt(cutoff))
-            .filter(
-                build_job::Column::Status.is_in(["success", "failed", "cancelled"]),
-            )
+            .filter(build_job::Column::Status.is_in(["success", "failed", "cancelled"]))
             .exec(&self.db)
             .await
             .into_diagnostic()

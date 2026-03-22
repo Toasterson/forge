@@ -377,10 +377,7 @@ impl GateService for GateServiceImpl {
         };
 
         let has_more = filtered.len() > page_size as usize;
-        let members: Vec<_> = filtered
-            .into_iter()
-            .take(page_size as usize)
-            .collect();
+        let members: Vec<_> = filtered.into_iter().take(page_size as usize).collect();
 
         let next_page_token = if has_more {
             members
@@ -471,10 +468,7 @@ impl GateService for GateServiceImpl {
         };
 
         let has_more = filtered.len() > page_size as usize;
-        let components: Vec<_> = filtered
-            .into_iter()
-            .take(page_size as usize)
-            .collect();
+        let components: Vec<_> = filtered.into_iter().take(page_size as usize).collect();
 
         let next_page_token = if has_more {
             components
@@ -536,10 +530,7 @@ impl GateService for GateServiceImpl {
         };
 
         let has_more = filtered.len() > page_size as usize;
-        let gates: Vec<_> = filtered
-            .into_iter()
-            .take(page_size as usize)
-            .collect();
+        let gates: Vec<_> = filtered.into_iter().take(page_size as usize).collect();
 
         let next_page_token = if has_more {
             gates

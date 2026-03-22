@@ -107,10 +107,18 @@ impl Default for AcmeConfig {
     }
 }
 
-fn default_acme_cache_dir() -> String { "./data/acme".to_string() }
-fn default_acme_directory_url() -> String { "https://acme-v02.api.letsencrypt.org/directory".to_string() }
-fn default_acme_challenge_type() -> String { "http-01".to_string() }
-fn default_acme_http_listen_addr() -> String { "0.0.0.0:80".to_string() }
+fn default_acme_cache_dir() -> String {
+    "./data/acme".to_string()
+}
+fn default_acme_directory_url() -> String {
+    "https://acme-v02.api.letsencrypt.org/directory".to_string()
+}
+fn default_acme_challenge_type() -> String {
+    "http-01".to_string()
+}
+fn default_acme_http_listen_addr() -> String {
+    "0.0.0.0:80".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TlsConfig {

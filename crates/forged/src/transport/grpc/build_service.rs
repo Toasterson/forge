@@ -366,10 +366,7 @@ impl BuildService for BuildServiceImpl {
         };
 
         let has_more = filtered.len() > page_size as usize;
-        let jobs: Vec<_> = filtered
-            .into_iter()
-            .take(page_size as usize)
-            .collect();
+        let jobs: Vec<_> = filtered.into_iter().take(page_size as usize).collect();
 
         let next_page_token = if has_more {
             jobs.last()

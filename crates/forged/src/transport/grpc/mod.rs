@@ -70,7 +70,9 @@ pub async fn start_server(
             let cert = std::fs::read(cache_dir.join("cert.pem")).into_diagnostic()?;
             let key = std::fs::read(cache_dir.join("key.pem")).into_diagnostic()?;
             let identity = Identity::from_pem(cert, key);
-            builder = builder.tls_config(ServerTlsConfig::new().identity(identity)).into_diagnostic()?;
+            builder = builder
+                .tls_config(ServerTlsConfig::new().identity(identity))
+                .into_diagnostic()?;
             info!(domains = ?tls_config.acme.domains, "TLS enabled (ACME)");
         }
         TlsMode::None => {
@@ -79,7 +81,9 @@ pub async fn start_server(
     }
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter.set_service_status("", ServingStatus::Serving).await;
+    health_reporter
+        .set_service_status("", ServingStatus::Serving)
+        .await;
 
     if let Some(deps) = health_deps {
         tokio::spawn(async move {
@@ -109,10 +113,18 @@ pub async fn start_server(
         .concurrency_limit_per_connection(256)
         .layer(concurrency_limit)
         .layer(auth_layer)
-        .add_service(proto::auth_service_server::AuthServiceServer::new(auth_service))
-        .add_service(proto::gate_service_server::GateServiceServer::new(gate_service))
-        .add_service(proto::component_service_server::ComponentServiceServer::new(component_service))
-        .add_service(proto::build_service_server::BuildServiceServer::new(build_service))
+        .add_service(proto::auth_service_server::AuthServiceServer::new(
+            auth_service,
+        ))
+        .add_service(proto::gate_service_server::GateServiceServer::new(
+            gate_service,
+        ))
+        .add_service(
+            proto::component_service_server::ComponentServiceServer::new(component_service),
+        )
+        .add_service(proto::build_service_server::BuildServiceServer::new(
+            build_service,
+        ))
         .add_service(health_service)
         .serve(addr)
         .await

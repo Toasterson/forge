@@ -77,12 +77,8 @@ fn main() -> miette::Result<()> {
             timeout,
             database_url,
         } => {
-            let info = setup_test_env(
-                name.as_deref(),
-                Duration::from_secs(timeout),
-                &database_url,
-            )
-            .wrap_err("setup test env failed")?;
+            let info = setup_test_env(name.as_deref(), Duration::from_secs(timeout), &database_url)
+                .wrap_err("setup test env failed")?;
             println!("{}", serde_json::to_string_pretty(&info).into_diagnostic()?);
             Ok(())
         }

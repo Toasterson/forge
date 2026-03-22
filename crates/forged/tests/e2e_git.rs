@@ -17,15 +17,12 @@ use common::TestContext;
 use forged::settings::TlsMode;
 use forged::transport;
 use forged::transport::grpc::proto::{
-    auth_service_client::AuthServiceClient,
-    build_service_client::BuildServiceClient,
-    component_service_client::ComponentServiceClient,
-    gate_service_client::GateServiceClient,
-    ActorRef, AuthenticateRequest, ComponentId, CreateComponentRequest,
-    CreateGateRequest, GetComponentRequest, GetGateRequest, GateId,
-    ListComponentFilesRequest, ListComponentsRequest, ListGatesRequest,
-    ListMembersRequest, ListSourceArchivesRequest, UpdateComponentRequest, UpdateGateRequest,
-    AddMemberRequest, RemoveMemberRequest, GetBuildManifestRequest,
+    auth_service_client::AuthServiceClient, build_service_client::BuildServiceClient,
+    component_service_client::ComponentServiceClient, gate_service_client::GateServiceClient,
+    ActorRef, AddMemberRequest, AuthenticateRequest, ComponentId, CreateComponentRequest,
+    CreateGateRequest, GateId, GetBuildManifestRequest, GetComponentRequest, GetGateRequest,
+    ListComponentFilesRequest, ListComponentsRequest, ListGatesRequest, ListMembersRequest,
+    ListSourceArchivesRequest, RemoveMemberRequest, UpdateComponentRequest, UpdateGateRequest,
 };
 use std::net::SocketAddr;
 use tokio_util::sync::CancellationToken;
@@ -98,15 +95,11 @@ fn actor_ref(id: &str) -> Option<ActorRef> {
 }
 
 fn gate_id(id: &str) -> Option<GateId> {
-    Some(GateId {
-        id: id.to_string(),
-    })
+    Some(GateId { id: id.to_string() })
 }
 
 fn component_id(id: &str) -> Option<ComponentId> {
-    Some(ComponentId {
-        id: id.to_string(),
-    })
+    Some(ComponentId { id: id.to_string() })
 }
 
 // =============================================================================
@@ -119,10 +112,9 @@ async fn e2e_authenticate_and_get_actor() {
     let ctx = TestContext::new().await;
     let (addr, _cancel) = start_test_server(&ctx).await;
 
-    let mut client =
-        AuthServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = AuthServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     // Authenticate with stub token (OIDC issuer_url is empty = stub mode)
     let resp = client
@@ -145,10 +137,9 @@ async fn e2e_authenticate_idempotent() {
     let ctx = TestContext::new().await;
     let (addr, _cancel) = start_test_server(&ctx).await;
 
-    let mut client =
-        AuthServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = AuthServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     // Same sub, different display name should update
     let resp1 = client
@@ -185,10 +176,9 @@ async fn e2e_gate_lifecycle() {
     // Create actor via repository (middleware bypass -- stub OIDC has no real token flow)
     let actor = TestFixtures::actor(&ctx, "gate_owner").await;
 
-    let mut gate_client =
-        GateServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut gate_client = GateServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     // Inject auth by creating a request with the actor's OIDC sub as bearer token.
     // The middleware validates via OidcService stub mode (empty issuer = stub).
@@ -200,15 +190,16 @@ async fn e2e_gate_lifecycle() {
     });
     req.metadata_mut().insert(
         "authorization",
-        format!("Bearer {}:{}", actor.oidc_sub.as_deref().unwrap_or(""), actor.display_name)
-            .parse()
-            .unwrap(),
+        format!(
+            "Bearer {}:{}",
+            actor.oidc_sub.as_deref().unwrap_or(""),
+            actor.display_name
+        )
+        .parse()
+        .unwrap(),
     );
 
-    let create_resp = gate_client
-        .create_gate(req)
-        .await
-        .expect("create gate");
+    let create_resp = gate_client.create_gate(req).await.expect("create gate");
     let gate_info = create_resp.into_inner().gate.expect("gate present");
     assert_eq!(gate_info.name, "e2e-test-gate");
     assert!(!gate_info.id.is_empty());
@@ -221,9 +212,13 @@ async fn e2e_gate_lifecycle() {
     });
     req.metadata_mut().insert(
         "authorization",
-        format!("Bearer {}:{}", actor.oidc_sub.as_deref().unwrap_or(""), actor.display_name)
-            .parse()
-            .unwrap(),
+        format!(
+            "Bearer {}:{}",
+            actor.oidc_sub.as_deref().unwrap_or(""),
+            actor.display_name
+        )
+        .parse()
+        .unwrap(),
     );
     let get_resp = gate_client.get_gate(req).await.expect("get gate");
     let fetched = get_resp.into_inner().gate.unwrap();
@@ -239,9 +234,13 @@ async fn e2e_gate_lifecycle() {
     });
     req.metadata_mut().insert(
         "authorization",
-        format!("Bearer {}:{}", actor.oidc_sub.as_deref().unwrap_or(""), actor.display_name)
-            .parse()
-            .unwrap(),
+        format!(
+            "Bearer {}:{}",
+            actor.oidc_sub.as_deref().unwrap_or(""),
+            actor.display_name
+        )
+        .parse()
+        .unwrap(),
     );
     let update_resp = gate_client.update_gate(req).await.expect("update gate");
     let updated = update_resp.into_inner().gate.unwrap();
@@ -256,9 +255,13 @@ async fn e2e_gate_lifecycle() {
     });
     req.metadata_mut().insert(
         "authorization",
-        format!("Bearer {}:{}", actor.oidc_sub.as_deref().unwrap_or(""), actor.display_name)
-            .parse()
-            .unwrap(),
+        format!(
+            "Bearer {}:{}",
+            actor.oidc_sub.as_deref().unwrap_or(""),
+            actor.display_name
+        )
+        .parse()
+        .unwrap(),
     );
     let list_resp = gate_client.list_gates(req).await.expect("list gates");
     let gates = list_resp.into_inner().gates;
@@ -280,10 +283,9 @@ async fn e2e_gate_membership() {
     let member = TestFixtures::actor(&ctx, "membership_member").await;
     let gate = TestFixtures::gate(&ctx, &owner, "membership-gate").await;
 
-    let mut client =
-        GateServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = GateServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     let bearer = format!(
         "Bearer {}:{}",
@@ -346,10 +348,9 @@ async fn e2e_component_lifecycle() {
     let actor = TestFixtures::actor(&ctx, "comp_owner").await;
     let gate = TestFixtures::gate(&ctx, &actor, "comp-gate").await;
 
-    let mut client =
-        ComponentServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = ComponentServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     let bearer = format!(
         "Bearer {}:{}",
@@ -379,7 +380,10 @@ build {
     req.metadata_mut()
         .insert("authorization", bearer.parse().unwrap());
 
-    let create_resp = client.create_component(req).await.expect("create component");
+    let create_resp = client
+        .create_component(req)
+        .await
+        .expect("create component");
     let comp = create_resp.into_inner().component.unwrap();
     assert_eq!(comp.name, "library/test-lib");
     assert!(!comp.id.is_empty());
@@ -406,15 +410,17 @@ build {
     });
     req.metadata_mut()
         .insert("authorization", bearer.parse().unwrap());
-    let update_resp = client.update_component(req).await.expect("update component");
+    let update_resp = client
+        .update_component(req)
+        .await
+        .expect("update component");
     let updated = update_resp.into_inner().component.unwrap();
     assert!(updated.recipe_kdl.contains("2.0.0"));
 
     // ListComponents via GateService
-    let mut gate_client =
-        GateServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect gate");
+    let mut gate_client = GateServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect gate");
     let mut req = tonic::Request::new(ListComponentsRequest {
         actor: actor_ref(&actor.id),
         gate_id: gate_id(&gate.id),
@@ -423,7 +429,10 @@ build {
     });
     req.metadata_mut()
         .insert("authorization", bearer.parse().unwrap());
-    let list_resp = gate_client.list_components(req).await.expect("list components");
+    let list_resp = gate_client
+        .list_components(req)
+        .await
+        .expect("list components");
     let components = list_resp.into_inner().components;
     assert!(components.iter().any(|c| c.id == comp_id));
 }
@@ -446,10 +455,9 @@ async fn e2e_upload_source_archive() {
     let gate = TestFixtures::gate(&ctx, &actor, "upload-gate").await;
     let comp = TestFixtures::component(&ctx, &actor, &gate, "upload-comp").await;
 
-    let mut client =
-        ComponentServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = ComponentServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     let bearer = format!(
         "Bearer {}:{}",
@@ -507,7 +515,10 @@ async fn e2e_upload_source_archive() {
     });
     req.metadata_mut()
         .insert("authorization", bearer.parse().unwrap());
-    let list_resp = client.list_source_archives(req).await.expect("list archives");
+    let list_resp = client
+        .list_source_archives(req)
+        .await
+        .expect("list archives");
     let archives = list_resp.into_inner().archives;
     assert_eq!(archives.len(), 1);
     assert_eq!(archives[0].filename, "test-archive-1.0.tar.gz");
@@ -527,10 +538,9 @@ async fn e2e_upload_component_file() {
     let gate = TestFixtures::gate(&ctx, &actor, "file-gate").await;
     let comp = TestFixtures::component(&ctx, &actor, &gate, "file-comp").await;
 
-    let mut client =
-        ComponentServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = ComponentServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     let bearer = format!(
         "Bearer {}:{}",
@@ -555,7 +565,9 @@ async fn e2e_upload_component_file() {
     };
 
     let chunk_msg = UploadComponentFileRequest {
-        data: Some(upload_component_file_request::Data::Chunk(patch_data.clone())),
+        data: Some(upload_component_file_request::Data::Chunk(
+            patch_data.clone(),
+        )),
     };
 
     let stream = tokio_stream::iter(vec![metadata_msg, chunk_msg]);
@@ -615,10 +627,9 @@ async fn e2e_build_manifest() {
         .await
         .expect("add archive");
 
-    let mut client =
-        BuildServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = BuildServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     let bearer = format!(
         "Bearer {}:{}",
@@ -693,7 +704,9 @@ async fn e2e_full_packaging_workflow() {
 
     let mut auth = AuthServiceClient::connect(endpoint.clone()).await.unwrap();
     let mut gates = GateServiceClient::connect(endpoint.clone()).await.unwrap();
-    let mut components = ComponentServiceClient::connect(endpoint.clone()).await.unwrap();
+    let mut components = ComponentServiceClient::connect(endpoint.clone())
+        .await
+        .unwrap();
     let mut builds = BuildServiceClient::connect(endpoint.clone()).await.unwrap();
 
     // 1. Authenticate
@@ -714,8 +727,7 @@ async fn e2e_full_packaging_workflow() {
         gate_kdl: r#"name "workflow-gate" version "0.5.11" branch "2024.0.0" publisher "test.com""#
             .to_string(),
     });
-    req.metadata_mut()
-        .insert("authorization", bearer.clone());
+    req.metadata_mut().insert("authorization", bearer.clone());
     let gate_resp = gates.create_gate(req).await.unwrap();
     let gid = gate_resp.into_inner().gate.unwrap().id;
 
@@ -740,8 +752,7 @@ dependency "library/zlib" kind="require"
 "#
         .to_string(),
     });
-    req.metadata_mut()
-        .insert("authorization", bearer.clone());
+    req.metadata_mut().insert("authorization", bearer.clone());
     let comp_resp = components.create_component(req).await.unwrap();
     let cid = comp_resp.into_inner().component.unwrap().id;
 
@@ -764,8 +775,7 @@ dependency "library/zlib" kind="require"
         },
     ]);
     let mut req = tonic::Request::new(stream);
-    req.metadata_mut()
-        .insert("authorization", bearer.clone());
+    req.metadata_mut().insert("authorization", bearer.clone());
     components
         .upload_source_archive(req)
         .await
@@ -791,8 +801,7 @@ dependency "library/zlib" kind="require"
         },
     ]);
     let mut req = tonic::Request::new(stream);
-    req.metadata_mut()
-        .insert("authorization", bearer.clone());
+    req.metadata_mut().insert("authorization", bearer.clone());
     components
         .upload_component_file(req)
         .await
@@ -803,16 +812,12 @@ dependency "library/zlib" kind="require"
         actor: actor_ref(&actor_id),
         component_id: component_id(&cid),
     });
-    req.metadata_mut()
-        .insert("authorization", bearer.clone());
+    req.metadata_mut().insert("authorization", bearer.clone());
     let manifest_resp = builds.get_build_manifest(req).await.unwrap();
     let manifest = manifest_resp.into_inner().manifest.unwrap();
     assert_eq!(manifest.component_name, "web/curl");
     assert_eq!(manifest.source_archives.len(), 1, "should have 1 archive");
-    assert_eq!(
-        manifest.source_archives[0].filename,
-        "curl-8.6.0.tar.xz"
-    );
+    assert_eq!(manifest.source_archives[0].filename, "curl-8.6.0.tar.xz");
     assert_eq!(manifest.patches.len(), 1, "should have 1 patch");
     assert_eq!(manifest.patches[0].name, "fix-configure.patch");
 
@@ -823,8 +828,7 @@ dependency "library/zlib" kind="require"
         page_size: 1,
         page_token: String::new(),
     });
-    req.metadata_mut()
-        .insert("authorization", bearer.clone());
+    req.metadata_mut().insert("authorization", bearer.clone());
     let list_resp = gates.list_gates(req).await.unwrap();
     let inner = list_resp.into_inner();
     assert_eq!(inner.gates.len(), 1);
@@ -850,10 +854,9 @@ async fn e2e_upload_size_limit_enforced() {
     let gate = TestFixtures::gate(&ctx, &actor, "limit-gate").await;
     let comp = TestFixtures::component(&ctx, &actor, &gate, "limit-comp").await;
 
-    let mut client =
-        ComponentServiceClient::connect(format!("http://{}", addr))
-            .await
-            .expect("connect");
+    let mut client = ComponentServiceClient::connect(format!("http://{}", addr))
+        .await
+        .expect("connect");
 
     let bearer = format!(
         "Bearer {}:{}",

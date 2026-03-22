@@ -66,7 +66,8 @@ impl ComponentRepository {
             "created_at": component.created_at.to_string(),
         });
 
-        if let Err(e) = self.jj_manager
+        if let Err(e) = self
+            .jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![
@@ -143,7 +144,8 @@ impl ComponentRepository {
             "updated_at": updated.updated_at.to_string(),
         });
 
-        if let Err(e) = self.jj_manager
+        if let Err(e) = self
+            .jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![
@@ -216,7 +218,8 @@ impl ComponentRepository {
         let repo_id = RepoId::Component(ComponentId(component_id.to_string()));
         let jj_path = format!("{}/{}", kind, name);
 
-        if let Err(e) = self.jj_manager
+        if let Err(e) = self
+            .jj_manager
             .ensure_and_commit(
                 &repo_id,
                 vec![(jj_path, data.to_vec())],

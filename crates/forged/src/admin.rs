@@ -90,8 +90,8 @@ async fn run_build_cleanup(settings: &Settings, older_than_days: u32) -> Result<
             )
         })?;
 
-    let cutoff = chrono::Utc::now().fixed_offset()
-        - chrono::Duration::days(i64::from(older_than_days));
+    let cutoff =
+        chrono::Utc::now().fixed_offset() - chrono::Duration::days(i64::from(older_than_days));
 
     let repo = Arc::new(BuildJobRepository::new(db));
     let deleted = repo
