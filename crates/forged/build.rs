@@ -8,7 +8,7 @@ fn main() {
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .compile_well_known_types(true)
         .build_server(true)
-        .build_client(false) // Server doesn't need client
+        .build_client(true) // Needed for e2e tests
         .protoc_arg("--experimental_allow_proto3_optional")
         .compile(&["proto/api_v2.proto"], &["proto"])
         .expect("failed to compile protos");

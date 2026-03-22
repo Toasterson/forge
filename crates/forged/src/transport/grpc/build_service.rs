@@ -6,6 +6,7 @@ use super::proto::{
     GetBuildStatusResponse, ListBuildsRequest, ListBuildsResponse, SourceArchiveInfo,
     SubmitBuildRequest, SubmitBuildResponse, Timestamp,
 };
+use crate::pagination::{decode_cursor, encode_cursor, resolve_page_size};
 use crate::repositories::{
     ApplicationBlobType, BlobRepository, ComponentRepository, SourceArchiveRepository,
 };
@@ -15,6 +16,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+
+/// Default page size for paginated list requests.
+const DEFAULT_PAGE_SIZE: u32 = 50;
+
+/// Maximum allowed page size for paginated list requests.
+const MAX_PAGE_SIZE: u32 = 1000;
 
 /// BuildService implementation
 /// Provides build manifests, blob streaming downloads, and build dispatch
@@ -336,7 +343,10 @@ impl BuildService for BuildServiceImpl {
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
-        let jobs = self
+        let page_size = resolve_page_size(req.page_size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        let cursor = decode_cursor(&req.page_token);
+
+        let all_jobs = self
             .build_dispatch
             .list_builds(&actor.actor_id, &component_id.id)
             .await
@@ -345,8 +355,33 @@ impl BuildService for BuildServiceImpl {
                 Status::internal(format!("Failed to list builds: {}", e))
             })?;
 
+        // Apply cursor-based pagination
+        let filtered: Vec<_> = if let Some(after) = cursor {
+            all_jobs
+                .into_iter()
+                .filter(|j| j.created_at.with_timezone(&chrono::Utc) > after)
+                .collect()
+        } else {
+            all_jobs
+        };
+
+        let has_more = filtered.len() > page_size as usize;
+        let jobs: Vec<_> = filtered
+            .into_iter()
+            .take(page_size as usize)
+            .collect();
+
+        let next_page_token = if has_more {
+            jobs.last()
+                .map(|j| encode_cursor(&j.created_at.with_timezone(&chrono::Utc)))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+
         Ok(Response::new(ListBuildsResponse {
             jobs: jobs.iter().map(Self::to_build_job_info).collect(),
+            next_page_token,
         }))
     }
 

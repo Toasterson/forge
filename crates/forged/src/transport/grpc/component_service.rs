@@ -8,10 +8,17 @@ use super::proto::{
     UpdateComponentResponse, UploadComponentFileRequest, UploadComponentFileResponse,
     UploadSourceArchiveRequest, UploadSourceArchiveResponse,
 };
+use crate::pagination::{decode_cursor, encode_cursor, resolve_page_size};
 use crate::repositories::{ApplicationBlobType, ComponentRepository, SourceArchiveRepository};
 use crate::services::RbacService;
 use std::sync::Arc;
 use tonic::{Request, Response, Status, Streaming};
+
+/// Default page size for paginated list requests.
+const DEFAULT_PAGE_SIZE: u32 = 50;
+
+/// Maximum allowed page size for paginated list requests.
+const MAX_PAGE_SIZE: u32 = 1000;
 
 /// Maximum allowed length for a name field (256 characters).
 const MAX_NAME_LEN: usize = 256;
@@ -457,6 +464,9 @@ impl ComponentService for ComponentServiceImpl {
             .component_id
             .ok_or_else(|| Status::invalid_argument("component_id is required"))?;
 
+        let page_size = resolve_page_size(req.page_size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        let cursor = decode_cursor(&req.page_token);
+
         // Check actor has ComponentRead permission
         let has_perm = self
             .rbac
@@ -469,7 +479,7 @@ impl ComponentService for ComponentServiceImpl {
             ));
         }
 
-        let archives = self
+        let all_archives = self
             .source_archive_repo
             .list_for_component(&component_id.id)
             .await
@@ -477,6 +487,31 @@ impl ComponentService for ComponentServiceImpl {
                 tracing::error!(error = %e, "Failed to list source archives");
                 Status::internal(format!("Failed to list source archives: {}", e))
             })?;
+
+        // Apply cursor-based pagination
+        let filtered: Vec<_> = if let Some(after) = cursor {
+            all_archives
+                .into_iter()
+                .filter(|a| a.created_at.with_timezone(&chrono::Utc) > after)
+                .collect()
+        } else {
+            all_archives
+        };
+
+        let has_more = filtered.len() > page_size as usize;
+        let archives: Vec<_> = filtered
+            .into_iter()
+            .take(page_size as usize)
+            .collect();
+
+        let next_page_token = if has_more {
+            archives
+                .last()
+                .map(|a| encode_cursor(&a.created_at.with_timezone(&chrono::Utc)))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
         let response = ListSourceArchivesResponse {
             archives: archives
@@ -491,6 +526,7 @@ impl ComponentService for ComponentServiceImpl {
                     created_at: Self::to_proto_timestamp(&a.created_at),
                 })
                 .collect(),
+            next_page_token,
         };
 
         Ok(Response::new(response))
@@ -516,6 +552,9 @@ impl ComponentService for ComponentServiceImpl {
             None
         };
 
+        let page_size = resolve_page_size(req.page_size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        let cursor = decode_cursor(&req.page_token);
+
         // Check actor has ComponentRead permission
         let has_perm = self
             .rbac
@@ -528,7 +567,7 @@ impl ComponentService for ComponentServiceImpl {
             ));
         }
 
-        let files = self
+        let all_files = self
             .component_repo
             .list_component_files(&component_id.id, kind)
             .await
@@ -536,6 +575,31 @@ impl ComponentService for ComponentServiceImpl {
                 tracing::error!(error = %e, "Failed to list component files");
                 Status::internal(format!("Failed to list component files: {}", e))
             })?;
+
+        // Apply cursor-based pagination
+        let filtered: Vec<_> = if let Some(after) = cursor {
+            all_files
+                .into_iter()
+                .filter(|f| f.created_at.with_timezone(&chrono::Utc) > after)
+                .collect()
+        } else {
+            all_files
+        };
+
+        let has_more = filtered.len() > page_size as usize;
+        let files: Vec<_> = filtered
+            .into_iter()
+            .take(page_size as usize)
+            .collect();
+
+        let next_page_token = if has_more {
+            files
+                .last()
+                .map(|f| encode_cursor(&f.created_at.with_timezone(&chrono::Utc)))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
         let response = ListComponentFilesResponse {
             files: files
@@ -551,6 +615,7 @@ impl ComponentService for ComponentServiceImpl {
                     created_at: Self::to_proto_timestamp(&f.created_at),
                 })
                 .collect(),
+            next_page_token,
         };
 
         Ok(Response::new(response))

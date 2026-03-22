@@ -180,28 +180,37 @@ message RemoveMemberResponse {
 message ListMembersRequest {
   ActorRef actor = 1;
   GateId gate_id = 2;
+  int32 page_size = 3;
+  string page_token = 4;
 }
 
 message ListMembersResponse {
   repeated GateMemberInfo members = 1;
+  string next_page_token = 2;
 }
 
 message ListComponentsRequest {
   ActorRef actor = 1;
   GateId gate_id = 2;
+  int32 page_size = 3;
+  string page_token = 4;
 }
 
 message ListComponentsResponse {
   repeated ComponentInfo components = 1;
+  string next_page_token = 2;
 }
 
 message ListGatesRequest {
   ActorRef actor = 1;
-  optional string owner_id = 2; // Filter by owner
+  optional string owner_id = 2;
+  int32 page_size = 3;
+  string page_token = 4;
 }
 
 message ListGatesResponse {
   repeated GateInfo gates = 1;
+  string next_page_token = 2;
 }
 
 message GateInfo {
@@ -320,20 +329,26 @@ message UploadComponentFileResponse {
 message ListSourceArchivesRequest {
   ActorRef actor = 1;
   ComponentId component_id = 2;
+  int32 page_size = 3;
+  string page_token = 4;
 }
 
 message ListSourceArchivesResponse {
   repeated SourceArchiveInfo archives = 1;
+  string next_page_token = 2;
 }
 
 message ListComponentFilesRequest {
   ActorRef actor = 1;
   ComponentId component_id = 2;
-  optional string kind = 3; // Filter by kind ("patch", "license", "script")
+  optional string kind = 3;
+  int32 page_size = 4;
+  string page_token = 5;
 }
 
 message ListComponentFilesResponse {
   repeated ComponentFileInfo files = 1;
+  string next_page_token = 2;
 }
 
 message ComponentInfo {
@@ -438,10 +453,13 @@ message GetBuildStatusResponse {
 
 message ListBuildsRequest {
   ComponentId component_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
 
 message ListBuildsResponse {
   repeated BuildJobInfo jobs = 1;
+  string next_page_token = 2;
 }
 
 message CancelBuildRequest {

@@ -6,10 +6,17 @@ use super::proto::{
     ListGatesResponse, ListMembersRequest, ListMembersResponse, RemoveMemberRequest,
     RemoveMemberResponse, Timestamp, UpdateGateRequest, UpdateGateResponse,
 };
+use crate::pagination::{decode_cursor, encode_cursor, resolve_page_size};
 use crate::repositories::{ComponentRepository, GateRepository};
 use crate::services::RbacService;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
+
+/// Default page size for paginated list requests.
+const DEFAULT_PAGE_SIZE: u32 = 50;
+
+/// Maximum allowed page size for paginated list requests.
+const MAX_PAGE_SIZE: u32 = 1000;
 
 /// Maximum allowed length for a name field (256 characters).
 const MAX_NAME_LEN: usize = 256;
@@ -334,6 +341,9 @@ impl GateService for GateServiceImpl {
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
+        let page_size = resolve_page_size(req.page_size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        let cursor = decode_cursor(&req.page_token);
+
         // Check actor has GateRead permission
         let has_perm = self
             .rbac
@@ -347,7 +357,7 @@ impl GateService for GateServiceImpl {
             ));
         }
 
-        let members = self
+        let all_members = self
             .gate_repo
             .list_members(&gate_id.id)
             .await
@@ -355,6 +365,31 @@ impl GateService for GateServiceImpl {
                 tracing::error!(error = %e, "Failed to list members");
                 Status::internal(format!("Failed to list members: {}", e))
             })?;
+
+        // Apply cursor-based pagination
+        let filtered: Vec<_> = if let Some(after) = cursor {
+            all_members
+                .into_iter()
+                .filter(|m| m.created_at.with_timezone(&chrono::Utc) > after)
+                .collect()
+        } else {
+            all_members
+        };
+
+        let has_more = filtered.len() > page_size as usize;
+        let members: Vec<_> = filtered
+            .into_iter()
+            .take(page_size as usize)
+            .collect();
+
+        let next_page_token = if has_more {
+            members
+                .last()
+                .map(|m| encode_cursor(&m.created_at.with_timezone(&chrono::Utc)))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
         let response = ListMembersResponse {
             members: members
@@ -383,6 +418,7 @@ impl GateService for GateServiceImpl {
                     created_at: Self::to_proto_timestamp(&m.created_at),
                 })
                 .collect(),
+            next_page_token,
         };
 
         Ok(Response::new(response))
@@ -399,6 +435,9 @@ impl GateService for GateServiceImpl {
             .gate_id
             .ok_or_else(|| Status::invalid_argument("gate_id is required"))?;
 
+        let page_size = resolve_page_size(req.page_size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        let cursor = decode_cursor(&req.page_token);
+
         // Check actor has GateRead permission
         let has_perm = self
             .rbac
@@ -412,7 +451,7 @@ impl GateService for GateServiceImpl {
             ));
         }
 
-        let components = self
+        let all_components = self
             .component_repo
             .list_by_gate(&gate_id.id)
             .await
@@ -420,6 +459,31 @@ impl GateService for GateServiceImpl {
                 tracing::error!(error = %e, "Failed to list components");
                 Status::internal(format!("Failed to list components: {}", e))
             })?;
+
+        // Apply cursor-based pagination
+        let filtered: Vec<_> = if let Some(after) = cursor {
+            all_components
+                .into_iter()
+                .filter(|c| c.created_at.with_timezone(&chrono::Utc) > after)
+                .collect()
+        } else {
+            all_components
+        };
+
+        let has_more = filtered.len() > page_size as usize;
+        let components: Vec<_> = filtered
+            .into_iter()
+            .take(page_size as usize)
+            .collect();
+
+        let next_page_token = if has_more {
+            components
+                .last()
+                .map(|c| encode_cursor(&c.created_at.with_timezone(&chrono::Utc)))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
         let response = ListComponentsResponse {
             components: components
@@ -433,6 +497,7 @@ impl GateService for GateServiceImpl {
                     updated_at: Self::to_proto_timestamp(&c.updated_at),
                 })
                 .collect(),
+            next_page_token,
         };
 
         Ok(Response::new(response))
@@ -445,9 +510,12 @@ impl GateService for GateServiceImpl {
         let _actor = extract_actor(&request)?;
         let req = request.into_inner();
 
+        let page_size = resolve_page_size(req.page_size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        let cursor = decode_cursor(&req.page_token);
+
         // List gates: if owner_id specified, filter by owner.
         // Otherwise list all gates the actor has access to.
-        let gates = if let Some(owner_id) = req.owner_id {
+        let all_gates = if let Some(owner_id) = req.owner_id {
             self.gate_repo.list_by_owner(&owner_id).await
         } else {
             self.gate_repo.list_all().await
@@ -456,6 +524,31 @@ impl GateService for GateServiceImpl {
             tracing::error!(error = %e, "Failed to list gates");
             Status::internal(format!("Failed to list gates: {}", e))
         })?;
+
+        // Apply cursor-based pagination
+        let filtered: Vec<_> = if let Some(after) = cursor {
+            all_gates
+                .into_iter()
+                .filter(|g| g.created_at.with_timezone(&chrono::Utc) > after)
+                .collect()
+        } else {
+            all_gates
+        };
+
+        let has_more = filtered.len() > page_size as usize;
+        let gates: Vec<_> = filtered
+            .into_iter()
+            .take(page_size as usize)
+            .collect();
+
+        let next_page_token = if has_more {
+            gates
+                .last()
+                .map(|g| encode_cursor(&g.created_at.with_timezone(&chrono::Utc)))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
         let response = ListGatesResponse {
             gates: gates
@@ -469,6 +562,7 @@ impl GateService for GateServiceImpl {
                     updated_at: Self::to_proto_timestamp(&g.updated_at),
                 })
                 .collect(),
+            next_page_token,
         };
 
         Ok(Response::new(response))

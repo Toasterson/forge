@@ -28,17 +28,18 @@ impl TestContext {
                     .unwrap_or_else(|_| "postgresql://forged:forged@localhost/forged_test".to_string())
                     .replace("/forged_test", &format!("/{}", test_db_name)),
                 max_connections: 5,
+                ..Default::default()
             },
             seaweedfs: forged::settings::SeaweedFsConfig {
                 master_url: std::env::var("TEST_SEAWEEDFS_URL")
                     .unwrap_or_else(|_| "http://localhost:9333".to_string()),
                 namespace: test_namespace.clone(),
+                ..Default::default()
             },
             jj_repos: forged::settings::JjReposConfig {
                 root: format!("./test_data/{}/jj-repos", test_db_name),
             },
-            oidc: Default::default(),
-            server: Default::default(),
+            ..Default::default()
         };
 
         let app_state = AppState::new(settings).await
