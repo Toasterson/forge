@@ -18,17 +18,18 @@ async fn test_database_connection() {
             url: std::env::var("TEST_DATABASE_URL")
                 .unwrap_or_else(|_| "postgresql://forged:forged@localhost/forged_test".to_string()),
             max_connections: 5,
+            ..Default::default()
         },
         seaweedfs: forged::settings::SeaweedFsConfig {
             master_url: std::env::var("TEST_SEAWEEDFS_URL")
                 .unwrap_or_else(|_| "http://localhost:9333".to_string()),
             namespace: "test".to_string(),
+            ..Default::default()
         },
         jj_repos: forged::settings::JjReposConfig {
             root: "./test_data/jj-repos".to_string(),
         },
-        oidc: Default::default(),
-        server: Default::default(),
+        ..Default::default()
     };
 
     // This will run migrations
@@ -248,17 +249,18 @@ async fn setup_test_app_state() -> AppState {
             url: std::env::var("TEST_DATABASE_URL")
                 .unwrap_or_else(|_| "postgresql://forged:forged@localhost/forged_test".to_string()),
             max_connections: 5,
+            ..Default::default()
         },
         seaweedfs: forged::settings::SeaweedFsConfig {
             master_url: std::env::var("TEST_SEAWEEDFS_URL")
                 .unwrap_or_else(|_| "http://localhost:9333".to_string()),
             namespace: "test".to_string(),
+            ..Default::default()
         },
         jj_repos: forged::settings::JjReposConfig {
             root: "./test_data/jj-repos".to_string(),
         },
-        oidc: Default::default(),
-        server: Default::default(),
+        ..Default::default()
     };
 
     AppState::new(settings)
