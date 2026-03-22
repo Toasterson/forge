@@ -22,19 +22,10 @@ Forge requires four backing services:
 
 ## 1. Install PostgreSQL
 
-OpenIndiana ships PostgreSQL in the repository:
+OpenIndiana ships PostgreSQL in the repository. The service comes with the data directory already initialized and local password authentication pre-configured:
 
 ```bash
 sudo pkg install database/postgres-17
-```
-
-### Initialize the Database
-
-```bash
-# Initialize the data directory
-sudo -u postgres /usr/postgres/17/bin/initdb -D /var/postgres/17/data
-
-# Enable and start the service
 sudo svcadm enable postgresql:version_17
 ```
 
@@ -48,22 +39,6 @@ GRANT ALL PRIVILEGES ON DATABASE forged TO forged;
 SQL
 ```
 
-### Configure PostgreSQL for Local Connections
-
-Edit `/var/postgres/17/data/pg_hba.conf` to allow password authentication for the `forged` user:
-
-```
-# TYPE  DATABASE  USER   ADDRESS        METHOD
-host    forged    forged 127.0.0.1/32   scram-sha-256
-host    forged    forged ::1/128        scram-sha-256
-```
-
-Reload the configuration:
-
-```bash
-sudo svcadm refresh postgresql:version_17
-```
-
 ### Verify
 
 ```bash
@@ -72,95 +47,17 @@ psql -U forged -h localhost -d forged -c "SELECT 1;"
 
 ## 2. Install SeaweedFS
 
-SeaweedFS is not packaged for OpenIndiana. Download the latest release binary:
+OpenIndiana provides SeaweedFS as a package:
 
 ```bash
-# Download SeaweedFS
-curl -L -o /tmp/seaweedfs.tar.gz \
-  https://github.com/seaweedfs/seaweedfs/releases/latest/download/linux_amd64.tar.gz
-
-# Extract (SeaweedFS provides a single binary called 'weed')
-sudo mkdir -p /opt/seaweedfs/bin
-cd /tmp && tar xzf seaweedfs.tar.gz
-sudo cp weed /opt/seaweedfs/bin/
-sudo chmod +x /opt/seaweedfs/bin/weed
+sudo pkg install network/seaweedfs
 ```
 
-> **Note**: SeaweedFS provides illumos/Solaris binaries for some releases. Check the releases page for `solaris_amd64` builds. If unavailable, build from source with Go or use a Linux binary under an lx-branded zone.
+This installs the `weed` binary and sets up the SMF services for the master and volume servers.
 
-### Create Data Directories
+### Enable the Services
 
 ```bash
-sudo mkdir -p /var/seaweedfs/master /var/seaweedfs/volume
-sudo useradd -d /var/seaweedfs -s /usr/bin/false seaweedfs
-sudo chown -R seaweedfs:seaweedfs /var/seaweedfs
-```
-
-### Create SMF Manifests
-
-**SeaweedFS Master** -- `/opt/seaweedfs/smf/master.xml`:
-
-```xml
-<?xml version="1.0"?>
-<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
-<service_bundle type="manifest" name="seaweedfs-master">
-  <service name="application/seaweedfs/master" type="service" version="1">
-    <create_default_instance enabled="true"/>
-    <single_instance/>
-    <dependency name="network" grouping="require_all"
-                restart_on="error" type="service">
-      <service_fmri value="svc:/milestone/network:default"/>
-    </dependency>
-    <exec_method type="method" name="start"
-      exec="/opt/seaweedfs/bin/weed master -mdir=/var/seaweedfs/master -ip=127.0.0.1 -port=9333"
-      timeout_seconds="30">
-      <method_context>
-        <method_credential user="seaweedfs" group="seaweedfs"/>
-      </method_context>
-    </exec_method>
-    <exec_method type="method" name="stop" exec=":kill" timeout_seconds="30"/>
-    <stability value="Unstable"/>
-    <template>
-      <common_name><loctext xml:lang="C">SeaweedFS Master</loctext></common_name>
-    </template>
-  </service>
-</service_bundle>
-```
-
-**SeaweedFS Volume** -- `/opt/seaweedfs/smf/volume.xml`:
-
-```xml
-<?xml version="1.0"?>
-<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
-<service_bundle type="manifest" name="seaweedfs-volume">
-  <service name="application/seaweedfs/volume" type="service" version="1">
-    <create_default_instance enabled="true"/>
-    <single_instance/>
-    <dependency name="master" grouping="require_all"
-                restart_on="error" type="service">
-      <service_fmri value="svc:/application/seaweedfs/master:default"/>
-    </dependency>
-    <exec_method type="method" name="start"
-      exec="/opt/seaweedfs/bin/weed volume -mserver=127.0.0.1:9333 -port=8080 -dir=/var/seaweedfs/volume"
-      timeout_seconds="30">
-      <method_context>
-        <method_credential user="seaweedfs" group="seaweedfs"/>
-      </method_context>
-    </exec_method>
-    <exec_method type="method" name="stop" exec=":kill" timeout_seconds="30"/>
-    <stability value="Unstable"/>
-    <template>
-      <common_name><loctext xml:lang="C">SeaweedFS Volume Server</loctext></common_name>
-    </template>
-  </service>
-</service_bundle>
-```
-
-### Import and Enable
-
-```bash
-sudo svccfg import /opt/seaweedfs/smf/master.xml
-sudo svccfg import /opt/seaweedfs/smf/volume.xml
 sudo svcadm enable seaweedfs/master
 sudo svcadm enable seaweedfs/volume
 ```
@@ -196,8 +93,8 @@ cd /opt/rabbitmq && sudo tar xJf /tmp/rabbitmq.tar.xz --strip-components=1
 
 ```bash
 sudo useradd -d /var/rabbitmq -s /usr/bin/false rabbitmq
-sudo mkdir -p /var/rabbitmq
-sudo chown rabbitmq:rabbitmq /var/rabbitmq
+sudo mkdir -p /var/rabbitmq /var/log/rabbitmq
+sudo chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
 ```
 
 ### Create SMF Manifest
@@ -248,9 +145,6 @@ sudo chown rabbitmq:rabbitmq /var/rabbitmq
 ### Import, Enable, and Configure
 
 ```bash
-sudo mkdir -p /var/log/rabbitmq
-sudo chown rabbitmq:rabbitmq /var/log/rabbitmq
-
 sudo svccfg import /opt/rabbitmq/smf/rabbitmq.xml
 sudo svcadm enable rabbitmq
 
@@ -472,8 +366,8 @@ Expected output:
 
 ```
 online  svc:/application/database/postgresql:version_17
-online  svc:/application/seaweedfs/master:default
-online  svc:/application/seaweedfs/volume:default
+online  svc:/network/seaweedfs/master:default
+online  svc:/network/seaweedfs/volume:default
 online  svc:/application/rabbitmq:default
 online  svc:/application/forge/forged:default
 ```
