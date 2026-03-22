@@ -1,6 +1,6 @@
 use crate::entities::{component, gate, gate_member};
 use crate::repositories::{ComponentRepository, GateRepository};
-use crate::services::{GatePermission, RbacService};
+use crate::services::{RbacService, ServerPermission};
 use miette::{Context, Result};
 use std::sync::Arc;
 
@@ -33,6 +33,18 @@ impl GateManager {
         name: String,
         gate_kdl: String,
     ) -> Result<gate::Model> {
+        // Check server-level permission to create gates
+        let can_create = self
+            .rbac
+            .check_server_permission(actor_id, ServerPermission::GateCreate)
+            .await?;
+        if !can_create {
+            return Err(miette::miette!(
+                "You do not have permission to create gates.\n\
+                 Ask a server administrator to grant you the gate_create permission."
+            ));
+        }
+
         // Validate gate KDL before creating
         validate_gate_kdl(&name, &gate_kdl)?;
 

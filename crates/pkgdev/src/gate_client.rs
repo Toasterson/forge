@@ -1,8 +1,8 @@
 use crate::api::forged::api::v1 as api;
+use crate::auth::authenticated_request;
 use miette::Diagnostic;
 use thiserror::Error;
 use tonic::transport::Channel;
-use tonic::Request;
 
 #[derive(Error, Debug, Diagnostic)]
 #[diagnostic(code(ips::gate_error), help("check server address and parameters"))]
@@ -42,28 +42,34 @@ impl GateClient {
         api::gate_service_client::GateServiceClient::new(self.channel.clone())
     }
 
-    pub async fn create_gate(&self, gate: api::Gate) -> Result<api::Gate> {
+    pub async fn create_gate(&self, gate: api::Gate, token: &str) -> Result<api::Gate> {
         let req = api::CreateGateRequest { gate: Some(gate) };
         let mut c = self.client();
-        let resp = c.create_gate(Request::new(req)).await?;
+        let resp = c.create_gate(authenticated_request(req, token)).await?;
         Ok(resp.into_inner().gate.unwrap_or_default())
     }
 
-    pub async fn list_gates(&self) -> Result<Vec<api::Gate>> {
+    pub async fn list_gates(&self, token: &str) -> Result<Vec<api::Gate>> {
         let mut c = self.client();
         let resp = c
-            .list_gates(Request::new(api::ListGatesRequest {
-                page_size: 0,
-                page_token: String::new(),
-            }))
+            .list_gates(authenticated_request(
+                api::ListGatesRequest {
+                    page_size: 0,
+                    page_token: String::new(),
+                },
+                token,
+            ))
             .await?;
         Ok(resp.into_inner().gates)
     }
 
-    pub async fn get_gate(&self, id: &str) -> Result<Option<api::Gate>> {
+    pub async fn get_gate(&self, id: &str, token: &str) -> Result<Option<api::Gate>> {
         let mut c = self.client();
         let resp = c
-            .get_gate(Request::new(api::GetGateRequest { id: id.to_string() }))
+            .get_gate(authenticated_request(
+                api::GetGateRequest { id: id.to_string() },
+                token,
+            ))
             .await;
         match resp {
             Ok(r) => Ok(r.into_inner().gate),

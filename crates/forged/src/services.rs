@@ -14,4 +14,7 @@ pub use build_report_consumer::BuildReportConsumer;
 pub use component_manager::ComponentManager;
 pub use gate_manager::GateManager;
 pub use oidc_service::OidcService;
-pub use rbac_service::{role_defaults, ComponentPermission, GatePermission, RbacService};
+pub use rbac_service::{
+    role_defaults, server_role_defaults, ComponentPermission, GatePermission, RbacService,
+    ServerPermission, ServerRole,
+};

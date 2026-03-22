@@ -3,5 +3,6 @@
 pub mod forged {
     pub mod api {
         pub use forged_client::api::forged::api::v1;
+        pub use forged_client::api::forged::api::v2;
     }
 }

@@ -32,6 +32,16 @@ impl AuthService {
         }
     }
 
+    /// Get the configured OIDC issuer URL.
+    pub fn oidc_issuer_url(&self) -> &str {
+        self.oidc.issuer_url()
+    }
+
+    /// Get the configured OIDC client ID.
+    pub fn oidc_client_id(&self) -> &str {
+        self.oidc.client_id()
+    }
+
     /// Authenticate via OIDC token: validate, then create or update the actor.
     pub async fn authenticate_oidc(&self, token: &str) -> Result<actor::Model> {
         let claims = self.oidc.validate_token(token).await?;
@@ -60,14 +70,7 @@ impl AuthService {
         key_id: String,
     ) -> Result<(actor::Model, String)> {
         // 1. Parse SSH public key (validate it's a valid OpenSSH key)
-        let ssh_pubkey = ssh_key::PublicKey::from_openssh(public_key_str)
-            .into_diagnostic()
-            .wrap_err(
-                "Failed to parse SSH public key.\n\
-                 Ensure the key is in OpenSSH format (e.g. 'ssh-ed25519 AAAA...').\n\
-                 Supported algorithms: Ed25519, RSA.",
-            )?;
-
+        let ssh_pubkey = parse_ssh_public_key(public_key_str)?;
         let algorithm = ssh_pubkey.algorithm().to_string();
 
         // 2. Generate a random challenge
@@ -153,6 +156,22 @@ impl AuthService {
         Ok(confirmed)
     }
 
+    /// Add an SSH key to an OIDC-authenticated actor.
+    ///
+    /// Validates the SSH public key format, then stores it for the given actor.
+    /// No proof signature is required because the caller is already authenticated
+    /// via OIDC bearer token.
+    pub async fn add_ssh_key(&self, actor_id: &str, key_id: &str, public_key_str: &str) -> Result<()> {
+        let ssh_pubkey = parse_ssh_public_key(public_key_str)?;
+        let algorithm = ssh_pubkey.algorithm().to_string();
+
+        self.actor_repo
+            .add_key(actor_id, key_id.to_string(), algorithm, public_key_str.to_string())
+            .await?;
+
+        Ok(())
+    }
+
     /// Add a new SSH key to an existing (confirmed) actor.
     ///
     /// Requires a proof signature: the caller signs a challenge with an existing key
@@ -186,13 +205,7 @@ impl AuthService {
         )?;
 
         // 3. Parse and store the new key
-        let ssh_pubkey = ssh_key::PublicKey::from_openssh(public_key_str)
-            .into_diagnostic()
-            .wrap_err(
-                "Failed to parse the new SSH public key.\n\
-                 Ensure the key is in OpenSSH format (e.g. 'ssh-ed25519 AAAA...').",
-            )?;
-
+        let ssh_pubkey = parse_ssh_public_key(public_key_str)?;
         let algorithm = ssh_pubkey.algorithm().to_string();
 
         self.actor_repo
@@ -260,6 +273,17 @@ impl AuthService {
         tracing::info!(to = %to_email, "Sent registration confirmation email");
         Ok(())
     }
+}
+
+/// Parse and validate an SSH public key in OpenSSH format.
+fn parse_ssh_public_key(public_key_str: &str) -> Result<ssh_key::PublicKey> {
+    ssh_key::PublicKey::from_openssh(public_key_str)
+        .into_diagnostic()
+        .wrap_err(
+            "Failed to parse SSH public key.\n\
+             Ensure the key is in OpenSSH format (e.g. 'ssh-ed25519 AAAA...').\n\
+             Supported algorithms: Ed25519, RSA.",
+        )
 }
 
 /// Generate a cryptographically random challenge string.

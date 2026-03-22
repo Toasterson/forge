@@ -138,7 +138,11 @@ impl AppState {
             settings.smtp.url.clone(),
         ));
 
-        let rbac = Arc::new(RbacService::new(gate_repo.clone(), component_repo.clone()));
+        let rbac = Arc::new(RbacService::new(
+            gate_repo.clone(),
+            component_repo.clone(),
+            db.clone(),
+        ));
 
         let gate_manager = Arc::new(GateManager::new(
             gate_repo.clone(),

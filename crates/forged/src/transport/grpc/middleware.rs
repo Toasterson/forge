@@ -13,12 +13,12 @@ pub struct AuthenticatedActor {
 
 /// gRPC paths that do not require authentication.
 ///
-/// RegisterActor and RegistrationConfirmation are public RPCs
-/// that must be accessible without a bearer token.
+/// GetAuthConfig and IssueToken are public RPCs.
+/// RegistrationConfirmation is kept public but returns UNIMPLEMENTED.
 const UNAUTHENTICATED_METHODS: &[&str] = &[
-    "/forged.api.v2.AuthService/RegisterActor",
     "/forged.api.v2.AuthService/RegistrationConfirmation",
     "/forged.api.v2.AuthService/IssueToken",
+    "/forged.api.v2.AuthService/GetAuthConfig",
 ];
 
 /// Extract the authenticated actor from request extensions.

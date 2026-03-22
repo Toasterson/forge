@@ -7,6 +7,7 @@ pub mod component_file;
 pub mod gate;
 pub mod gate_member;
 pub mod operation;
+pub mod server_member;
 pub mod source_archive;
 
 pub use actor::Entity as Actor;
@@ -18,4 +19,5 @@ pub use component_file::Entity as ComponentFile;
 pub use gate::Entity as Gate;
 pub use gate_member::Entity as GateMember;
 pub use operation::Entity as Operation;
+pub use server_member::Entity as ServerMember;
 pub use source_archive::Entity as SourceArchive;

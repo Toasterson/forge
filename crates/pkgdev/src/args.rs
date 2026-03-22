@@ -18,7 +18,8 @@ use repology::MetadataBuilder;
 use strum::Display;
 
 use crate::auth::{
-    default_auth_state_path, server_url_from_host, ActorKind, AuthClient, AuthState, LoginEntry,
+    default_auth_state_path, get_valid_token, login_device_flow, print_token_status,
+    server_url_from_host, ActorKind, AuthClient, AuthState, LoginEntry, TokenStore,
 };
 use crate::component_client::ComponentClient;
 use crate::gate_client::GateClient;
@@ -235,7 +236,30 @@ pub enum ForgeCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum AuthCmd {
-    /// Register a new actor with their SSH public key on a forge
+    /// Authenticate with a forge server using OAuth 2.0 Device Authorization Grant (RFC 8628).
+    /// Opens the OIDC provider in your browser for interactive login.
+    Login {
+        /// Forge hostname (or hostname:port) to authenticate against
+        #[arg(long)]
+        host: String,
+        /// Also select this login as the default context for future commands
+        #[arg(long)]
+        select: bool,
+    },
+    /// Show the current token status for stored OAuth sessions
+    Status {
+        /// Forge hostname (or hostname:port). Shows all hosts if omitted.
+        #[arg(long)]
+        host: Option<String>,
+    },
+    /// Remove stored OAuth tokens for a forge host (log out)
+    Logout {
+        /// Forge hostname (or hostname:port) to remove tokens for
+        #[arg(long)]
+        host: String,
+    },
+    /// Register a new actor with their SSH public key on a forge.
+    /// Requires an active OAuth session (run 'auth login' first).
     Register {
         /// Forge hostname (or hostname:port) to talk to (gRPC)
         #[arg(long)]
@@ -272,20 +296,8 @@ pub enum AuthCmd {
         identity: Option<PathBuf>,
         /// After confirming, record a local login for this host/actor
         #[arg(long)]
-        login: bool,
+        set_login: bool,
         /// Also select this login as the default context
-        #[arg(long)]
-        select: bool,
-    },
-    /// Mark yourself as logged in for a given forge/actor locally
-    Login {
-        #[arg(long)]
-        host: String,
-        #[arg(long)]
-        actor_id: String,
-        #[arg(long, value_enum, default_value_t = ActorKind::User)]
-        kind: ActorKind,
-        /// Select this login as the default context for future commands
         #[arg(long)]
         select: bool,
     },
@@ -362,6 +374,55 @@ pub async fn run(args: Args) -> miette::Result<()> {
 
     match args.command {
         Commands::Auth { cmd } => match cmd {
+            AuthCmd::Login { host, select } => {
+                let token_set = login_device_flow(&host)
+                    .await
+                    .wrap_err("device authorization flow failed")?;
+
+                // Store the token
+                let mut store = TokenStore::load();
+                store.set(host.clone(), token_set);
+                store.save().wrap_err("failed to save token")?;
+
+                // Optionally select this host as default context
+                if select {
+                    let path = default_auth_state_path();
+                    let mut state =
+                        AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
+                            format!("failed to load auth state from {}", path.display())
+                        })?;
+                    // Record a login entry (actor_id comes from the OIDC flow;
+                    // we use the host as a placeholder until the user registers)
+                    state.add_login(
+                        &host,
+                        LoginEntry {
+                            actor_id: host.clone(),
+                            kind: ActorKind::User,
+                        },
+                    );
+                    state.set_selected(host.clone(), host.clone(), ActorKind::User);
+                    state.save(&path).into_diagnostic().wrap_err_with(|| {
+                        format!("failed to save auth state to {}", path.display())
+                    })?;
+                }
+
+                println!("authenticated successfully on {}", host);
+                Ok(())
+            }
+            AuthCmd::Status { host } => {
+                print_token_status(host.as_deref());
+                Ok(())
+            }
+            AuthCmd::Logout { host } => {
+                let mut store = TokenStore::load();
+                if store.remove(&host).is_some() {
+                    store.save().wrap_err("failed to save token store")?;
+                    println!("logged out from {}", host);
+                } else {
+                    println!("no stored token for host '{}'", host);
+                }
+                Ok(())
+            }
             AuthCmd::Register {
                 host,
                 actor_id,
@@ -370,12 +431,17 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 public_key,
                 algorithm,
             } => {
+                // Verify we have a valid token for this host
+                let token = get_valid_token(&host)
+                    .await
+                    .wrap_err("authentication required before registration")?;
+
                 let url = server_url_from_host(&host);
                 let client = AuthClient::connect(url)
                     .await
                     .wrap_err("failed to connect to forge host")?;
                 client
-                    .register_actor(actor_id, email, kind, &public_key, algorithm)
+                    .register_actor(actor_id, email, kind, &public_key, algorithm, &token)
                     .await
                     .wrap_err("registration RPC failed")?;
                 println!("registration submitted on {}", host);
@@ -387,9 +453,12 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 kind,
                 envelope,
                 identity,
-                login,
+                set_login,
                 select,
             } => {
+                let token = get_valid_token(&host)
+                    .await
+                    .wrap_err("authentication required before confirmation")?;
                 let url = server_url_from_host(&host);
                 let client = AuthClient::connect(url)
                     .await
@@ -405,18 +474,19 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         kind,
                         &envelope,
                         &identity_path,
+                        &token,
                     )
                     .await
                     .wrap_err("confirmation RPC failed (decrypt)")?;
 
                 // Optionally record login and select context
-                if login || select {
+                if set_login || select {
                     let path = default_auth_state_path();
                     let mut state =
                         AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
                             format!("failed to load auth state from {}", path.display())
                         })?;
-                    if login {
+                    if set_login {
                         state.add_login(
                             &host,
                             LoginEntry {
@@ -433,43 +503,6 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     })?;
                 }
                 println!("registration confirmation sent on {}", host);
-                Ok(())
-            }
-            AuthCmd::Login {
-                host,
-                actor_id,
-                kind,
-                select,
-            } => {
-                let path = default_auth_state_path();
-                let mut state = AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
-                    format!("failed to load auth state from {}", path.display())
-                })?;
-                state.add_login(
-                    &host,
-                    LoginEntry {
-                        actor_id: actor_id.clone(),
-                        kind,
-                    },
-                );
-                if select {
-                    state.set_selected(host.clone(), actor_id.clone(), kind);
-                }
-                state
-                    .save(&path)
-                    .into_diagnostic()
-                    .wrap_err_with(|| format!("failed to save auth state to {}", path.display()))?;
-                println!(
-                    "logged in as '{}' ({:?}) on host '{}'{}",
-                    actor_id,
-                    kind,
-                    host,
-                    if select {
-                        " and selected as default"
-                    } else {
-                        ""
-                    }
-                );
                 Ok(())
             }
             AuthCmd::List { host } => {
@@ -518,13 +551,11 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     .any(|e| e.actor_id == actor_id && e.kind == kind);
                 if !exists {
                     return Err(miette::miette!(
-                        "no such login for host '{}': {} ({:?}). Use 'pkgdev auth login --host {} --actor-id {} --kind {}' first",
+                        "no such login for host '{}': {} ({:?}). Use 'pkgdev auth login --host {}' first",
                         host,
                         actor_id,
                         kind,
                         host,
-                        actor_id,
-                        match kind { ActorKind::User => "user", ActorKind::Service => "service" }
                     ));
                 }
                 state.set_selected(host.clone(), actor_id.clone(), kind);
@@ -550,6 +581,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         owner_kind,
                     } => {
                         let host = resolve_host_or_selected(host)?;
+                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
@@ -565,7 +597,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             members: vec![],
                         };
                         let created = client
-                            .create_gate(gate)
+                            .create_gate(gate, &token)
                             .await
                             .wrap_err("create gate RPC failed")?;
                         println!("gate '{}' created on {}", created.id, host);
@@ -580,6 +612,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             return Err(miette::miette!("--gate must be provided for 'forge gate upload' or run in a gate directory"));
                         };
                         let host = resolve_host_or_selected(host)?;
+                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
@@ -596,7 +629,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             members: vec![],
                         };
                         let created = client
-                            .create_gate(gate_msg)
+                            .create_gate(gate_msg, &token)
                             .await
                             .wrap_err("upload gate RPC failed")?;
                         println!("gate '{}' uploaded to {}", created.id, host);
@@ -604,12 +637,13 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     }
                     GateCmd::List { host, no_header } => {
                         let host = resolve_host_or_selected(host)?;
+                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
                             .wrap_err("failed to connect to forge host")?;
                         let gates = client
-                            .list_gates()
+                            .list_gates(&token)
                             .await
                             .wrap_err("list gates RPC failed")?;
                         if gates.is_empty() {
@@ -631,11 +665,12 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     }
                     GateCmd::Show { host, id } => {
                         let host = resolve_host_or_selected(host)?;
+                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
                             .wrap_err("failed to connect to forge host")?;
-                        match client.get_gate(&id).await.wrap_err("get gate RPC failed")? {
+                        match client.get_gate(&id, &token).await.wrap_err("get gate RPC failed")? {
                             None => {
                                 println!("gate '{}' not found on {}", id, host);
                             }
@@ -679,6 +714,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     match cmd {
                         ComponentCmd::Create { host, id, name } => {
                             let host = resolve_host_or_selected(host)?;
+                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
@@ -690,7 +726,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                                 base_json: String::new(),
                             };
                             let created = client
-                                .create_component(comp)
+                                .create_component(comp, &token)
                                 .await
                                 .wrap_err("create component RPC failed")?;
                             println!("component '{}' created on {}", created.id, host);
@@ -698,6 +734,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         }
                         ComponentCmd::Upload { host, component } => {
                             let host = resolve_host_or_selected(host)?;
+                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
@@ -715,7 +752,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                                 base_json,
                             };
                             let created = client
-                                .create_component(comp_msg)
+                                .create_component(comp_msg, &token)
                                 .await
                                 .wrap_err("upload component RPC failed")?;
                             println!("component '{}' uploaded to {}", created.id, host);
@@ -723,12 +760,13 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         }
                         ComponentCmd::List { host, no_header } => {
                             let host = resolve_host_or_selected(host)?;
+                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
                                 .wrap_err("failed to connect to forge host")?;
                             let components = client
-                                .list_components()
+                                .list_components(&token)
                                 .await
                                 .wrap_err("list components RPC failed")?;
                             if components.is_empty() {
@@ -745,13 +783,14 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         }
                         ComponentCmd::Show { host, id } => {
                             let host = resolve_host_or_selected(host)?;
+                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
                                 .wrap_err("failed to connect to forge host")?;
 
                             let remote = client
-                                .get_component(&id)
+                                .get_component(&id, &token)
                                 .await
                                 .wrap_err("get component RPC failed")?;
 

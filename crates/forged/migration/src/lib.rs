@@ -3,6 +3,7 @@ pub use sea_orm_migration::prelude::*;
 mod m20260120_000001_create_initial_schema;
 mod m20260216_000001_add_actor_keys;
 mod m20260216_000002_create_build_jobs;
+mod m20260323_000001_create_server_member;
 
 pub struct Migrator;
 
@@ -13,6 +14,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260120_000001_create_initial_schema::Migration),
             Box::new(m20260216_000001_add_actor_keys::Migration),
             Box::new(m20260216_000002_create_build_jobs::Migration),
+            Box::new(m20260323_000001_create_server_member::Migration),
         ]
     }
 }

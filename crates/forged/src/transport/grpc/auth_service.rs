@@ -1,9 +1,10 @@
 use super::proto::{
     auth_service_server::AuthService, ActorRef, AddActorKeyRequest, AddActorKeyResponse,
-    AuthenticateRequest, AuthenticateResponse, IssueTokenRequest, IssueTokenResponse,
-    RegisterActorRequest, RegisterActorResponse, RegistrationConfirmationRequest,
-    RegistrationConfirmationResponse,
+    AuthenticateRequest, AuthenticateResponse, GetAuthConfigRequest, GetAuthConfigResponse,
+    IssueTokenRequest, IssueTokenResponse, RegisterActorRequest, RegisterActorResponse,
+    RegistrationConfirmationRequest, RegistrationConfirmationResponse,
 };
+use super::middleware::extract_actor;
 use crate::services::AuthService as AuthServiceLogic;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
@@ -60,11 +61,14 @@ impl AuthService for AuthServiceImpl {
         &self,
         request: Request<RegisterActorRequest>,
     ) -> Result<Response<RegisterActorResponse>, Status> {
+        // Requires OIDC authentication — the middleware injects the authenticated actor
+        let authenticated = extract_actor(&request)?;
         let req = request.into_inner();
 
-        if req.display_name.is_empty() || req.email.is_empty() || req.public_key.is_empty() {
+        if req.public_key.is_empty() {
             return Err(Status::invalid_argument(
-                "display_name, email, and public_key are required for registration.",
+                "public_key is required.\n\
+                 Provide an SSH public key in OpenSSH format (e.g. 'ssh-ed25519 AAAA...').",
             ));
         }
 
@@ -74,49 +78,37 @@ impl AuthService for AuthServiceImpl {
             req.key_id
         };
 
-        let (actor, envelope) = self
-            .auth
-            .register_actor(req.display_name, req.email, &req.public_key, key_id)
+        self.auth
+            .add_ssh_key(&authenticated.actor_id, &key_id, &req.public_key)
             .await
             .map_err(|e| {
-                tracing::warn!(error = %e, "Actor registration failed");
+                tracing::warn!(error = %e, actor_id = %authenticated.actor_id, "SSH key registration failed");
                 Status::internal(format!("{}", e))
             })?;
 
+        tracing::info!(
+            actor_id = %authenticated.actor_id,
+            key_id = %key_id,
+            "SSH key registered for OIDC-authenticated actor"
+        );
+
         Ok(Response::new(RegisterActorResponse {
             actor: Some(ActorRef {
-                id: actor.id,
-                kind: actor.kind,
+                id: authenticated.actor_id,
+                kind: "user".to_string(),
             }),
-            confirmation_envelope: envelope,
+            confirmation_envelope: String::new(),
         }))
     }
 
     async fn registration_confirmation(
         &self,
-        request: Request<RegistrationConfirmationRequest>,
+        _request: Request<RegistrationConfirmationRequest>,
     ) -> Result<Response<RegistrationConfirmationResponse>, Status> {
-        let req = request.into_inner();
-
-        if req.actor_id.is_empty() || req.decrypted_challenge.is_empty() {
-            return Err(Status::invalid_argument(
-                "actor_id and decrypted_challenge are required.",
-            ));
-        }
-
-        let actor = self
-            .auth
-            .confirm_registration(&req.actor_id, &req.decrypted_challenge)
-            .await
-            .map_err(|e| {
-                tracing::warn!(error = %e, "Registration confirmation failed");
-                Status::permission_denied(format!("{}", e))
-            })?;
-
-        Ok(Response::new(RegistrationConfirmationResponse {
-            confirmed: true,
-            display_name: actor.display_name,
-        }))
+        Err(Status::unimplemented(
+            "Registration confirmation is no longer required.\n\
+             SSH keys are now added to OIDC-authenticated accounts directly via RegisterActor.",
+        ))
     }
 
     async fn add_actor_key(
@@ -183,5 +175,15 @@ impl AuthService for AuthServiceImpl {
              Configure your OIDC provider and obtain a token from it.\n\
              See: https://forge.example.com/docs/auth for setup instructions.",
         ))
+    }
+
+    async fn get_auth_config(
+        &self,
+        _request: Request<GetAuthConfigRequest>,
+    ) -> Result<Response<GetAuthConfigResponse>, Status> {
+        Ok(Response::new(GetAuthConfigResponse {
+            issuer_url: self.auth.oidc_issuer_url().to_string(),
+            client_id: self.auth.oidc_client_id().to_string(),
+        }))
     }
 }

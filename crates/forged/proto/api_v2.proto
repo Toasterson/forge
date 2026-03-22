@@ -44,6 +44,9 @@ service AuthService {
 
   // Token issuance is handled by the OIDC provider, not forged
   rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
+
+  // Return OIDC configuration for client-side device flow
+  rpc GetAuthConfig(GetAuthConfigRequest) returns (GetAuthConfigResponse);
 }
 
 message AuthenticateRequest {
@@ -96,6 +99,12 @@ message IssueTokenRequest {
 
 message IssueTokenResponse {
   // Intentionally empty — this RPC always returns UNIMPLEMENTED
+}
+
+message GetAuthConfigRequest {}
+message GetAuthConfigResponse {
+  string issuer_url = 1;
+  string client_id = 2;
 }
 
 // ========== Gate Service ==========

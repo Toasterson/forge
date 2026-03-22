@@ -1,8 +1,8 @@
 use crate::api::forged::api::v1 as api;
+use crate::auth::authenticated_request;
 use miette::Diagnostic;
 use thiserror::Error;
 use tonic::transport::Channel;
-use tonic::Request;
 
 #[derive(Error, Debug, Diagnostic)]
 #[diagnostic(
@@ -45,32 +45,44 @@ impl ComponentClient {
         api::component_service_client::ComponentServiceClient::new(self.channel.clone())
     }
 
-    pub async fn create_component(&self, component: api::Component) -> Result<api::Component> {
+    pub async fn create_component(
+        &self,
+        component: api::Component,
+        token: &str,
+    ) -> Result<api::Component> {
         let req = api::CreateComponentRequest {
             component: Some(component),
         };
         let mut c = self.client();
-        let resp = c.create_component(Request::new(req)).await?;
+        let resp = c
+            .create_component(authenticated_request(req, token))
+            .await?;
         Ok(resp.into_inner().component.unwrap_or_default())
     }
 
-    pub async fn list_components(&self) -> Result<Vec<api::Component>> {
+    pub async fn list_components(&self, token: &str) -> Result<Vec<api::Component>> {
         let mut c = self.client();
         let resp = c
-            .list_components(Request::new(api::ListComponentsRequest {
-                page_size: 0,
-                page_token: String::new(),
-            }))
+            .list_components(authenticated_request(
+                api::ListComponentsRequest {
+                    page_size: 0,
+                    page_token: String::new(),
+                },
+                token,
+            ))
             .await?;
         Ok(resp.into_inner().components)
     }
 
-    pub async fn get_component(&self, id: &str) -> Result<Option<api::Component>> {
+    pub async fn get_component(&self, id: &str, token: &str) -> Result<Option<api::Component>> {
         let mut c = self.client();
         let resp = c
-            .get_component(Request::new(api::GetComponentRequest {
-                id: id.to_string(),
-            }))
+            .get_component(authenticated_request(
+                api::GetComponentRequest {
+                    id: id.to_string(),
+                },
+                token,
+            ))
             .await;
         match resp {
             Ok(r) => Ok(r.into_inner().component),

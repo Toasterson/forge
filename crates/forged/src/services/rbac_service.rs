@@ -1,7 +1,8 @@
 use crate::entities::gate_member::{Permission, Role};
-use crate::entities::{component, gate_member};
+use crate::entities::{component, gate_member, server_member};
 use crate::repositories::{ComponentRepository, GateRepository};
 use miette::{Context, Result};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use std::sync::Arc;
 
 /// RBAC Service for permission checking
@@ -10,13 +11,19 @@ use std::sync::Arc;
 pub struct RbacService {
     gate_repo: Arc<GateRepository>,
     component_repo: Arc<ComponentRepository>,
+    db: Arc<DatabaseConnection>,
 }
 
 impl RbacService {
-    pub fn new(gate_repo: Arc<GateRepository>, component_repo: Arc<ComponentRepository>) -> Self {
+    pub fn new(
+        gate_repo: Arc<GateRepository>,
+        component_repo: Arc<ComponentRepository>,
+        db: Arc<DatabaseConnection>,
+    ) -> Self {
         Self {
             gate_repo,
             component_repo,
+            db,
         }
     }
 
@@ -133,6 +140,32 @@ impl RbacService {
             .wrap_err("failed to list gate memberships for actor")
     }
 
+    /// Check if an actor has a specific server-level permission
+    pub async fn check_server_permission(
+        &self,
+        actor_id: &str,
+        permission: ServerPermission,
+    ) -> Result<bool> {
+        let member = server_member::Entity::find()
+            .filter(server_member::Column::ActorId.eq(actor_id))
+            .one(self.db.as_ref())
+            .await
+            .map_err(|e| miette::miette!("Failed to query server_member table: {}", e))
+            .wrap_err("failed to check server permission")?;
+
+        if let Some(m) = member {
+            let has_permission = m
+                .permissions
+                .as_array()
+                .map(|arr| arr.iter().any(|v| v.as_str() == Some(permission.as_str())))
+                .unwrap_or(false);
+
+            Ok(has_permission)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Get all components in a gate where actor has at least read permission
     pub async fn list_accessible_components(
         &self,
@@ -187,6 +220,53 @@ impl ComponentPermission {
             ComponentPermission::Read => "read",
             ComponentPermission::Write => "write",
         }
+    }
+}
+
+/// Server-level permissions (not scoped to any gate)
+#[derive(Debug, Clone, PartialEq)]
+pub enum ServerPermission {
+    GateCreate,
+    ServerAdmin,
+}
+
+impl ServerPermission {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::GateCreate => "gate_create",
+            Self::ServerAdmin => "server_admin",
+        }
+    }
+}
+
+/// Predefined server roles
+#[derive(Debug, Clone)]
+pub enum ServerRole {
+    Admin,
+    GateCreator,
+}
+
+impl ServerRole {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Admin => "admin",
+            Self::GateCreator => "gate_creator",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "admin" => Some(Self::Admin),
+            "gate_creator" => Some(Self::GateCreator),
+            _ => None,
+        }
+    }
+}
+
+pub fn server_role_defaults(role: &ServerRole) -> Vec<ServerPermission> {
+    match role {
+        ServerRole::Admin => vec![ServerPermission::ServerAdmin, ServerPermission::GateCreate],
+        ServerRole::GateCreator => vec![ServerPermission::GateCreate],
     }
 }
 
