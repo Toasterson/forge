@@ -47,17 +47,91 @@ psql -U forged -h localhost -d forged -c "SELECT 1;"
 
 ## 2. Install SeaweedFS
 
-OpenIndiana provides SeaweedFS as a package:
+OpenIndiana provides the SeaweedFS binary as a package:
 
 ```bash
 sudo pkg install network/seaweedfs
 ```
 
-This installs the `weed` binary and sets up the SMF services for the master and volume servers.
+The package installs the `weed` binary but does not include SMF service manifests. You need to create them.
 
-### Enable the Services
+### Create Data Directories and User
 
 ```bash
+sudo mkdir -p /var/seaweedfs/master /var/seaweedfs/volume
+sudo useradd -d /var/seaweedfs -s /usr/bin/false seaweedfs
+sudo chown -R seaweedfs:seaweedfs /var/seaweedfs
+```
+
+### Create SMF Manifests
+
+**SeaweedFS Master** -- save as `/opt/seaweedfs/smf/master.xml`:
+
+```bash
+sudo mkdir -p /opt/seaweedfs/smf
+```
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<service_bundle type="manifest" name="seaweedfs-master">
+  <service name="network/seaweedfs/master" type="service" version="1">
+    <create_default_instance enabled="true"/>
+    <single_instance/>
+    <dependency name="network" grouping="require_all"
+                restart_on="error" type="service">
+      <service_fmri value="svc:/milestone/network:default"/>
+    </dependency>
+    <exec_method type="method" name="start"
+      exec="/usr/bin/weed master -mdir=/var/seaweedfs/master -ip=127.0.0.1 -port=9333"
+      timeout_seconds="30">
+      <method_context>
+        <method_credential user="seaweedfs" group="seaweedfs"/>
+      </method_context>
+    </exec_method>
+    <exec_method type="method" name="stop" exec=":kill" timeout_seconds="30"/>
+    <stability value="Unstable"/>
+    <template>
+      <common_name><loctext xml:lang="C">SeaweedFS Master</loctext></common_name>
+    </template>
+  </service>
+</service_bundle>
+```
+
+**SeaweedFS Volume** -- save as `/opt/seaweedfs/smf/volume.xml`:
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<service_bundle type="manifest" name="seaweedfs-volume">
+  <service name="network/seaweedfs/volume" type="service" version="1">
+    <create_default_instance enabled="true"/>
+    <single_instance/>
+    <dependency name="master" grouping="require_all"
+                restart_on="error" type="service">
+      <service_fmri value="svc:/network/seaweedfs/master:default"/>
+    </dependency>
+    <exec_method type="method" name="start"
+      exec="/usr/bin/weed volume -mserver=127.0.0.1:9333 -port=8080 -dir=/var/seaweedfs/volume -publicUrl=localhost:8080"
+      timeout_seconds="30">
+      <method_context>
+        <method_credential user="seaweedfs" group="seaweedfs"/>
+      </method_context>
+    </exec_method>
+    <exec_method type="method" name="stop" exec=":kill" timeout_seconds="30"/>
+    <stability value="Unstable"/>
+    <template>
+      <common_name><loctext xml:lang="C">SeaweedFS Volume Server</loctext></common_name>
+    </template>
+  </service>
+</service_bundle>
+```
+
+### Import and Enable
+
+```bash
+sudo svccfg import /opt/seaweedfs/smf/master.xml
+sudo svccfg import /opt/seaweedfs/smf/volume.xml
 sudo svcadm enable seaweedfs/master
 sudo svcadm enable seaweedfs/volume
 ```
