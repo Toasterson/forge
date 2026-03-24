@@ -400,6 +400,39 @@ async fn connect_grpc(url: &str) -> miette::Result<Channel> {
     }
 }
 
+/// Diagnose a gRPC call error with actionable help for common failures.
+fn diagnose_rpc_error(url: &str, rpc_name: &str, e: tonic::Status) -> miette::Report {
+    let msg = e.message().to_string();
+    let is_tls = url.starts_with("https://");
+
+    if is_tls
+        && (msg.contains("h2 protocol error")
+            || msg.contains("connection error")
+            || msg.contains("certificate")
+            || msg.contains("tls")
+            || msg.contains("ssl"))
+    {
+        miette::miette!(
+            help = "The server's TLS certificate may not be trusted by this client.\n\
+                    - If using Let's Encrypt staging, switch to http:// for testing\n\
+                    - If the server has no valid certificate yet, use http://<host>:<port>\n\
+                    - If using a private CA, add it to your system trust store",
+            "TLS connection to {} failed during {} RPC: {}",
+            url,
+            rpc_name,
+            msg
+        )
+    } else if msg.contains("connection refused") || msg.contains("Connection refused") {
+        miette::miette!(
+            help = "Check that the forge server is running at {}",
+            "{} RPC failed: connection refused",
+            url
+        )
+    } else {
+        miette::miette!("{} RPC failed: {}", rpc_name, msg)
+    }
+}
+
 // ============================================================
 // OAuth 2.0 Device Authorization Grant (RFC 8628)
 // ============================================================
@@ -465,7 +498,7 @@ pub async fn get_auth_config(grpc_url: &str) -> miette::Result<(String, String)>
     let resp = client
         .get_auth_config(Request::new(api_v2::GetAuthConfigRequest {}))
         .await
-        .map_err(|e| miette::miette!("GetAuthConfig RPC failed: {}", e))?;
+        .map_err(|e| diagnose_rpc_error(grpc_url, "GetAuthConfig", e))?;
     let inner = resp.into_inner();
     if inner.issuer_url.is_empty() {
         return Err(miette::miette!(
