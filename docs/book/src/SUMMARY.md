@@ -27,6 +27,7 @@
 - [Packaging Perl Software](./packaging-guide/packaging-perl.md)
 - [Packaging with Build Scripts](./packaging-guide/packaging-buildscript.md)
 - [Package Splitting](./packaging-guide/package-splitting.md)
+- [Packaging Services](./packaging-guide/packaging-services.md)
 - [Contributing Packages](./packaging-guide/contributing-packages.md)
 
 # pkgdev CLI

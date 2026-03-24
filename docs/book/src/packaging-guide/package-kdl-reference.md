@@ -244,7 +244,7 @@ The arguments to `meson` are passed directly to the meson setup invocation.
 
 ### cargo
 
-For Rust projects using Cargo.
+For Rust projects using Cargo. In its simplest form, no configuration is needed:
 
 ```kdl
 build {
@@ -252,7 +252,32 @@ build {
 }
 ```
 
-No additional configuration is needed. Forge invokes `cargo build --release` and installs the resulting binaries.
+For more control, `cargo` accepts a block with child nodes:
+
+```kdl
+build {
+    cargo {
+        packages "forged" "pkgdev"
+        features "otel" "quic"
+        install-root "/opt/forge"
+        target "x86_64-unknown-illumos"
+        env OPENSSL_DIR="/usr/openssl/3.1"
+        env PKG_CONFIG_PATH="/usr/lib/amd64/pkgconfig"
+    }
+}
+```
+
+#### cargo children
+
+| Node | Repeatable | Default | Description |
+|---|---|---|---|
+| `packages` | no | all workspace binaries | Space-separated list of crate names to build |
+| `features` | no | default features | Space-separated list of Cargo features to enable |
+| `install-root` | no | `/usr` | Installation prefix for binaries |
+| `offline` | no | `true` | Pass `--offline` to cargo (present by default) |
+| `locked` | no | `true` | Pass `--locked` to cargo (present by default) |
+| `target` | no | host target | Rust target triple for cross-compilation |
+| `env` | yes | -- | Environment variable as a key-value property (e.g., `env OPENSSL_DIR="/usr/openssl/3.1"`) |
 
 ### script
 
@@ -340,72 +365,211 @@ Each node accepts arbitrary properties that serve as selectors or attribute over
 | `group` | Override the file group |
 | `action` | IPS action type |
 
-## Complete Example
+## User and Group
 
-Here is a complete `package.kdl` exercising all sections:
+System accounts required by the package. Each is a top-level node. These translate directly to IPS `group` and `user` actions, ensuring the accounts exist before package content is installed.
+
+### group
 
 ```kdl
-name "web/curl"
-project-name "curl"
+group "forged" gid=10001
+```
+
+| Property | Required | Description |
+|---|---|---|
+| *(argument)* | yes | Group name |
+| `gid` | yes | Numeric group ID |
+
+### user
+
+```kdl
+user "forged" uid=10001 group="forged" home="/var/lib/forged" shell="/usr/bin/false" description="Forge server daemon"
+```
+
+| Property | Required | Default | Description |
+|---|---|---|---|
+| *(argument)* | yes | -- | Username |
+| `uid` | yes | -- | Numeric user ID |
+| `group` | yes | -- | Primary group name |
+| `home` | no | `/` | Home directory |
+| `shell` | no | `/usr/bin/false` | Login shell |
+| `description` | no | -- | GECOS field / description |
+| `ftpuser` | no | `false` | Allow FTP access |
+
+## Files
+
+The `files` block delivers component-local files into the package prototype directory. This is distinct from the `source` block, which fetches upstream content, and the `package` block, which controls how output is split into IPS packages.
+
+Use `files` for configuration files, SMF manifests, method scripts, and any other local content that is not part of the upstream source tree.
+
+### Separation of concerns
+
+| Section | Purpose |
+|---|---|
+| `source {}` | Obtain upstream source code, patches, and overlays |
+| `files {}` | Deliver component-local files (configs, manifests, scripts) |
+| `build {}` | Compile the software |
+| `package {}` | Control IPS manifest attributes and package splitting |
+
+### install
+
+Each `install` child copies a file from the component directory into the prototype.
+
+```kdl
+files {
+    install "smf/forged.xml" "lib/svc/manifest/application/forge-forged.xml"
+    install "smf/forged-method" "opt/forge/lib/svc/method/forged-method" mode="0555"
+    install "files/forged.toml" "etc/forged/forged.toml"
+}
+```
+
+| Argument | Position | Description |
+|---|---|---|
+| source path | 1st | Path to the file in the component directory |
+| destination path | 2nd | Destination path in the prototype (relative to root) |
+
+| Property | Required | Default | Description |
+|---|---|---|---|
+| `mode` | no | preserved from source | Override the file permission mode (e.g., `"0555"`, `"0644"`) |
+
+## Enhanced Package Options
+
+In addition to `file`, `link`, and `hardlink` selectors described in the Package section above, the `package` block supports `dir` entries and additional properties on file entries.
+
+### dir
+
+Declares a directory with explicit ownership and permissions. This is essential for service data directories that must be owned by a non-root user.
+
+```kdl
+package {
+    dir path="var/lib/forged" owner="forged" group="forged" mode="0755"
+    dir path="etc/forged" owner="root" group="forged" mode="0755"
+}
+```
+
+| Property | Description |
+|---|---|
+| `path` | Directory path (relative to root) |
+| `owner` | Directory owner |
+| `group` | Directory group |
+| `mode` | Directory permission mode |
+
+### preserve
+
+Marks a file as a configuration file. When the package is upgraded, IPS will not overwrite the user's modifications.
+
+```kdl
+package {
+    file path="etc/forged/.*" preserve="true" mode="0640" owner="root" group="forged"
+}
+```
+
+### restart-fmri
+
+Specifies an SMF FMRI to restart after the file is installed or updated. This is commonly used for SMF manifest files so that `manifest-import` picks up changes automatically.
+
+```kdl
+package {
+    file path="lib/svc/manifest/.*" restart-fmri="svc:/system/manifest-import:default"
+}
+```
+
+### link with target
+
+Explicit symbolic links can be created using the `link` node with a `target` property.
+
+```kdl
+package {
+    link path="usr/bin/myapp" target="../../opt/myapp/bin/myapp"
+}
+```
+
+| Property | Description |
+|---|---|
+| `path` | Path of the symbolic link |
+| `target` | Target the link points to |
+
+All `file`, `link`, `hardlink`, and `dir` nodes accept arbitrary key-value properties, which are passed through as IPS manifest attributes. Common properties include `path`, `mode`, `owner`, `group`, `preserve`, `restart-fmri`, and `target`.
+
+## Driver
+
+The `driver` action registers a device driver with the system. This is a top-level node.
+
+```kdl
+driver "mydriver" {
+    perms "* 0666 root sys"
+    alias "pci1234,5678"
+    alias "pci1234,9abc"
+    devlink "type=ddi_pseudo;name=mydriver\\t\\D"
+    class "net"
+    policy "read_priv_set=net_rawaccess"
+}
+```
+
+| Node | Repeatable | Description |
+|---|---|---|
+| `perms` | no | Device file permissions (format: `"minor-spec mode owner group"`) |
+| `alias` | yes | Device alias (e.g., PCI ID) |
+| `devlink` | yes | `/etc/devlink.tab` entry |
+| `class` | no | Driver class |
+| `policy` | no | Device policy |
+
+## Complete Example
+
+Here is a complete `package.kdl` for the Forge project itself, exercising the cargo build system, local file delivery, system accounts, and enhanced package options:
+
+```kdl
+name "developer/packaging/forge"
+project-name "forge"
+classification "Development/Distribution Tools"
+summary "Code forge and IPS packaging platform"
+license "MPL-2.0"
+license-file "LICENSE"
+version "0.1.0"
+project-url "https://github.com/Toasterson/forge"
+maintainer "The Forge Contributors"
 
 metadata {
-    anitya-id "381"
-    repology-id "curl"
+    repology-id "forge"
 }
 
-classification "System/Libraries"
-summary "The CURL Network Utility and Library"
-license "CURL"
-license-file "COPYING"
-version "8.6.0"
-revision "1"
-project-url "https://curl.se"
-maintainer "The OpenIndiana Maintainers"
-
 source {
-    archive "https://curl.haxx.se/download/curl-8.6.0.tar.xz" \
-        sha256="3ccd55d91af9516539df80625f818c734dc6f2ecf9bada33c76765e99121db15"
-    patch "000-configure.ac.patch"
-    patch "005-libcurl.pc.in.patch"
+    git "https://github.com/Toasterson/forge.git" tag="v0.1.0"
 }
 
 build {
-    configure {
-        option "--prefix=/usr"
-        option "--mandir=/usr/share/man"
-        option "--bindir=/usr/bin"
-        option "--libdir=/usr/lib"
-        option "--enable-shared"
-        option "--disable-static"
-        option "--enable-ipv6"
-        option "--with-ssl=/usr/openssl/3.1"
-        option "--with-zlib=/usr"
-        option "--with-ca-bundle=/etc/certs/ca-certificates.crt"
-
-        flag "-m64" name="CFLAGS"
-        flag "-m64" name="LDFLAGS"
-        flag "-I/usr/openssl/3.1/include" name="CPPFLAGS"
-        flag "-L/usr/openssl/3.1/lib" name="LDFLAGS"
+    cargo {
+        packages "forged" "pkgdev"
+        install-root "/opt/forge"
+        env OPENSSL_DIR="/usr/openssl/3.1"
+        env PKG_CONFIG_PATH="/usr/lib/amd64/pkgconfig"
     }
 }
 
-dependency "library/zlib" dev=true kind="require"
-dependency "library/openssl-31" dev=true kind="require"
-dependency "library/libssh2" dev=true kind="require"
-dependency "library/nghttp2" dev=true kind="require"
-dependency "system/library" kind="require"
-
-package {
-    file path="usr/bin/.*"
-    file path="usr/lib/.*\\.so\\..*"
-    link path="usr/lib/.*\\.so$"
-    file path="usr/share/man/man1/.*"
+files {
+    install "smf/forged.xml" "lib/svc/manifest/application/forge-forged.xml"
+    install "smf/forged-method" "opt/forge/lib/svc/method/forged-method" mode="0555"
+    install "files/forged.toml" "etc/forged/forged.toml"
 }
 
-package "developer/web/curl" {
-    file path="usr/include/.*"
-    file path="usr/lib/.*\\.a$"
-    file path="usr/lib/pkgconfig/.*"
-    file path="usr/share/man/man3/.*"
+group "forged" gid=10001
+user "forged" uid=10001 group="forged" home="/var/lib/forged" shell="/usr/bin/false" description="Forge server daemon"
+
+dependency "system/library" kind="require"
+dependency "system/library/gcc-14-runtime" kind="require"
+dependency "system/library/g++-14-runtime" kind="require"
+dependency "library/security/openssl-31" kind="require"
+
+package {
+    file path="opt/forge/bin/.*"
+    file path="opt/forge/lib/.*"
+
+    dir path="var/lib/forged" owner="forged" group="forged" mode="0755"
+    dir path="var/lib/forged/jj-repos" owner="forged" group="forged" mode="0755"
+    dir path="var/lib/forged/acme" owner="forged" group="forged" mode="0700"
+    dir path="etc/forged" owner="root" group="forged" mode="0755"
+
+    file path="etc/forged/.*" preserve="true" mode="0640" owner="root" group="forged"
+    file path="lib/svc/manifest/.*" restart-fmri="svc:/system/manifest-import:default"
 }
 ```

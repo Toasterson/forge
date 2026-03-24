@@ -56,7 +56,9 @@ pub fn build_package_sources(wks: &Workspace, pkg: &Component, settings: &Settin
         } else if let Some(script) = section.script.clone() {
             build_using_scripts(wks, pkg, &script, settings)?;
         } else if section.cargo.is_some() {
-            crate::build::cargo::build_and_stage_cargo(wks, pkg).wrap_err("cargo build failed")?;
+            let cargo_config = section.cargo.as_ref().cloned().unwrap_or_default();
+            crate::build::cargo::build_and_stage_cargo(wks, pkg, &cargo_config)
+                .wrap_err("cargo build failed")?;
         }
     }
 

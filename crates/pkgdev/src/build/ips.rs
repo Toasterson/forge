@@ -266,6 +266,11 @@ pub fn generate_manifest_files(
         };
         let mut manifest = render(DEFAULT_IPS_TEMPLATE, vars);
 
+        // Emit user/group/driver actions
+        generate_group_actions(&mut manifest, &pkg.recipe.groups);
+        generate_user_actions(&mut manifest, &pkg.recipe.users);
+        generate_driver_actions(&mut manifest, &pkg.recipe.drivers);
+
         let drop_dir_line = "\n<transform dir path=.* -> drop>";
         manifest.push_str(drop_dir_line);
 
@@ -322,14 +327,30 @@ pub fn generate_manifest_files(
             generate_transform_lines(&mut manifest, &p.files);
             generate_transform_lines(&mut manifest, &p.links);
             generate_transform_lines(&mut manifest, &p.hardlinks);
+
+            // Emit file attribute transforms (preserve, restart-fmri, mode, etc.)
+            generate_file_attribute_transforms(&mut manifest, &p.files);
+
+            // Emit explicit link actions (links with a target property)
+            generate_link_actions(&mut manifest, &p.links);
+
             let drop_actions_line = "\n<transform file link hardlink keep=false -> drop>";
             manifest.push_str(drop_actions_line);
 
             let cleanup_line = "\n<transform file link hardlink keep=true -> delete keep true>";
             manifest.push_str(cleanup_line);
 
+            // Drop auto-generated dirs from proto area (explicit dirs are added after)
             let drop_dir_line = "\n<transform dir path=.* -> drop>";
             manifest.push_str(drop_dir_line);
+
+            // Emit explicit dir actions AFTER the drop-dir transform
+            generate_dir_actions(&mut manifest, &p.dirs);
+
+            // Emit user/group/driver actions
+            generate_group_actions(&mut manifest, &pkg.recipe.groups);
+            generate_user_actions(&mut manifest, &pkg.recipe.users);
+            generate_driver_actions(&mut manifest, &pkg.recipe.drivers);
 
             let manifest_collection = ManifestCollection::new(&name);
             let base_path = manifest_path.join(manifest_collection.get_base_manifest_name());
@@ -561,7 +582,7 @@ pub fn generate_manifest_files(
 }
 
 #[allow(dead_code)]
-fn generate_transform_lines(manifest: &mut String, nodes: &Vec<TransformNode>) {
+fn generate_transform_lines(manifest: &mut String, nodes: &[TransformNode]) {
     for node in nodes {
         for (attribute, selector) in node.selectors.iter() {
             let tranforms_string = format!(
@@ -570,6 +591,111 @@ fn generate_transform_lines(manifest: &mut String, nodes: &Vec<TransformNode>) {
             );
             manifest.push_str(&tranforms_string);
         }
+    }
+}
+
+#[cfg(not(feature = "libips"))]
+/// Emit IPS group actions from the recipe's group definitions.
+fn generate_group_actions(manifest: &mut String, groups: &[component::GroupAction]) {
+    for g in groups {
+        manifest.push_str(&format!("\ngroup groupname={} gid={}", g.name, g.gid));
+    }
+}
+
+#[cfg(not(feature = "libips"))]
+/// Emit IPS user actions from the recipe's user definitions.
+fn generate_user_actions(manifest: &mut String, users: &[component::UserAction]) {
+    for u in users {
+        let mut action = format!(
+            "\nuser username={} uid={} group={} password=NP",
+            u.name, u.uid, u.group
+        );
+        if let Some(home) = &u.home {
+            action.push_str(&format!(" home-dir={}", home));
+        }
+        if let Some(shell) = &u.shell {
+            action.push_str(&format!(" login-shell={}", shell));
+        }
+        if let Some(desc) = &u.description {
+            action.push_str(&format!(" gcos-field=\"{}\"", desc));
+        }
+        if u.ftpuser {
+            action.push_str(" ftpuser=true");
+        } else {
+            action.push_str(" ftpuser=false");
+        }
+        manifest.push_str(&action);
+    }
+}
+
+#[cfg(not(feature = "libips"))]
+/// Emit explicit IPS dir actions from the package section's dir entries.
+fn generate_dir_actions(manifest: &mut String, dirs: &[TransformNode]) {
+    for d in dirs {
+        if let Some(path) = d.selectors.get("path") {
+            let mut action = format!("\ndir path={}", path);
+            for (k, v) in &d.selectors {
+                if k != "path" {
+                    action.push_str(&format!(" {}={}", k, v));
+                }
+            }
+            manifest.push_str(&action);
+        }
+    }
+}
+
+#[cfg(not(feature = "libips"))]
+/// Emit IPS attribute transforms for files with special properties (preserve, restart-fmri, etc).
+fn generate_file_attribute_transforms(manifest: &mut String, files: &[TransformNode]) {
+    for f in files {
+        let path = match f.selectors.get("path") {
+            Some(p) => p,
+            None => continue,
+        };
+        // Check for IPS-specific attributes beyond just path
+        for (k, v) in &f.selectors {
+            if k != "path" {
+                // Emit a transform that sets this attribute on matching files
+                manifest.push_str(&format!(
+                    "\n<transform file path={} -> set {} {}>",
+                    path, k, v
+                ));
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "libips"))]
+/// Emit explicit IPS link actions from the package section.
+fn generate_link_actions(manifest: &mut String, links: &[TransformNode]) {
+    for l in links {
+        if let (Some(path), Some(target)) = (l.selectors.get("path"), l.selectors.get("target")) {
+            manifest.push_str(&format!("\nlink path={} target={}", path, target));
+        }
+    }
+}
+
+#[cfg(not(feature = "libips"))]
+/// Emit IPS driver actions from the recipe's driver definitions.
+fn generate_driver_actions(manifest: &mut String, drivers: &[component::DriverAction]) {
+    for d in drivers {
+        let mut action = format!("\ndriver name={}", d.name);
+        if let Some(perms) = &d.perms {
+            action.push_str(&format!(" perms=\"{}\"", perms));
+        }
+        for alias in &d.aliases {
+            action.push_str(&format!(" alias=\"{}\"", alias));
+        }
+        if let Some(class) = &d.class {
+            action.push_str(&format!(" class={}", class));
+        }
+        for devlink in &d.devlinks {
+            action.push_str(&format!(" devlink=\"{}\"", devlink));
+        }
+        if let Some(policy) = &d.policy {
+            action.push_str(&format!(" policy=\"{}\"", policy));
+        }
+        manifest.push_str(&action);
     }
 }
 
