@@ -590,7 +590,7 @@ pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::
     debug!(endpoint = %device_auth_endpoint, "requesting device authorization");
 
     let device_resp = {
-        let mut form_params: Vec<(&str, &str)> = vec![("scope", "openid profile email")];
+        let mut form_params: Vec<(&str, &str)> = vec![("scope", "openid profile email offline_access")];
         if !client_id.is_empty() {
             form_params.push(("client_id", &client_id));
         }
@@ -613,7 +613,7 @@ pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::
             info!("device authorization with client_id failed, retrying with auto-registration");
             let resp = http
                 .post(&device_auth_endpoint)
-                .form(&[("scope", "openid profile email")])
+                .form(&[("scope", "openid profile email offline_access")])
                 .send()
                 .await
                 .map_err(|e| {
