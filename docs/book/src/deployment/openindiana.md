@@ -280,7 +280,8 @@ If building from source on the machine:
 ```bash
 # Install build dependencies
 pfexec pkg install developer/gcc-13 developer/build/gnu-make \
-  library/security/openssl-31 system/header system/library/gcc-runtime \
+  library/security/openssl-31 system/header \
+  system/library/gcc-13-runtime system/library/g++-13-runtime \
   developer/build/pkg-config library/libarchive
 
 # Install Rust
