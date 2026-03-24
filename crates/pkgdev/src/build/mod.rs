@@ -55,7 +55,7 @@ pub fn build_package_sources(wks: &Workspace, pkg: &Component, settings: &Settin
             unimplemented!();
         } else if let Some(script) = section.script.clone() {
             build_using_scripts(wks, pkg, &script, settings)?;
-        } else if section.cargo {
+        } else if section.cargo.is_some() {
             crate::build::cargo::build_and_stage_cargo(wks, pkg).wrap_err("cargo build failed")?;
         }
     }

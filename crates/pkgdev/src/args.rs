@@ -923,7 +923,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                                                 for (idx, b) in r.build_sections.iter().enumerate()
                                                 {
                                                     let mut kinds: Vec<&str> = Vec::new();
-                                                    if b.cargo {
+                                                    if b.cargo.is_some() {
                                                         kinds.push("cargo");
                                                     }
                                                     if b.script.is_some() {

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use cargo_metadata::TargetKind;
-use component::{BuildSection, Component, Recipe, RecipeBuilder};
+use component::{BuildSection, CargoBuildSection, Component, Recipe, RecipeBuilder};
 use miette::{IntoDiagnostic, WrapErr};
 
 #[derive(Debug, Clone)]
@@ -103,7 +103,7 @@ fn build_component_from_package(
         .wrap_err("failed to initialize component for cargo project")?;
     comp.recipe = recipe;
     comp.recipe.build_sections.push(BuildSection {
-        cargo: true,
+        cargo: Some(CargoBuildSection::default()),
         ..Default::default()
     });
     if let Some(f) = fmri {

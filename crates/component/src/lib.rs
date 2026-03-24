@@ -329,6 +329,22 @@ pub struct Recipe {
     #[knuffel(children(name = "package"))]
     #[builder(default)]
     pub package_sections: Vec<PackageSection>,
+
+    #[knuffel(children(name = "group"))]
+    #[builder(default)]
+    pub groups: Vec<GroupAction>,
+
+    #[knuffel(children(name = "user"))]
+    #[builder(default)]
+    pub users: Vec<UserAction>,
+
+    #[knuffel(children(name = "driver"))]
+    #[builder(default)]
+    pub drivers: Vec<DriverAction>,
+
+    #[knuffel(children(name = "files"))]
+    #[builder(default)]
+    pub file_sections: Vec<FilesSection>,
 }
 
 impl Display for Recipe {
@@ -460,6 +476,22 @@ impl Recipe {
             doc.nodes_mut().push(package_node);
         }
 
+        for group in &self.groups {
+            doc.nodes_mut().push(group.to_node());
+        }
+
+        for user in &self.users {
+            doc.nodes_mut().push(user.to_node());
+        }
+
+        for driver in &self.drivers {
+            doc.nodes_mut().push(driver.to_node());
+        }
+
+        for files in &self.file_sections {
+            doc.nodes_mut().push(files.to_node());
+        }
+
         node
     }
 
@@ -512,6 +544,22 @@ impl Recipe {
 
         for dep in &other.dependencies {
             self.dependencies.push(dep.clone());
+        }
+
+        for group in &other.groups {
+            self.groups.push(group.clone());
+        }
+
+        for user in &other.users {
+            self.users.push(user.clone());
+        }
+
+        for driver in &other.drivers {
+            self.drivers.push(driver.clone());
+        }
+
+        for files in &other.file_sections {
+            self.file_sections.push(files.clone());
         }
     }
 }
@@ -580,6 +628,7 @@ pub enum DependencyKind {
     Require,
     Incorporate,
     Optional,
+    Group,
 }
 
 impl From<&DependencyKind> for KdlValue {
@@ -588,6 +637,7 @@ impl From<&DependencyKind> for KdlValue {
             DependencyKind::Require => "require".into(),
             DependencyKind::Incorporate => "incorporate".into(),
             DependencyKind::Optional => "optional".into(),
+            DependencyKind::Group => "group".into(),
         }
     }
 }
@@ -599,6 +649,7 @@ impl From<&str> for DependencyKind {
             "require" => Self::Require,
             "incorporate" => Self::Incorporate,
             "optional" => Self::Optional,
+            "group" => Self::Group,
             _ => Self::Require,
         }
     }
@@ -981,9 +1032,9 @@ pub struct BuildSection {
     #[knuffel(child)]
     #[builder(default)]
     pub script: Option<ScriptBuildSection>,
-    #[knuffel(child, default = false)]
+    #[knuffel(child)]
     #[builder(default)]
-    pub cargo: bool,
+    pub cargo: Option<CargoBuildSection>,
 }
 
 impl BuildSection {
@@ -998,8 +1049,8 @@ impl BuildSection {
             doc.nodes_mut().push(configure.to_node());
         } else if let Some(script) = &self.script {
             doc.nodes_mut().push(script.to_node());
-        } else if self.cargo {
-            doc.nodes_mut().push(kdl::KdlNode::new("cargo"));
+        } else if let Some(cargo) = &self.cargo {
+            doc.nodes_mut().push(cargo.to_node());
         } else {
             doc.nodes_mut().push(kdl::KdlNode::new("no-build"));
         }
@@ -1263,8 +1314,11 @@ pub struct PackageSection {
     #[knuffel(children(name = "link"))]
     pub links: Vec<TransformNode>,
 
-    #[knuffel(children(name = "hardlinks"))]
+    #[knuffel(children(name = "hardlink"))]
     pub hardlinks: Vec<TransformNode>,
+
+    #[knuffel(children(name = "dir"))]
+    pub dirs: Vec<TransformNode>,
 }
 
 impl PackageSection {
@@ -1287,6 +1341,10 @@ impl PackageSection {
 
         for hardlink in &self.hardlinks {
             doc.nodes_mut().push(hardlink.to_node());
+        }
+
+        for dir in &self.dirs {
+            doc.nodes_mut().push(dir.to_node());
         }
 
         node
@@ -1315,6 +1373,299 @@ impl TransformNode {
             node.insert(selector.0.as_str(), selector.1.as_str());
         }
 
+        node
+    }
+}
+
+#[derive(
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Diff,
+    JsonSchema,
+    ToSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct CargoBuildSection {
+    #[knuffel(child, unwrap(arguments))]
+    pub packages: Vec<String>,
+
+    #[knuffel(child, unwrap(arguments))]
+    pub features: Vec<String>,
+
+    #[knuffel(child, unwrap(argument))]
+    pub install_root: Option<String>,
+
+    #[knuffel(child, default = true)]
+    pub offline: bool,
+
+    #[knuffel(child, default = true)]
+    pub locked: bool,
+
+    #[knuffel(child, unwrap(argument))]
+    pub target: Option<String>,
+
+    #[knuffel(children(name = "env"))]
+    pub env_vars: Vec<EnvVarNode>,
+}
+
+impl CargoBuildSection {
+    #[must_use]
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("cargo");
+        let doc = node.ensure_children();
+
+        if !self.packages.is_empty() {
+            let mut packages_node = kdl::KdlNode::new("packages");
+            for (i, pkg) in self.packages.iter().enumerate() {
+                packages_node.insert(i, pkg.as_str());
+            }
+            doc.nodes_mut().push(packages_node);
+        }
+
+        if !self.features.is_empty() {
+            let mut features_node = kdl::KdlNode::new("features");
+            for (i, feat) in self.features.iter().enumerate() {
+                features_node.insert(i, feat.as_str());
+            }
+            doc.nodes_mut().push(features_node);
+        }
+
+        if let Some(install_root) = &self.install_root {
+            let mut n = kdl::KdlNode::new("install-root");
+            n.insert(0, install_root.as_str());
+            doc.nodes_mut().push(n);
+        }
+
+        if self.offline {
+            doc.nodes_mut().push(kdl::KdlNode::new("offline"));
+        }
+
+        if self.locked {
+            doc.nodes_mut().push(kdl::KdlNode::new("locked"));
+        }
+
+        if let Some(target) = &self.target {
+            let mut n = kdl::KdlNode::new("target");
+            n.insert(0, target.as_str());
+            doc.nodes_mut().push(n);
+        }
+
+        for env_var in &self.env_vars {
+            doc.nodes_mut().push(env_var.to_node());
+        }
+
+        node
+    }
+}
+
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Eq, Diff, JsonSchema, ToSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct EnvVarNode {
+    #[knuffel(properties)]
+    pub vars: HashMap<String, String>,
+}
+
+impl EnvVarNode {
+    #[must_use]
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("env");
+        for (key, value) in &self.vars {
+            node.insert(key.as_str(), value.as_str());
+        }
+        node
+    }
+}
+
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Eq, Diff, JsonSchema, ToSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct GroupAction {
+    #[knuffel(argument)]
+    pub name: String,
+    #[knuffel(property)]
+    pub gid: i64,
+}
+
+impl GroupAction {
+    #[must_use]
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("group");
+        node.insert(0, self.name.as_str());
+        node.insert("gid", self.gid);
+        node
+    }
+}
+
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Eq, Diff, JsonSchema, ToSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct UserAction {
+    #[knuffel(argument)]
+    pub name: String,
+    #[knuffel(property)]
+    pub uid: i64,
+    #[knuffel(property)]
+    pub group: String,
+    #[knuffel(property)]
+    pub home: Option<String>,
+    #[knuffel(property)]
+    pub shell: Option<String>,
+    #[knuffel(property)]
+    pub description: Option<String>,
+    #[knuffel(property, default = false)]
+    pub ftpuser: bool,
+}
+
+impl UserAction {
+    #[must_use]
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("user");
+        node.insert(0, self.name.as_str());
+        node.insert("uid", self.uid);
+        node.insert("group", self.group.as_str());
+        if let Some(home) = &self.home {
+            node.insert("home", home.as_str());
+        }
+        if let Some(shell) = &self.shell {
+            node.insert("shell", shell.as_str());
+        }
+        if let Some(description) = &self.description {
+            node.insert("description", description.as_str());
+        }
+        if self.ftpuser {
+            node.insert("ftpuser", true);
+        }
+        node
+    }
+}
+
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Eq, Diff, JsonSchema, ToSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct DriverAction {
+    #[knuffel(argument)]
+    pub name: String,
+    #[knuffel(child, unwrap(argument))]
+    pub perms: Option<String>,
+    #[knuffel(children(name = "devlink"), unwrap(argument))]
+    pub devlinks: Vec<String>,
+    #[knuffel(children(name = "alias"), unwrap(argument))]
+    pub aliases: Vec<String>,
+    #[knuffel(child, unwrap(argument))]
+    pub class: Option<String>,
+    #[knuffel(child, unwrap(argument))]
+    pub policy: Option<String>,
+}
+
+impl DriverAction {
+    #[must_use]
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("driver");
+        node.insert(0, self.name.as_str());
+        let doc = node.ensure_children();
+
+        if let Some(perms) = &self.perms {
+            let mut n = kdl::KdlNode::new("perms");
+            n.insert(0, perms.as_str());
+            doc.nodes_mut().push(n);
+        }
+
+        for devlink in &self.devlinks {
+            let mut n = kdl::KdlNode::new("devlink");
+            n.insert(0, devlink.as_str());
+            doc.nodes_mut().push(n);
+        }
+
+        for alias in &self.aliases {
+            let mut n = kdl::KdlNode::new("alias");
+            n.insert(0, alias.as_str());
+            doc.nodes_mut().push(n);
+        }
+
+        if let Some(class) = &self.class {
+            let mut n = kdl::KdlNode::new("class");
+            n.insert(0, class.as_str());
+            doc.nodes_mut().push(n);
+        }
+
+        if let Some(policy) = &self.policy {
+            let mut n = kdl::KdlNode::new("policy");
+            n.insert(0, policy.as_str());
+            doc.nodes_mut().push(n);
+        }
+
+        node
+    }
+}
+
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Eq, Diff, JsonSchema, ToSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct FilesSection {
+    #[knuffel(children(name = "install"))]
+    pub installs: Vec<InstallFile>,
+}
+
+impl FilesSection {
+    #[must_use]
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("files");
+        let doc = node.ensure_children();
+        for install in &self.installs {
+            doc.nodes_mut().push(install.to_node());
+        }
+        node
+    }
+}
+
+#[derive(
+    Debug, knuffel::Decode, Clone, Serialize, Deserialize, PartialEq, Eq, Diff, JsonSchema, ToSchema,
+)]
+#[diff(attr(
+# [derive(Debug, Clone, Serialize, Deserialize)]
+))]
+pub struct InstallFile {
+    #[knuffel(argument)]
+    pub src: String,
+    #[knuffel(argument)]
+    pub dest: String,
+    #[knuffel(property)]
+    pub mode: Option<String>,
+}
+
+impl InstallFile {
+    #[must_use]
+    pub fn to_node(&self) -> kdl::KdlNode {
+        let mut node = kdl::KdlNode::new("install");
+        node.insert(0, self.src.as_str());
+        node.insert(1, self.dest.as_str());
+        if let Some(mode) = &self.mode {
+            node.insert("mode", mode.as_str());
+        }
         node
     }
 }
