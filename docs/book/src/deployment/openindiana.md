@@ -25,18 +25,16 @@ Forge requires four backing services:
 OpenIndiana ships PostgreSQL in the repository. The service comes with the data directory already initialized and local password authentication pre-configured:
 
 ```bash
-sudo pkg install database/postgres-17
-sudo svcadm enable postgresql:version_17
+pfexec pkg install database/postgres-16 service/database/postgres-16
+pfexec svcadm enable postgresql:version_16
 ```
 
 ### Create the Forge Database and User
 
 ```bash
-sudo -u postgres psql <<SQL
-CREATE USER forged WITH PASSWORD 'changeme-use-a-strong-password';
-CREATE DATABASE forged OWNER forged;
-GRANT ALL PRIVILEGES ON DATABASE forged TO forged;
-SQL
+pfexec su - postgres -c "psql -c \"CREATE USER forged WITH PASSWORD 'changeme-use-a-strong-password';\""
+pfexec su - postgres -c "psql -c \"CREATE DATABASE forged OWNER forged;\""
+pfexec su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE forged TO forged;\""
 ```
 
 ### Verify
@@ -50,7 +48,7 @@ psql -U forged -h localhost -d forged -c "SELECT 1;"
 OpenIndiana provides the SeaweedFS binary as a package:
 
 ```bash
-sudo pkg install network/seaweedfs
+pfexec pkg install network/seaweedfs
 ```
 
 The package installs the `weed` binary but does not include SMF service manifests. You need to create them.
@@ -58,9 +56,9 @@ The package installs the `weed` binary but does not include SMF service manifest
 ### Create Data Directories and User
 
 ```bash
-sudo mkdir -p /var/seaweedfs/master /var/seaweedfs/volume
-sudo useradd -d /var/seaweedfs -s /usr/bin/false seaweedfs
-sudo chown -R seaweedfs:seaweedfs /var/seaweedfs
+pfexec mkdir -p /var/seaweedfs/master /var/seaweedfs/volume
+pfexec useradd -d /var/seaweedfs -s /usr/bin/false seaweedfs
+pfexec chown -R seaweedfs:seaweedfs /var/seaweedfs
 ```
 
 ### Create SMF Manifests
@@ -68,7 +66,7 @@ sudo chown -R seaweedfs:seaweedfs /var/seaweedfs
 **SeaweedFS Master** -- save as `/opt/seaweedfs/smf/master.xml`:
 
 ```bash
-sudo mkdir -p /opt/seaweedfs/smf
+pfexec mkdir -p /opt/seaweedfs/smf
 ```
 
 ```xml
@@ -130,10 +128,10 @@ sudo mkdir -p /opt/seaweedfs/smf
 ### Import and Enable
 
 ```bash
-sudo svccfg import /opt/seaweedfs/smf/master.xml
-sudo svccfg import /opt/seaweedfs/smf/volume.xml
-sudo svcadm enable seaweedfs/master
-sudo svcadm enable seaweedfs/volume
+pfexec svccfg import /opt/seaweedfs/smf/master.xml
+pfexec svccfg import /opt/seaweedfs/smf/volume.xml
+pfexec svcadm enable seaweedfs/master
+pfexec svcadm enable seaweedfs/volume
 ```
 
 ### Verify
@@ -149,7 +147,7 @@ You should see a JSON response with cluster information.
 RabbitMQ requires Erlang. On OpenIndiana:
 
 ```bash
-sudo pkg install runtime/erlang
+pfexec pkg install runtime/erlang
 ```
 
 If RabbitMQ is not packaged, download and install it:
@@ -159,16 +157,16 @@ If RabbitMQ is not packaged, download and install it:
 curl -L -o /tmp/rabbitmq.tar.xz \
   https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-generic-unix-3.12.14.tar.xz
 
-sudo mkdir -p /opt/rabbitmq
-cd /opt/rabbitmq && sudo tar xJf /tmp/rabbitmq.tar.xz --strip-components=1
+pfexec mkdir -p /opt/rabbitmq
+cd /opt/rabbitmq && pfexec tar xJf /tmp/rabbitmq.tar.xz --strip-components=1
 ```
 
 ### Create User and Directories
 
 ```bash
-sudo useradd -d /var/rabbitmq -s /usr/bin/false rabbitmq
-sudo mkdir -p /var/rabbitmq /var/log/rabbitmq
-sudo chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
+pfexec useradd -d /var/rabbitmq -s /usr/bin/false rabbitmq
+pfexec mkdir -p /var/rabbitmq /var/log/rabbitmq
+pfexec chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
 ```
 
 ### Create SMF Manifest
@@ -219,25 +217,25 @@ sudo chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
 ### Import, Enable, and Configure
 
 ```bash
-sudo svccfg import /opt/rabbitmq/smf/rabbitmq.xml
-sudo svcadm enable rabbitmq
+pfexec svccfg import /opt/rabbitmq/smf/rabbitmq.xml
+pfexec svcadm enable rabbitmq
 
 # Wait for RabbitMQ to start, then configure
 sleep 10
 
 # Enable management plugin (optional, for web UI on port 15672)
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmq-plugins enable rabbitmq_management
+pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmq-plugins enable rabbitmq_management"
 
 # Create vhost and user for Forge
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl add_vhost master
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl add_user forged changeme-use-a-strong-password
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl set_permissions -p master forged ".*" ".*" ".*"
+pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl add_vhost master"
+pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl add_user forged changeme-use-a-strong-password"
+pfexec su - rabbitmq -c '/opt/rabbitmq/sbin/rabbitmqctl set_permissions -p master forged ".*" ".*" ".*"'
 ```
 
 ### Verify
 
 ```bash
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl status
+pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl status"
 ```
 
 ## 4. Install Forge
@@ -245,11 +243,11 @@ sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl status
 ### Create User and Directories
 
 ```bash
-sudo useradd -d /opt/forge -s /usr/bin/false forged
-sudo mkdir -p /opt/forge/bin /opt/forge/lib/svc/method
-sudo mkdir -p /etc/forged
-sudo mkdir -p /var/lib/forged/jj-repos /var/lib/forged/acme
-sudo chown -R forged:forged /var/lib/forged
+pfexec useradd -d /opt/forge -s /usr/bin/false forged
+pfexec mkdir -p /opt/forge/bin /opt/forge/lib/svc/method
+pfexec mkdir -p /etc/forged
+pfexec mkdir -p /var/lib/forged/jj-repos /var/lib/forged/acme
+pfexec chown -R forged:forged /var/lib/forged
 ```
 
 ### Install the Binaries
@@ -257,16 +255,16 @@ sudo chown -R forged:forged /var/lib/forged
 If you have pre-built illumos binaries:
 
 ```bash
-sudo cp forged /opt/forge/bin/
-sudo cp pkgdev /opt/forge/bin/
-sudo chmod +x /opt/forge/bin/*
+pfexec cp forged /opt/forge/bin/
+pfexec cp pkgdev /opt/forge/bin/
+pfexec chmod +x /opt/forge/bin/*
 ```
 
 If building from source on the machine:
 
 ```bash
 # Install build dependencies
-sudo pkg install developer/gcc-13 developer/build/gnu-make \
+pfexec pkg install developer/gcc-13 developer/build/gnu-make \
   library/security/openssl-31 system/header \
   developer/build/pkg-config library/libarchive
 
@@ -276,15 +274,15 @@ source ~/.cargo/env
 
 # Build
 cargo build -p forged -p pkgdev --release
-sudo cp target/release/forged target/release/pkgdev /opt/forge/bin/
+pfexec cp target/release/forged target/release/pkgdev /opt/forge/bin/
 ```
 
 ### Install the SMF Manifest and Method Script
 
 ```bash
-sudo cp smf/forged.xml /lib/svc/manifest/application/forge-forged.xml
-sudo cp smf/forged-method /opt/forge/lib/svc/method/forged-method
-sudo chmod +x /opt/forge/lib/svc/method/forged-method
+pfexec cp smf/forged.xml /lib/svc/manifest/application/forge-forged.xml
+pfexec cp smf/forged-method /opt/forge/lib/svc/method/forged-method
+pfexec chmod +x /opt/forge/lib/svc/method/forged-method
 ```
 
 ### Write the Configuration File
@@ -326,15 +324,15 @@ http_listen_addr = "0.0.0.0:80"
 Set file permissions:
 
 ```bash
-sudo chown root:forged /etc/forged/forged.toml
-sudo chmod 640 /etc/forged/forged.toml
+pfexec chown root:forged /etc/forged/forged.toml
+pfexec chmod 640 /etc/forged/forged.toml
 ```
 
 ### Import and Enable the Service
 
 ```bash
-sudo svccfg import /lib/svc/manifest/application/forge-forged.xml
-sudo svcadm enable forge/forged
+pfexec svccfg import /lib/svc/manifest/application/forge-forged.xml
+pfexec svcadm enable forge/forged
 ```
 
 ### Verify
@@ -363,14 +361,14 @@ When `tls.mode = "acme"` is set, Forge automatically obtains a TLS certificate f
 On illumos, non-root processes cannot bind ports below 1024 by default. Grant the privilege:
 
 ```bash
-sudo usermod -K defaultpriv=basic,net_privaddr forged
+pfexec usermod -K defaultpriv=basic,net_privaddr forged
 ```
 
 Alternatively, use port forwarding with `ipnat` or `ipfilter`:
 
 ```bash
 # Forward port 80 -> 8080 and port 443 -> 50051 (if needed)
-echo "rdr e1000g0 0/0 port 80 -> 127.0.0.1 port 8080 tcp" | sudo ipnat -f -
+echo "rdr e1000g0 0/0 port 80 -> 127.0.0.1 port 8080 tcp" | pfexec ipnat -f -
 ```
 
 If using port forwarding, update the config accordingly:
@@ -422,8 +420,8 @@ block in on e1000g0 all
 Apply:
 
 ```bash
-sudo svcadm enable ipfilter
-sudo ipf -Fa -f /etc/ipf/ipf.conf
+pfexec svcadm enable ipfilter
+pfexec ipf -Fa -f /etc/ipf/ipf.conf
 ```
 
 Internal services (PostgreSQL 5432, SeaweedFS 9333/8080, RabbitMQ 5672) should only be accessible from localhost. The default configuration binds them to `127.0.0.1`, which is already secure.
@@ -439,7 +437,7 @@ svcs -a | grep -E 'postgres|seaweedfs|rabbitmq|forge'
 Expected output:
 
 ```
-online  svc:/application/database/postgresql:version_17
+online  svc:/application/database/postgresql:version_16
 online  svc:/network/seaweedfs/master:default
 online  svc:/network/seaweedfs/volume:default
 online  svc:/application/rabbitmq:default
@@ -479,18 +477,17 @@ Migrations run automatically on server startup. To check status manually:
 Use the provided backup script:
 
 ```bash
-sudo cp scripts/backup.sh /opt/forge/bin/
-sudo chmod +x /opt/forge/bin/backup.sh
+pfexec cp scripts/backup.sh /opt/forge/bin/
+pfexec chmod +x /opt/forge/bin/backup.sh
 
 # Run a backup
-sudo -u forged FORGED_POSTGRES_URL="postgresql://forged:password@localhost/forged" \
-  /opt/forge/bin/backup.sh /var/backups/forged
+pfexec su - forged -c 'FORGED_POSTGRES_URL="postgresql://forged:password@localhost/forged" /opt/forge/bin/backup.sh /var/backups/forged'
 ```
 
 Schedule daily backups with cron:
 
 ```bash
-sudo crontab -e -u forged
+pfexec crontab -e -u forged
 # Add:
 0 2 * * * FORGED_POSTGRES_URL="postgresql://forged:password@localhost/forged" /opt/forge/bin/backup.sh /var/backups/forged/$(date +\%Y\%m\%d)
 ```
@@ -552,11 +549,11 @@ svcs -xv seaweedfs/volume
 ### RabbitMQ Connection Refused
 
 ```bash
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl status
+pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl status"
 # Check vhost exists:
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl list_vhosts
+pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl list_vhosts"
 # Check user permissions:
-sudo -u rabbitmq /opt/rabbitmq/sbin/rabbitmqctl list_permissions -p master
+pfexec su - rabbitmq -c '/opt/rabbitmq/sbin/rabbitmqctl list_permissions -p master'
 ```
 
 ### ACME Certificate Issues
@@ -569,22 +566,22 @@ curl http://forge.example.com/.well-known/acme-challenge/test
 ls -la /var/lib/forged/acme/
 
 # Force certificate renewal by removing cache
-sudo rm /var/lib/forged/acme/cert.pem /var/lib/forged/acme/key.pem
-sudo svcadm restart forge/forged
+pfexec rm /var/lib/forged/acme/cert.pem /var/lib/forged/acme/key.pem
+pfexec svcadm restart forge/forged
 ```
 
 ## 10. Upgrading
 
 ```bash
 # Stop the service
-sudo svcadm disable forge/forged
+pfexec svcadm disable forge/forged
 
 # Replace binaries
-sudo cp new-forged /opt/forge/bin/forged
-sudo cp new-pkgdev /opt/forge/bin/pkgdev
+pfexec cp new-forged /opt/forge/bin/forged
+pfexec cp new-pkgdev /opt/forge/bin/pkgdev
 
 # Start the service (migrations run automatically)
-sudo svcadm enable forge/forged
+pfexec svcadm enable forge/forged
 
 # Verify
 svcs forge/forged
