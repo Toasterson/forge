@@ -578,7 +578,7 @@ pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::
 
     // 3. Request device authorization
     debug!(endpoint = %device_auth_endpoint, "requesting device authorization");
-    let device_resp: DeviceAuthResponse = http
+    let resp = http
         .post(&device_auth_endpoint)
         .form(&[
             ("client_id", client_id.as_str()),
@@ -592,7 +592,20 @@ pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::
                 device_auth_endpoint,
                 e
             )
-        })?
+        })?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(miette::miette!(
+            "device authorization failed (HTTP {}):\n  {}\n\n\
+             Ensure the client '{}' is registered with the OIDC provider at {}.\n\
+             The client must support the 'urn:ietf:params:oauth:grant-type:device_code' grant type.",
+            status, body, client_id, issuer_url,
+        ));
+    }
+
+    let device_resp: DeviceAuthResponse = resp
         .json()
         .await
         .map_err(|e| miette::miette!("failed to parse device authorization response: {}", e))?;
