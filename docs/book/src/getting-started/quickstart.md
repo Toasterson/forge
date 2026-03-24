@@ -16,27 +16,18 @@ Then start the Forge server:
 cargo run -p forged
 ```
 
-## 2. Register and Authenticate
+## 2. Authenticate
 
-Generate an SSH key pair if you don't have one, then register with the Forge instance:
+Log in to the Forge instance using your OIDC identity:
 
 ```bash
-pkgdev auth register \
-  --host http://localhost:50051 \
-  --actor-id myuser \
-  --email user@example.com \
-  --public-key ~/.ssh/id_ed25519.pub
+pkgdev auth login --host http://localhost:50051
 ```
 
-Confirm registration using the challenge envelope you receive:
+Follow the instructions to visit the OIDC provider URL and enter the code. After authorization, optionally add your SSH key:
 
 ```bash
-pkgdev auth confirm \
-  --host http://localhost:50051 \
-  --actor-id myuser \
-  --envelope <ENCRYPTED_ENVELOPE> \
-  --identity ~/.ssh/id_ed25519 \
-  --login --select
+pkgdev auth add-key --public-key ~/.ssh/id_ed25519.pub --key-id default
 ```
 
 ## 3. Create a Gate

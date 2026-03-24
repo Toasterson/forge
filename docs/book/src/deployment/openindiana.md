@@ -519,11 +519,7 @@ From a client machine with `pkgdev` installed:
 
 ```bash
 pkgdev auth login --host https://forge.example.com
-pkgdev auth register \
-  --host https://forge.example.com \
-  --actor-id admin \
-  --email admin@example.com \
-  --public-key ~/.ssh/id_ed25519.pub
+pkgdev auth add-key --public-key ~/.ssh/id_ed25519.pub --key-id default
 ```
 
 ## 9. Troubleshooting
