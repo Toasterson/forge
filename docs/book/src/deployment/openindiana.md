@@ -306,7 +306,9 @@ Create `/etc/forged/forged.toml`:
 
 ```toml
 [server]
-listen_addr = "0.0.0.0:50051"
+# Use port 443 for public TLS servers so clients don't need to specify a port.
+# Use 50051 for internal/development deployments.
+listen_addr = "0.0.0.0:443"
 
 [postgres]
 url = "postgresql://forged:changeme-use-a-strong-password@localhost/forged"
@@ -373,24 +375,10 @@ When `tls.mode = "acme"` is set, Forge automatically obtains a TLS certificate f
 
 ### Allow Binding to Privileged Ports
 
-On illumos, non-root processes cannot bind ports below 1024 by default. Grant the privilege:
+On illumos, non-root processes cannot bind ports below 1024 by default. Since the server listens on port 443 (gRPC/TLS) and port 80 (ACME HTTP-01), grant the `net_privaddr` privilege:
 
 ```bash
 pfexec usermod -K defaultpriv=basic,net_privaddr forged
-```
-
-Alternatively, use port forwarding with `ipnat` or `ipfilter`:
-
-```bash
-# Forward port 80 -> 8080 and port 443 -> 50051 (if needed)
-echo "rdr e1000g0 0/0 port 80 -> 127.0.0.1 port 8080 tcp" | pfexec ipnat -f -
-```
-
-If using port forwarding, update the config accordingly:
-
-```toml
-[tls.acme]
-http_listen_addr = "0.0.0.0:8080"
 ```
 
 ### Certificate Lifecycle
@@ -419,8 +407,8 @@ Open the required ports using `ipfilter`:
 
 ```bash
 # /etc/ipf/ipf.conf
-# Allow gRPC (TLS)
-pass in on e1000g0 proto tcp from any to any port = 50051
+# Allow gRPC over TLS (port 443 for public servers, or 50051 if using a non-standard port)
+pass in on e1000g0 proto tcp from any to any port = 443
 
 # Allow HTTP for ACME challenges
 pass in on e1000g0 proto tcp from any to any port = 80
@@ -462,11 +450,11 @@ online  svc:/application/forge/forged:default
 Test the gRPC endpoint:
 
 ```bash
-# Without TLS
+# Without TLS (development, port 50051)
 grpcurl -plaintext localhost:50051 grpc.health.v1.Health/Check
 
-# With TLS
-grpcurl forge.example.com:50051 grpc.health.v1.Health/Check
+# With TLS on port 443
+grpcurl forge.example.com:443 grpc.health.v1.Health/Check
 ```
 
 Expected response:
@@ -526,8 +514,9 @@ svcadm restart forge/forged
 From a client machine with `pkgdev` installed:
 
 ```bash
+pkgdev auth login --host https://forge.example.com
 pkgdev auth register \
-  --host https://forge.example.com:50051 \
+  --host https://forge.example.com \
   --actor-id admin \
   --email admin@example.com \
   --public-key ~/.ssh/id_ed25519.pub
@@ -549,7 +538,7 @@ Common issues:
 
 - **"PostgreSQL URL is required"** -- Check `/etc/forged/forged.toml` exists and is readable by the `forged` user
 - **"Failed to connect to PostgreSQL"** -- Verify PostgreSQL is running (`svcs postgresql`) and the password is correct
-- **"Failed to bind"** -- Check if the port is already in use (`netstat -an | grep 50051`)
+- **"Failed to bind"** -- Check if the port is already in use (`netstat -an | grep 443`) or if the `forged` user lacks the `net_privaddr` privilege
 - **"ACME certificate not found"** -- The ACME flow may have failed. Check that port 80 is reachable and DNS resolves correctly
 
 ### SeaweedFS Health Check Failing
