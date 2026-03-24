@@ -169,12 +169,10 @@ pfexec mkdir -p /opt/rabbitmq
 cd /opt/rabbitmq && pfexec gtar xJf /tmp/rabbitmq.tar.xz --strip-components=1
 
 # RabbitMQ shell scripts use bashisms (local keyword) incompatible with illumos ksh.
-# Only patch the actual shell scripts — do NOT patch escript binaries (rabbitmqctl,
-# rabbitmq-plugins, rabbitmq-diagnostics, rabbitmq-queues, rabbitmq-streams,
-# rabbitmq-upgrade) as those are Erlang escripts with a different header format.
-for f in rabbitmq-server rabbitmq-env rabbitmq-defaults; do
-  [ -f "/opt/rabbitmq/sbin/$f" ] && \
-    pfexec sed -i 's|#!/bin/sh|#!/usr/bin/bash|' "/opt/rabbitmq/sbin/$f"
+# Patch all sbin/ scripts that have a #!/bin/sh shebang to use bash:
+for f in /opt/rabbitmq/sbin/*; do
+  [ -f "$f" ] && head -1 "$f" | grep -q '^#!/bin/sh' && \
+    pfexec sed -i 's|#!/bin/sh|#!/usr/bin/bash|' "$f"
 done
 ```
 
