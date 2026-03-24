@@ -412,7 +412,7 @@ pub async fn connect_grpc(url: &str, tls_insecure: bool) -> miette::Result<Chann
 }
 
 /// Diagnose a gRPC call error with actionable help for common failures.
-fn diagnose_rpc_error(url: &str, rpc_name: &str, e: tonic::Status) -> miette::Report {
+pub fn diagnose_rpc_error(url: &str, rpc_name: &str, e: tonic::Status) -> miette::Report {
     let msg = e.message().to_string();
     let is_tls = url.starts_with("https://");
 

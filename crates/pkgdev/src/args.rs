@@ -17,9 +17,11 @@ use miette::{Context, IntoDiagnostic};
 use repology::MetadataBuilder;
 use strum::Display;
 
+use crate::api::forged::api::v2 as api_v2;
 use crate::auth::{
-    default_auth_state_path, get_valid_token, login_device_flow, print_token_status,
-    server_url_from_host, ActorKind, AuthClient, AuthState, LoginEntry, TokenStore,
+    authenticated_request, connect_grpc, default_auth_state_path, diagnose_rpc_error,
+    get_valid_token, login_device_flow, print_token_status, server_url_from_host, ActorKind,
+    AuthClient, AuthState, LoginEntry, TokenStore,
 };
 use crate::component_client::ComponentClient;
 use crate::gate_client::GateClient;
@@ -266,25 +268,19 @@ pub enum AuthCmd {
     },
     /// Register a new actor with their SSH public key on a forge.
     /// Requires an active OAuth session (run 'auth login' first).
-    Register {
-        /// Forge hostname (or hostname:port) to talk to (gRPC)
+    /// Add an SSH public key to your OIDC-authenticated account.
+    /// Requires a prior `auth login`.
+    #[command(name = "add-key")]
+    AddKey {
+        /// Forge hostname
         #[arg(long)]
-        host: String,
-        /// Actor identifier (username@domain)
-        #[arg(long)]
-        actor_id: String,
-        /// Email address to receive the registration confirmation envelope
-        #[arg(long)]
-        email: String,
-        /// Actor kind
-        #[arg(long, value_enum, default_value_t = ActorKind::User)]
-        kind: ActorKind,
+        host: Option<String>,
         /// Path to the SSH public key file (OpenSSH format)
         #[arg(long)]
         public_key: PathBuf,
-        /// Optional algorithm hint (ed25519, rsa-ssh, ecdsa-p256, ...)
-        #[arg(long)]
-        algorithm: Option<String>,
+        /// Human-readable label for the key (e.g., "laptop", "ci")
+        #[arg(long, default_value = "default")]
+        key_id: String,
     },
     /// Confirm a pending registration using the age-encrypted envelope from the email
     Confirm {
@@ -429,28 +425,43 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 }
                 Ok(())
             }
-            AuthCmd::Register {
+            AuthCmd::AddKey {
                 host,
-                actor_id,
-                email,
-                kind,
                 public_key,
-                algorithm,
+                key_id,
             } => {
-                // Verify we have a valid token for this host
+                let host = resolve_host_or_selected(host)?;
                 let token = get_valid_token(&host)
                     .await
-                    .wrap_err("authentication required before registration")?;
+                    .wrap_err("authentication required — run 'pkgdev auth login' first")?;
 
-                let url = server_url_from_host(&host);
-                let client = AuthClient::connect(url)
-                    .await
-                    .wrap_err("failed to connect to forge host")?;
+                // Read SSH public key
+                let key_data = std::fs::read_to_string(&public_key).map_err(|e| {
+                    miette::miette!(
+                        "failed to read public key file '{}': {}",
+                        public_key.display(),
+                        e
+                    )
+                })?;
+
+                let grpc_url = server_url_from_host(&host);
+                let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                let mut client = api_v2::auth_service_client::AuthServiceClient::new(channel);
+                let req = authenticated_request(
+                    api_v2::RegisterActorRequest {
+                        display_name: String::new(), // ignored, identity from OIDC token
+                        email: String::new(),        // ignored
+                        public_key: key_data.trim().to_string(),
+                        key_id: key_id.clone(),
+                    },
+                    &token,
+                );
                 client
-                    .register_actor(actor_id, email, kind, &public_key, algorithm, &token)
+                    .register_actor(req)
                     .await
-                    .wrap_err("registration RPC failed")?;
-                println!("registration submitted on {}", host);
+                    .map_err(|e| diagnose_rpc_error(&grpc_url, "RegisterActor", e))?;
+
+                println!("SSH key '{}' added to your account on {}", key_id, host);
                 Ok(())
             }
             AuthCmd::Confirm {
