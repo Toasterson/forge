@@ -46,7 +46,6 @@
                               privileges="basic,net_privaddr" />
         <method_environment>
           <envvar name="FORGED_CONFIG" value="/etc/forged/forged.toml" />
-          <envvar name="RUST_LOG" value="forged=info,warn" />
         </method_environment>
       </method_context>
     </exec_method>
@@ -62,10 +61,26 @@
       <propval name="duration" type="astring" value="child" />
     </property_group>
 
-    <!-- Service-specific properties -->
+    <!-- Service-specific properties.
+         These can be changed at runtime with svccfg:
+           svccfg -s forge/forged setprop application/listen_addr = astring: "0.0.0.0:443"
+           svccfg -s forge/forged setprop application/log_level = astring: "forged=debug"
+           svcadm refresh forge/forged
+           svcadm restart forge/forged
+    -->
     <property_group name="application" type="application">
       <propval name="config_file" type="astring"
                value="/etc/forged/forged.toml" />
+      <propval name="listen_addr" type="astring"
+               value="" />
+      <propval name="log_level" type="astring"
+               value="forged=info,warn" />
+      <propval name="postgres_url" type="astring"
+               value="" />
+      <propval name="seaweedfs_url" type="astring"
+               value="" />
+      <propval name="amqp_url" type="astring"
+               value="" />
     </property_group>
 
     <!-- Authorization -->

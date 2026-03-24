@@ -13,15 +13,20 @@ DEFAULT_CONFIG="/etc/forged/forged.toml"
 FAIL_COUNT_FILE="/var/lib/forged/.restart_count"
 MAX_RESTARTS=3
 
-getproparg() {
+# Read an SMF property value. Returns empty string if not set.
+getprop() {
     val=$(svcprop -p "application/$1" "$SMF_FMRI" 2>/dev/null)
-    [ -n "$val" ] && echo "$val"
+    # svcprop returns the literal '""' for empty astring values
+    case "$val" in
+        '""'|"") echo "" ;;
+        *) echo "$val" ;;
+    esac
 }
 
 case "$1" in
 start)
     # Read config path from SMF property, fall back to default
-    config=$(getproparg config_file)
+    config=$(getprop config_file)
     if [ -z "$config" ]; then
         config="$DEFAULT_CONFIG"
     fi
@@ -36,12 +41,39 @@ start)
         exit "$SMF_EXIT_ERR_FATAL"
     fi
 
+    # Export SMF properties as environment variables.
+    # These override values from the config file (env has highest precedence).
+    log_level=$(getprop log_level)
+    listen_addr=$(getprop listen_addr)
+    postgres_url=$(getprop postgres_url)
+    seaweedfs_url=$(getprop seaweedfs_url)
+    amqp_url=$(getprop amqp_url)
+
+    # RUST_LOG controls logging verbosity
+    if [ -n "$log_level" ]; then
+        export RUST_LOG="$log_level"
+    fi
+
+    # FORGED__* environment variables override config file sections
+    if [ -n "$listen_addr" ]; then
+        export FORGED__SERVER__LISTEN_ADDR="$listen_addr"
+    fi
+    if [ -n "$postgres_url" ]; then
+        export FORGED__POSTGRES__URL="$postgres_url"
+    fi
+    if [ -n "$seaweedfs_url" ]; then
+        export FORGED__SEAWEEDFS__MASTER_URL="$seaweedfs_url"
+    fi
+    if [ -n "$amqp_url" ]; then
+        export FORGED__AMQP__URL="$amqp_url"
+    fi
+
     # Track consecutive restart failures.
     # If forged exits quickly more than MAX_RESTARTS times, go to maintenance.
     count=0
     if [ -f "$FAIL_COUNT_FILE" ]; then
         count=$(cat "$FAIL_COUNT_FILE" 2>/dev/null || echo 0)
-        # Check if last successful start was recent (>60s ago = reset counter)
+        # If last failure was >60s ago, reset counter (transient issue resolved)
         if [ -f "${FAIL_COUNT_FILE}.ts" ]; then
             last_ts=$(cat "${FAIL_COUNT_FILE}.ts" 2>/dev/null || echo 0)
             now_ts=$(date +%s)
@@ -59,15 +91,12 @@ start)
     if [ "$count" -gt "$MAX_RESTARTS" ]; then
         echo "forged has failed $count consecutive times (max $MAX_RESTARTS). Entering maintenance." >&2
         echo "Fix the issue, then run: svcadm clear forge/forged" >&2
-        # Reset counter so clear + enable starts fresh
         echo "0" > "$FAIL_COUNT_FILE"
         exit "$SMF_EXIT_ERR_FATAL"
     fi
 
-    # Reset counter on successful startup (forged runs for >60s).
-    # This is handled by the timestamp check above on next start.
-
-    FORGED_CONFIG="$config" exec "$FORGED_BIN"
+    export FORGED_CONFIG="$config"
+    exec "$FORGED_BIN"
     ;;
 
 stop)
