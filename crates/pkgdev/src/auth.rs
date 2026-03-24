@@ -350,8 +350,12 @@ pub fn default_auth_state_path() -> PathBuf {
 }
 
 pub fn server_url_from_host(host: &str) -> String {
-    // Accept host or host:port and default scheme http
-    format!("http://{}", host)
+    // If the host already has a scheme, use it as-is
+    if host.starts_with("http://") || host.starts_with("https://") {
+        host.to_string()
+    } else {
+        format!("http://{}", host)
+    }
 }
 
 // ============================================================
