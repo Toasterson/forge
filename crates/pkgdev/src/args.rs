@@ -376,7 +376,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
 
     match args.command {
         Commands::Auth { cmd } => match cmd {
-            AuthCmd::Login { host, select } => {
+            AuthCmd::Login { host, select: _ } => {
                 let token_set = login_device_flow(&host, args.tls_insecure)
                     .await
                     .wrap_err("device authorization flow failed")?;
@@ -386,26 +386,12 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 store.set(host.clone(), token_set);
                 store.save().wrap_err("failed to save token")?;
 
-                // Optionally select this host as default context
-                if select {
+                // Always set this host as the selected context
+                {
                     let path = default_auth_state_path();
-                    let mut state =
-                        AuthState::load(&path).into_diagnostic().wrap_err_with(|| {
-                            format!("failed to load auth state from {}", path.display())
-                        })?;
-                    // Record a login entry (actor_id comes from the OIDC flow;
-                    // we use the host as a placeholder until the user registers)
-                    state.add_login(
-                        &host,
-                        LoginEntry {
-                            actor_id: host.clone(),
-                            kind: ActorKind::User,
-                        },
-                    );
+                    let mut state = AuthState::load(&path).unwrap_or_default();
                     state.set_selected(host.clone(), host.clone(), ActorKind::User);
-                    state.save(&path).into_diagnostic().wrap_err_with(|| {
-                        format!("failed to save auth state to {}", path.display())
-                    })?;
+                    let _ = state.save(&path);
                 }
 
                 println!("authenticated successfully on {}", host);
