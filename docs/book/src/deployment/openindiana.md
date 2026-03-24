@@ -283,6 +283,7 @@ pfexec pkg install developer/gcc-14 developer/build/gnu-make \
   library/security/openssl-31 system/header \
   system/library/gcc-14-runtime system/library/g++-14-runtime \
   developer/build/pkg-config library/libarchive \
+  developer/linker developer/object-file \
   developer/lang/rustc
 
 # Build
