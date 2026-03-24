@@ -105,10 +105,15 @@ impl OidcService {
             return self.validate_stub(token);
         }
 
-        // 1. Decode JWT header to get kid
-        let header = decode_header(token)
-            .into_diagnostic()
-            .wrap_err("Failed to decode JWT header. Ensure the token is a valid JWT.")?;
+        // 1. Try to decode JWT header. If this fails, the token may be opaque —
+        //    fall back to userinfo endpoint validation.
+        let header = match decode_header(token) {
+            Ok(h) => h,
+            Err(_) => {
+                tracing::debug!("Token is not a JWT, attempting userinfo endpoint validation");
+                return self.validate_via_userinfo(token).await;
+            }
+        };
 
         let kid = header.kid.as_deref();
         let alg = header.alg;
@@ -162,6 +167,79 @@ impl OidcService {
             subject: claims.sub,
             display_name,
             email: claims.email,
+        })
+    }
+
+    /// Validate an opaque (non-JWT) token by calling the OIDC provider's userinfo endpoint.
+    /// This is the standard way to validate opaque access tokens per RFC 6750.
+    async fn validate_via_userinfo(&self, token: &str) -> Result<OidcClaims> {
+        // Discover the userinfo endpoint
+        let discovery_url = format!(
+            "{}/.well-known/openid-configuration",
+            self.issuer_url.trim_end_matches('/')
+        );
+        let discovery: serde_json::Value = self
+            .http_client
+            .get(&discovery_url)
+            .send()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to fetch OIDC discovery for userinfo endpoint")?
+            .json()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to parse OIDC discovery document")?;
+
+        let userinfo_endpoint = discovery["userinfo_endpoint"]
+            .as_str()
+            .ok_or_else(|| miette::miette!("OIDC provider does not have a userinfo_endpoint"))?;
+
+        // Call userinfo with the opaque token as Bearer
+        let resp = self
+            .http_client
+            .get(userinfo_endpoint)
+            .bearer_auth(token)
+            .send()
+            .await
+            .into_diagnostic()
+            .wrap_err("Userinfo request failed")?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(miette::miette!(
+                "Userinfo endpoint returned {}: {}\n\
+                 The access token may be invalid or expired.",
+                status,
+                body
+            ));
+        }
+
+        let userinfo: serde_json::Value = resp
+            .json()
+            .await
+            .into_diagnostic()
+            .wrap_err("Failed to parse userinfo response")?;
+
+        let sub = userinfo["sub"]
+            .as_str()
+            .ok_or_else(|| miette::miette!("Userinfo response missing 'sub' claim"))?
+            .to_string();
+
+        let display_name = userinfo["name"]
+            .as_str()
+            .or_else(|| userinfo["preferred_username"].as_str())
+            .unwrap_or(&sub)
+            .to_string();
+
+        let email = userinfo["email"].as_str().map(|s| s.to_string());
+
+        tracing::info!(sub = %sub, name = %display_name, "Validated opaque token via userinfo");
+
+        Ok(OidcClaims {
+            subject: sub,
+            display_name,
+            email,
         })
     }
 

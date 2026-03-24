@@ -430,6 +430,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     )
                 })?;
 
+                tracing::debug!(host = %host, token_len = token.len(), token_prefix = %&token[..std::cmp::min(20, token.len())], "add-key: using token");
                 let grpc_url = server_url_from_host(&host);
                 let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
                 let mut client = api_v2::auth_service_client::AuthServiceClient::new(channel);
