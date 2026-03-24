@@ -2628,28 +2628,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ghwhrecv"
-version = "0.1.0"
-dependencies = [
- "axum 0.7.9",
- "clap",
- "config 0.14.1",
- "deadpool-lapin",
- "forge",
- "github",
- "hyper 1.7.0",
- "miette 5.10.0",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
-]
-
-[[package]]
 name = "gimli"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8708,16 +8686,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-serde"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "704b1aeb7be0d0a84fc9828cae51dab5970fee5088f83d1dd7ee6f6246fc6ff1"
-dependencies = [
- "serde",
- "tracing-core",
-]
-
-[[package]]
 name = "tracing-subscriber"
 version = "0.3.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8727,15 +8695,12 @@ dependencies = [
  "nu-ansi-term",
  "once_cell",
  "regex-automata",
- "serde",
- "serde_json",
  "sharded-slab",
  "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",
  "tracing-log",
- "tracing-serde",
 ]
 
 [[package]]
@@ -9661,32 +9626,6 @@ name = "wit-bindgen"
 version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "052283831dbae3d879dc7f51f3d92703a316ca49f91540417d38591826127814"
-
-[[package]]
-name = "worker"
-version = "0.1.0"
-dependencies = [
- "axum 0.7.9",
- "base64 0.22.1",
- "clap",
- "component",
- "config 0.14.1",
- "deadpool-lapin",
- "forge",
- "futures 0.3.31",
- "github",
- "hyper 1.7.0",
- "integration",
- "itertools 0.12.1",
- "miette 5.10.0",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
-]
 
 [[package]]
 name = "workspace"

@@ -20,6 +20,7 @@ uuid.workspace = true
 
 [workspace]
 members = ["crates/*"]
+exclude = ["crates/ghwhrecv", "crates/worker"]
 resolver = "2"
 
 [workspace.metadata.forge]

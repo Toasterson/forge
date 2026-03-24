@@ -16,6 +16,7 @@ pub fn build_and_stage_cargo(
     cargo_config: &CargoBuildSection,
 ) -> Result<()> {
     let root = component.get_path();
+    let empty_pkgs: Vec<String> = Vec::new();
 
     // --- Build phase ---
     tracing::info!(target: "pkgdev::cargo", "[cargo] Building project at {}", root.display());
@@ -26,15 +27,25 @@ pub fn build_and_stage_cargo(
     build_cmd.arg("--release");
 
     // Add package selections
-    for pkg in &cargo_config.packages {
+    for pkg in cargo_config
+        .packages
+        .as_ref()
+        .map(|p| &p.0)
+        .unwrap_or(&empty_pkgs)
+    {
         build_cmd.arg("-p");
         build_cmd.arg(pkg);
     }
 
     // Add features
-    if !cargo_config.features.is_empty() {
+    if !cargo_config
+        .features
+        .as_ref()
+        .map(|f| f.0.is_empty())
+        .unwrap_or(true)
+    {
         build_cmd.arg("--features");
-        build_cmd.arg(cargo_config.features.join(","));
+        build_cmd.arg(cargo_config.features.as_ref().unwrap().0.join(","));
     }
 
     // Offline mode
@@ -124,15 +135,25 @@ pub fn build_and_stage_cargo(
     install_cmd.arg("--no-track");
 
     // For install, replicate the same package selections
-    for pkg in &cargo_config.packages {
+    for pkg in cargo_config
+        .packages
+        .as_ref()
+        .map(|p| &p.0)
+        .unwrap_or(&empty_pkgs)
+    {
         install_cmd.arg("--bin");
         install_cmd.arg(pkg);
     }
 
     // Replicate features
-    if !cargo_config.features.is_empty() {
+    if !cargo_config
+        .features
+        .as_ref()
+        .map(|f| f.0.is_empty())
+        .unwrap_or(true)
+    {
         install_cmd.arg("--features");
-        install_cmd.arg(cargo_config.features.join(","));
+        install_cmd.arg(cargo_config.features.as_ref().unwrap().0.join(","));
     }
 
     // Offline + locked

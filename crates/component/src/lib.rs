@@ -1377,6 +1377,74 @@ impl TransformNode {
     }
 }
 
+/// Wrapper for the `packages` node containing multiple package name arguments.
+#[derive(
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    JsonSchema,
+    ToSchema,
+)]
+pub struct CargoBuildPackages(#[knuffel(arguments)] pub Vec<String>);
+
+impl Diff for CargoBuildPackages {
+    type Repr = Option<Vec<String>>;
+    fn diff(&self, other: &Self) -> Self::Repr {
+        if self == other {
+            None
+        } else {
+            Some(other.0.clone())
+        }
+    }
+    fn apply(&mut self, diff: &Self::Repr) {
+        if let Some(d) = diff {
+            self.0 = d.clone();
+        }
+    }
+    fn identity() -> Self {
+        Self::default()
+    }
+}
+
+/// Wrapper for the `features` node containing multiple feature name arguments.
+#[derive(
+    Debug,
+    Default,
+    knuffel::Decode,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    JsonSchema,
+    ToSchema,
+)]
+pub struct CargoBuildFeatures(#[knuffel(arguments)] pub Vec<String>);
+
+impl Diff for CargoBuildFeatures {
+    type Repr = Option<Vec<String>>;
+    fn diff(&self, other: &Self) -> Self::Repr {
+        if self == other {
+            None
+        } else {
+            Some(other.0.clone())
+        }
+    }
+    fn apply(&mut self, diff: &Self::Repr) {
+        if let Some(d) = diff {
+            self.0 = d.clone();
+        }
+    }
+    fn identity() -> Self {
+        Self::default()
+    }
+}
+
 #[derive(
     Debug,
     Default,
@@ -1394,11 +1462,11 @@ impl TransformNode {
 # [derive(Debug, Clone, Serialize, Deserialize)]
 ))]
 pub struct CargoBuildSection {
-    #[knuffel(child, unwrap(arguments))]
-    pub packages: Vec<String>,
+    #[knuffel(child)]
+    pub packages: Option<CargoBuildPackages>,
 
-    #[knuffel(child, unwrap(arguments))]
-    pub features: Vec<String>,
+    #[knuffel(child)]
+    pub features: Option<CargoBuildFeatures>,
 
     #[knuffel(child, unwrap(argument))]
     pub install_root: Option<String>,
@@ -1422,20 +1490,24 @@ impl CargoBuildSection {
         let mut node = kdl::KdlNode::new("cargo");
         let doc = node.ensure_children();
 
-        if !self.packages.is_empty() {
-            let mut packages_node = kdl::KdlNode::new("packages");
-            for (i, pkg) in self.packages.iter().enumerate() {
-                packages_node.insert(i, pkg.as_str());
+        if let Some(packages) = &self.packages {
+            if !packages.0.is_empty() {
+                let mut packages_node = kdl::KdlNode::new("packages");
+                for (i, pkg) in packages.0.iter().enumerate() {
+                    packages_node.insert(i, pkg.as_str());
+                }
+                doc.nodes_mut().push(packages_node);
             }
-            doc.nodes_mut().push(packages_node);
         }
 
-        if !self.features.is_empty() {
-            let mut features_node = kdl::KdlNode::new("features");
-            for (i, feat) in self.features.iter().enumerate() {
-                features_node.insert(i, feat.as_str());
+        if let Some(features) = &self.features {
+            if !features.0.is_empty() {
+                let mut features_node = kdl::KdlNode::new("features");
+                for (i, feat) in features.0.iter().enumerate() {
+                    features_node.insert(i, feat.as_str());
+                }
+                doc.nodes_mut().push(features_node);
             }
-            doc.nodes_mut().push(features_node);
         }
 
         if let Some(install_root) = &self.install_root {
@@ -1667,5 +1739,274 @@ impl InstallFile {
             node.insert("mode", mode.as_str());
         }
         node
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_recipe(kdl: &str) -> Recipe {
+        knuffel::parse::<Recipe>("test.kdl", kdl).expect("failed to parse KDL")
+    }
+
+    #[test]
+    fn test_parse_minimal_recipe() {
+        let recipe = parse_recipe(r#"name "library/zlib""#);
+        assert_eq!(recipe.name, "library/zlib");
+        assert!(recipe.groups.is_empty());
+        assert!(recipe.users.is_empty());
+        assert!(recipe.drivers.is_empty());
+        assert!(recipe.file_sections.is_empty());
+    }
+
+    #[test]
+    fn test_parse_cargo_bare() {
+        let recipe = parse_recipe(
+            r#"
+            name "utility/ripgrep"
+            version "14.0.0"
+            build {
+                cargo
+            }
+            "#,
+        );
+        assert_eq!(recipe.build_sections.len(), 1);
+        let cargo = recipe.build_sections[0].cargo.as_ref().unwrap();
+        assert!(cargo.packages.is_none());
+        // Bare cargo node uses Default, so offline/locked are false
+        // When cargo has children, offline/locked default to true via knuffel
+        assert!(!cargo.offline);
+        assert!(!cargo.locked);
+    }
+
+    #[test]
+    fn test_parse_cargo_with_options() {
+        let recipe = parse_recipe(
+            r#"
+            name "developer/packaging/forge"
+            build {
+                cargo {
+                    packages "forged" "pkgdev"
+                    features "otel" "quic"
+                    install-root "/opt/forge"
+                    target "x86_64-unknown-illumos"
+                    env OPENSSL_DIR="/usr/openssl/3.1"
+                    env CC="/usr/gcc/14/bin/gcc" CFLAGS="-m64"
+                }
+            }
+            "#,
+        );
+        let cargo = recipe.build_sections[0].cargo.as_ref().unwrap();
+        assert_eq!(cargo.packages.as_ref().unwrap().0, vec!["forged", "pkgdev"]);
+        assert_eq!(cargo.features.as_ref().unwrap().0, vec!["otel", "quic"]);
+        assert_eq!(cargo.install_root.as_deref(), Some("/opt/forge"));
+        assert_eq!(cargo.target.as_deref(), Some("x86_64-unknown-illumos"));
+        // Two env nodes, merged
+        assert_eq!(cargo.env_vars.len(), 2);
+        assert_eq!(
+            cargo.env_vars[0].vars.get("OPENSSL_DIR"),
+            Some(&"/usr/openssl/3.1".to_string())
+        );
+        assert_eq!(
+            cargo.env_vars[1].vars.get("CC"),
+            Some(&"/usr/gcc/14/bin/gcc".to_string())
+        );
+        assert_eq!(
+            cargo.env_vars[1].vars.get("CFLAGS"),
+            Some(&"-m64".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_user_group() {
+        let recipe = parse_recipe(
+            r#"
+            name "application/database/redis"
+            group "redis" gid=58
+            user "redis" uid=58 group="redis" home="/var/lib/redis" shell="/usr/bin/false" description="Redis database"
+            "#,
+        );
+        assert_eq!(recipe.groups.len(), 1);
+        assert_eq!(recipe.groups[0].name, "redis");
+        assert_eq!(recipe.groups[0].gid, 58);
+
+        assert_eq!(recipe.users.len(), 1);
+        assert_eq!(recipe.users[0].name, "redis");
+        assert_eq!(recipe.users[0].uid, 58);
+        assert_eq!(recipe.users[0].group, "redis");
+        assert_eq!(recipe.users[0].home.as_deref(), Some("/var/lib/redis"));
+        assert_eq!(recipe.users[0].shell.as_deref(), Some("/usr/bin/false"));
+        assert_eq!(
+            recipe.users[0].description.as_deref(),
+            Some("Redis database")
+        );
+        assert!(!recipe.users[0].ftpuser);
+    }
+
+    #[test]
+    fn test_parse_files_section() {
+        let recipe = parse_recipe(
+            r#"
+            name "developer/packaging/forge"
+            files {
+                install "files/forged.toml" "etc/forged/forged.toml"
+                install "smf/forged.xml" "lib/svc/manifest/application/forge-forged.xml"
+                install "smf/forged-method" "opt/forge/lib/svc/method/forged-method" mode="0555"
+            }
+            "#,
+        );
+        assert_eq!(recipe.file_sections.len(), 1);
+        let files = &recipe.file_sections[0];
+        assert_eq!(files.installs.len(), 3);
+        assert_eq!(files.installs[0].src, "files/forged.toml");
+        assert_eq!(files.installs[0].dest, "etc/forged/forged.toml");
+        assert!(files.installs[0].mode.is_none());
+        assert_eq!(files.installs[2].mode.as_deref(), Some("0555"));
+    }
+
+    #[test]
+    fn test_parse_package_with_dirs_and_preserve() {
+        let recipe = parse_recipe(
+            r#"
+            name "application/forge"
+            package {
+                file path="opt/forge/bin/.*"
+                dir path="var/lib/forged" owner="forged" group="forged" mode="0755"
+                file path="etc/forged/.*" preserve="true" mode="0640"
+                link path="usr/bin/forge" target="../../opt/forge/bin/forged"
+            }
+            "#,
+        );
+        let pkg = &recipe.package_sections[0];
+        assert_eq!(pkg.files.len(), 2);
+        assert_eq!(pkg.dirs.len(), 1);
+        assert_eq!(pkg.links.len(), 1);
+
+        // Dir has ownership
+        let dir = &pkg.dirs[0];
+        assert_eq!(dir.selectors.get("path").unwrap(), "var/lib/forged");
+        assert_eq!(dir.selectors.get("owner").unwrap(), "forged");
+        assert_eq!(dir.selectors.get("mode").unwrap(), "0755");
+
+        // File with preserve
+        let preserved = &pkg.files[1];
+        assert_eq!(preserved.selectors.get("preserve").unwrap(), "true");
+
+        // Link with target
+        let link = &pkg.links[0];
+        assert_eq!(
+            link.selectors.get("target").unwrap(),
+            "../../opt/forge/bin/forged"
+        );
+    }
+
+    #[test]
+    fn test_parse_dependency_group_kind() {
+        let recipe = parse_recipe(
+            r#"
+            name "meta/python-modules"
+            dependency "runtime/python-312" kind="group"
+            dependency "system/library" kind="require"
+            "#,
+        );
+        assert_eq!(recipe.dependencies.len(), 2);
+        assert_eq!(recipe.dependencies[0].kind, DependencyKind::Group);
+        assert_eq!(recipe.dependencies[1].kind, DependencyKind::Require);
+    }
+
+    #[test]
+    fn test_parse_driver() {
+        let recipe = parse_recipe(
+            r#"
+            name "driver/network/e1000g"
+            driver "e1000g" {
+                perms "e1000g 0666 root sys"
+                alias "pci8086,1234"
+                alias "pci8086,5678"
+                class "net"
+            }
+            "#,
+        );
+        assert_eq!(recipe.drivers.len(), 1);
+        let drv = &recipe.drivers[0];
+        assert_eq!(drv.name, "e1000g");
+        assert_eq!(drv.perms.as_deref(), Some("e1000g 0666 root sys"));
+        assert_eq!(drv.aliases, vec!["pci8086,1234", "pci8086,5678"]);
+        assert_eq!(drv.class.as_deref(), Some("net"));
+    }
+
+    #[test]
+    fn test_parse_forge_self_package() {
+        let kdl = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../sample_data/components/developer/forge/package.kdl"
+        ))
+        .expect("Could not find forge package.kdl sample");
+        let recipe = knuffel::parse::<Recipe>("package.kdl", &kdl)
+            .expect("failed to parse forge package.kdl");
+
+        assert_eq!(recipe.name, "developer/packaging/forge");
+        assert_eq!(recipe.version.as_deref(), Some("0.1.0"));
+        assert_eq!(recipe.license.as_deref(), Some("MPL-2.0"));
+
+        // Cargo build with packages
+        assert!(!recipe.build_sections.is_empty());
+        let cargo = recipe.build_sections[0]
+            .cargo
+            .as_ref()
+            .expect("should have cargo section");
+        assert_eq!(cargo.packages.as_ref().unwrap().0, vec!["forged", "pkgdev"]);
+        assert_eq!(cargo.install_root.as_deref(), Some("/opt/forge"));
+
+        // User and group
+        assert_eq!(recipe.groups.len(), 1);
+        assert_eq!(recipe.groups[0].name, "forged");
+        assert_eq!(recipe.users.len(), 1);
+        assert_eq!(recipe.users[0].name, "forged");
+
+        // Files section
+        assert!(!recipe.file_sections.is_empty());
+        assert!(recipe.file_sections[0].installs.len() >= 3);
+
+        // Package section with dirs
+        assert!(!recipe.package_sections.is_empty());
+        assert!(!recipe.package_sections[0].dirs.is_empty());
+
+        // Dependencies
+        assert!(recipe.dependencies.len() >= 3);
+    }
+
+    #[test]
+    fn test_roundtrip_recipe() {
+        let original = parse_recipe(
+            r#"
+            name "test/roundtrip"
+            version "1.0.0"
+            summary "Test roundtrip"
+            group "testgrp" gid=100
+            user "testusr" uid=100 group="testgrp"
+            dependency "system/library" kind="require"
+            build {
+                cargo {
+                    packages "mybin"
+                }
+            }
+            "#,
+        );
+        // Serialize to KDL document
+        let doc = original.to_document();
+        let kdl_string = doc.to_string();
+
+        // Re-parse
+        let reparsed = knuffel::parse::<Recipe>("roundtrip.kdl", &kdl_string)
+            .expect("failed to re-parse roundtrip KDL");
+
+        assert_eq!(original.name, reparsed.name);
+        assert_eq!(original.version, reparsed.version);
+        assert_eq!(original.groups.len(), reparsed.groups.len());
+        assert_eq!(original.users.len(), reparsed.users.len());
+        assert_eq!(original.dependencies.len(), reparsed.dependencies.len());
+        assert!(reparsed.build_sections[0].cargo.is_some());
     }
 }
