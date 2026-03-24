@@ -25,7 +25,8 @@ Forge requires four backing services:
 OpenIndiana ships PostgreSQL in the repository. The service comes with the data directory already initialized and local password authentication pre-configured:
 
 ```bash
-pfexec pkg install database/postgres-16 service/database/postgres-16
+pfexec pkg install pkg://openindiana.org/database/postgres-16 \
+  pkg://openindiana.org/service/database/postgres-16
 pfexec svcadm enable postgresql:version_16
 ```
 
