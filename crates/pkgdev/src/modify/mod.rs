@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use clap::{arg, Subcommand, ValueEnum};
+use clap::{Subcommand, ValueEnum};
 use miette::IntoDiagnostic;
 
 use crate::component::open_component_local;
@@ -15,11 +15,11 @@ use gate::Gate;
 #[derive(Debug, Subcommand)]
 pub enum EditArgs {
     Add {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         args: AddArgs,
     },
     Set {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         args: SetArgs,
     },
 }
@@ -37,7 +37,7 @@ pub enum SetArgs {
     },
     License {
         arg: String,
-        #[clap(short, long)]
+        #[arg(short, long)]
         file: String,
     },
     Version {
@@ -51,7 +51,7 @@ pub enum SetArgs {
         value: String,
     },
     Build {
-        #[arg(short, long, value_parser)]
+        #[arg(short, long)]
         index: usize,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, raw = true)]
         args: Vec<String>,
@@ -68,9 +68,9 @@ struct DummyCommandArgs {
 #[derive(Debug, Subcommand, Clone)]
 pub enum AddArgs {
     Dependency {
-        #[clap(long)]
+        #[arg(long)]
         dev: bool,
-        #[clap(long)]
+        #[arg(long)]
         kind: String,
         package: String,
     },
@@ -84,7 +84,7 @@ pub enum AddArgs {
         args: Vec<String>,
     },
     Source {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         args: SourceKind,
     },
     Maintainer {

@@ -145,8 +145,7 @@ async fn run_add_server_member(settings: &Settings, actor_id: &str, role_str: &s
 
     let permissions = server_role_defaults(&server_role);
     let role_json = serde_json::json!([role_str]);
-    let perm_json =
-        serde_json::json!(permissions.iter().map(|p| p.as_str()).collect::<Vec<_>>());
+    let perm_json = serde_json::json!(permissions.iter().map(|p| p.as_str()).collect::<Vec<_>>());
 
     let db = connect_db(settings).await?;
 
@@ -231,7 +230,7 @@ async fn run_list_server_members(settings: &Settings) -> Result<()> {
     if members.is_empty() {
         println!("No server members found.");
     } else {
-        println!("{:<30} {:<20} {}", "ACTOR ID", "ROLES", "PERMISSIONS");
+        println!("{:<30} {:<20} PERMISSIONS", "ACTOR ID", "ROLES");
         println!("{}", "-".repeat(80));
         for m in &members {
             let roles = m

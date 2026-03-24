@@ -66,6 +66,7 @@ enum AudClaim {
 }
 
 impl AudClaim {
+    #[allow(dead_code)]
     fn contains(&self, aud: &str) -> bool {
         match self {
             AudClaim::Single(s) => s == aud,

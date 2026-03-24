@@ -222,7 +222,7 @@ fn default_jj_repos_root() -> String {
     "./data/jj-repos".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OidcConfig {
     #[serde(default)]
     pub issuer_url: String, // e.g. "https://auth.example.com"
@@ -232,17 +232,7 @@ pub struct OidcConfig {
     pub audience: String, // Expected audience claim in tokens
 }
 
-impl Default for OidcConfig {
-    fn default() -> Self {
-        Self {
-            issuer_url: String::new(),
-            client_id: String::new(),
-            audience: String::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SmtpConfig {
     /// Sender email address for outgoing emails (e.g. "forge@example.com")
     #[serde(default)]
@@ -250,15 +240,6 @@ pub struct SmtpConfig {
     /// SMTP relay URL (e.g. "smtp.example.com"). If empty, email sending is disabled.
     #[serde(default)]
     pub url: Option<String>,
-}
-
-impl Default for SmtpConfig {
-    fn default() -> Self {
-        Self {
-            from: String::new(),
-            url: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

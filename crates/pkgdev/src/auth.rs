@@ -507,12 +507,7 @@ pub async fn login_device_flow(forge_host: &str) -> miette::Result<TokenSet> {
         })?
         .json()
         .await
-        .map_err(|e| {
-            miette::miette!(
-                "failed to parse device authorization response: {}",
-                e
-            )
-        })?;
+        .map_err(|e| miette::miette!("failed to parse device authorization response: {}", e))?;
 
     // 4. Display instructions
     eprintln!();
@@ -521,7 +516,10 @@ pub async fn login_device_flow(forge_host: &str) -> miette::Result<TokenSet> {
     eprintln!();
     eprintln!("And enter the code: {}", device_resp.user_code);
     eprintln!();
-    eprintln!("Waiting for authorization (expires in {} seconds)...", device_resp.expires_in);
+    eprintln!(
+        "Waiting for authorization (expires in {} seconds)...",
+        device_resp.expires_in
+    );
 
     // 5. Poll for token
     let deadline =
@@ -542,22 +540,24 @@ pub async fn login_device_flow(forge_host: &str) -> miette::Result<TokenSet> {
         let resp = http
             .post(&discovery.token_endpoint)
             .form(&[
-                (
-                    "grant_type",
-                    "urn:ietf:params:oauth:grant-type:device_code",
-                ),
+                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                 ("device_code", &device_resp.device_code),
                 ("client_id", &client_id),
             ])
             .send()
             .await
             .map_err(|e| {
-                miette::miette!("token endpoint request to {} failed: {}", discovery.token_endpoint, e)
+                miette::miette!(
+                    "token endpoint request to {} failed: {}",
+                    discovery.token_endpoint,
+                    e
+                )
             })?;
 
-        let token_resp: TokenResponse = resp.json().await.map_err(|e| {
-            miette::miette!("failed to parse token response: {}", e)
-        })?;
+        let token_resp: TokenResponse = resp
+            .json()
+            .await
+            .map_err(|e| miette::miette!("failed to parse token response: {}", e))?;
 
         match token_resp.error.as_deref() {
             Some("authorization_pending") => {
@@ -583,9 +583,9 @@ pub async fn login_device_flow(forge_host: &str) -> miette::Result<TokenSet> {
             }
             None => {
                 // Success
-                let access_token = token_resp.access_token.ok_or_else(|| {
-                    miette::miette!("token response missing access_token field")
-                })?;
+                let access_token = token_resp
+                    .access_token
+                    .ok_or_else(|| miette::miette!("token response missing access_token field"))?;
                 let expires_in = token_resp.expires_in.unwrap_or(3600);
                 let expires_at = Utc::now() + chrono::Duration::seconds(expires_in as i64);
 
@@ -648,7 +648,8 @@ pub async fn refresh_token(token_set: &TokenSet) -> miette::Result<TokenSet> {
             .as_deref()
             .unwrap_or(err.as_str());
         return Err(miette::miette!(
-            help = "Your refresh token may have expired. Run 'pkgdev auth login' to re-authenticate.",
+            help =
+                "Your refresh token may have expired. Run 'pkgdev auth login' to re-authenticate.",
             "token refresh failed: {} ({})",
             desc,
             err
@@ -847,11 +848,7 @@ pub fn print_token_status(host: Option<&str>) {
 
     for h in hosts {
         if let Some(ts) = store.get(h) {
-            let status = if ts.is_expired() {
-                "EXPIRED"
-            } else {
-                "valid"
-            };
+            let status = if ts.is_expired() { "EXPIRED" } else { "valid" };
             let has_refresh = if ts.refresh_token.is_some() {
                 "yes"
             } else {

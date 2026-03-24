@@ -25,6 +25,7 @@ const UNAUTHENTICATED_METHODS: &[&str] = &[
 ///
 /// Call this in each handler that requires authentication.
 /// Returns `Status::unauthenticated` if no actor was injected by the middleware.
+#[allow(clippy::result_large_err)]
 pub fn extract_actor<T>(request: &Request<T>) -> Result<AuthenticatedActor, Status> {
     request
         .extensions()
@@ -42,7 +43,7 @@ pub fn extract_actor<T>(request: &Request<T>) -> Result<AuthenticatedActor, Stat
 
 /// Check if a gRPC method path should skip authentication.
 fn is_unauthenticated_method(path: &str) -> bool {
-    UNAUTHENTICATED_METHODS.iter().any(|m| path == *m)
+    UNAUTHENTICATED_METHODS.contains(&path)
 }
 
 /// Tower layer for async OIDC auth validation on gRPC requests.

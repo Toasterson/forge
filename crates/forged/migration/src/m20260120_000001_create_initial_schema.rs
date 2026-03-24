@@ -570,6 +570,7 @@ enum BlobMetadata {
 }
 
 #[derive(DeriveIden)]
+#[allow(clippy::enum_variant_names)]
 enum Gate {
     Table,
     Id,

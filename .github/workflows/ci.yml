@@ -74,7 +74,7 @@ jobs:
           - 8080:8080
 
       rabbitmq:
-        image: rabbitmq:3.12-management
+        image: rabbitmq:4-management
         env:
           RABBITMQ_DEFAULT_VHOST: master
           RABBITMQ_DEFAULT_USER: dev

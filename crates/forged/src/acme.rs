@@ -142,8 +142,8 @@ impl AcmeManager {
                 .into_diagnostic()
                 .wrap_err("Failed to signal challenge readiness to ACME server")?;
         }
-        // Drop the authorizations borrow before using order again
-        drop(auths);
+        // Let the authorizations borrow go out of scope before using order again
+        let _ = auths;
 
         // Wait for order to become ready
         let retries = RetryPolicy::new().timeout(Duration::from_secs(120));

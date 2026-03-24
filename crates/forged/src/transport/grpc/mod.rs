@@ -35,6 +35,7 @@ pub struct HealthCheckDeps {
 }
 
 /// Start the gRPC server with all services, auth middleware, TLS, health, and concurrency limiting
+#[allow(clippy::too_many_arguments)]
 pub async fn start_server(
     addr: SocketAddr,
     auth_service: AuthServiceImpl,

@@ -35,6 +35,7 @@ pub struct SeaweedFsBackend {
     /// SeaweedFS client for blob operations
     client: Arc<SeaweedFsClient>,
     /// Metadata about this backend instance
+    #[allow(dead_code)]
     metadata: BackendMetadata,
 }
 
@@ -132,6 +133,7 @@ impl SeaweedFsBackend {
         BlobKey::new(hash, BlobType::Symlink)
     }
 
+    #[allow(dead_code)]
     fn conflict_id_to_blob_key(&self, id: &ConflictId) -> BlobKey {
         let hash = ContentHash::from_bytes(&id.to_bytes());
         BlobKey::new(hash, BlobType::Conflict)

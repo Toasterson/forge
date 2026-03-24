@@ -45,66 +45,66 @@ pub struct Args {
     #[arg(long = "repo-context", global = true)]
     pub repo_context: Option<String>,
 
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    #[clap(name = "repo")]
+    #[command(name = "repo")]
     Repo {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         cmd: RepoCmd,
     },
-    #[clap(name = "forge")]
+    #[command(name = "forge")]
     /// Interact with the forge.
     Forge {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         cmd: ForgeCmd,
     },
-    #[clap(name = "download")]
+    #[command(name = "download")]
     Download {
         /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
         /// If omitted, current directory is used. Absolute paths are accepted.
-        #[clap(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".")]
         component: PathBuf,
     },
-    #[clap(name = "metadata")]
+    #[command(name = "metadata")]
     Metadata {
-        #[clap(flatten)]
+        #[command(flatten)]
         args: ComponentArgs,
-        #[clap(default_value_t = metadata::MetadataFormat::default())]
+        #[arg(default_value_t = metadata::MetadataFormat::default())]
         format: metadata::MetadataFormat,
     },
-    #[clap(name = "generate")]
+    #[command(name = "generate")]
     Generate {
-        #[clap(default_value_t = GenerateSchemaKind::default())]
+        #[arg(default_value_t = GenerateSchemaKind::default())]
         kind: GenerateSchemaKind,
         /// Output file path for generated data (stdout if omitted)
-        #[clap(long, short)]
+        #[arg(long, short)]
         output: Option<PathBuf>,
     },
-    #[clap(name = "create")]
+    #[command(name = "create")]
     Create {
         fmri: String,
-        #[clap(flatten)]
+        #[command(flatten)]
         args: ComponentArgs,
     },
-    #[clap(name = "edit")]
+    #[command(name = "edit")]
     Edit {
         /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
         /// If omitted, current directory is used. Absolute paths are accepted.
-        #[clap(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".")]
         component: PathBuf,
-        #[clap(subcommand)]
+        #[command(subcommand)]
         args: EditArgs,
     },
-    #[clap(name = "auth")]
+    #[command(name = "auth")]
     Auth {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         cmd: AuthCmd,
     },
-    #[clap(name = "build")]
+    #[command(name = "build")]
     Build {
         /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
         /// If omitted, current directory is used. Absolute paths are accepted.
@@ -120,7 +120,7 @@ pub enum Commands {
 pub struct ComponentArgs {
     /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
     /// If omitted, current directory is used. Absolute paths are accepted.
-    #[clap(short, long, default_value = ".")]
+    #[arg(short, long, default_value = ".")]
     pub component: PathBuf,
 }
 
@@ -224,12 +224,12 @@ pub enum ComponentCmd {
 pub enum ForgeCmd {
     /// Manage gates on the forge server
     Gate {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         cmd: GateCmd,
     },
     /// Manage components on the forge server
     Component {
-        #[clap(subcommand)]
+        #[command(subcommand)]
         cmd: ComponentCmd,
     },
 }
@@ -322,13 +322,13 @@ pub enum AuthCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum RepoCmd {
-    #[clap(name = "list")]
+    #[command(name = "list")]
     List,
-    #[clap(name = "create")]
+    #[command(name = "create")]
     Create { name: String, path: Option<PathBuf> },
-    #[clap(name = "delete")]
+    #[command(name = "delete")]
     Delete { name: String },
-    #[clap(name = "select")]
+    #[command(name = "select")]
     Select { name: String },
 }
 
@@ -581,7 +581,9 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         owner_kind,
                     } => {
                         let host = resolve_host_or_selected(host)?;
-                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                        let token = get_valid_token(&host)
+                            .await
+                            .wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
@@ -612,7 +614,9 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             return Err(miette::miette!("--gate must be provided for 'forge gate upload' or run in a gate directory"));
                         };
                         let host = resolve_host_or_selected(host)?;
-                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                        let token = get_valid_token(&host)
+                            .await
+                            .wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
@@ -637,7 +641,9 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     }
                     GateCmd::List { host, no_header } => {
                         let host = resolve_host_or_selected(host)?;
-                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                        let token = get_valid_token(&host)
+                            .await
+                            .wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
@@ -665,12 +671,18 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     }
                     GateCmd::Show { host, id } => {
                         let host = resolve_host_or_selected(host)?;
-                        let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                        let token = get_valid_token(&host)
+                            .await
+                            .wrap_err("authentication required")?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
                             .wrap_err("failed to connect to forge host")?;
-                        match client.get_gate(&id, &token).await.wrap_err("get gate RPC failed")? {
+                        match client
+                            .get_gate(&id, &token)
+                            .await
+                            .wrap_err("get gate RPC failed")?
+                        {
                             None => {
                                 println!("gate '{}' not found on {}", id, host);
                             }
@@ -714,7 +726,9 @@ pub async fn run(args: Args) -> miette::Result<()> {
                     match cmd {
                         ComponentCmd::Create { host, id, name } => {
                             let host = resolve_host_or_selected(host)?;
-                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                            let token = get_valid_token(&host)
+                                .await
+                                .wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
@@ -734,7 +748,9 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         }
                         ComponentCmd::Upload { host, component } => {
                             let host = resolve_host_or_selected(host)?;
-                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                            let token = get_valid_token(&host)
+                                .await
+                                .wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
@@ -760,7 +776,9 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         }
                         ComponentCmd::List { host, no_header } => {
                             let host = resolve_host_or_selected(host)?;
-                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                            let token = get_valid_token(&host)
+                                .await
+                                .wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
@@ -783,7 +801,9 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         }
                         ComponentCmd::Show { host, id } => {
                             let host = resolve_host_or_selected(host)?;
-                            let token = get_valid_token(&host).await.wrap_err("authentication required")?;
+                            let token = get_valid_token(&host)
+                                .await
+                                .wrap_err("authentication required")?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await

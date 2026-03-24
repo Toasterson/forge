@@ -205,7 +205,7 @@ impl BuildService for BuildServiceImpl {
         &self,
         request: Request<DownloadBlobRequest>,
     ) -> Result<Response<Self::DownloadBlobStream>, Status> {
-        let actor = extract_actor(&request)?;
+        let _actor = extract_actor(&request)?;
         let req = request.into_inner();
 
         let hash = req

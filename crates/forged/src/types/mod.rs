@@ -97,7 +97,7 @@ impl ContentHash {
     }
 
     pub fn hex(&self) -> String {
-        hex::encode(&self.0)
+        hex::encode(self.0)
     }
 
     pub fn as_bytes(&self) -> &[u8; 32] {

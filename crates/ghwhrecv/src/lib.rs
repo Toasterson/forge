@@ -15,7 +15,7 @@ use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::net::TcpListener;
-use tracing::{debug, error, event, info, instrument, span, Level};
+use tracing::{debug, event, info, instrument, span, Level};
 use url::Url;
 
 use forge::{

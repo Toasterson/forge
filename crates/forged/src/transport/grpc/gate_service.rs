@@ -25,6 +25,7 @@ const MAX_NAME_LEN: usize = 256;
 const MAX_KDL_LEN: usize = 1024 * 1024;
 
 /// Validate that a name field is non-empty and within the maximum length.
+#[allow(clippy::result_large_err)]
 fn validate_name(name: &str) -> Result<(), Status> {
     if name.is_empty() {
         return Err(Status::invalid_argument(
@@ -45,6 +46,7 @@ fn validate_name(name: &str) -> Result<(), Status> {
 }
 
 /// Validate that a KDL content field is within the maximum length (1 MiB).
+#[allow(clippy::result_large_err)]
 fn validate_kdl(kdl: &str) -> Result<(), Status> {
     if kdl.len() > MAX_KDL_LEN {
         return Err(Status::invalid_argument(format!(

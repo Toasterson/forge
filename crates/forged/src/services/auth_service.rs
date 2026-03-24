@@ -161,12 +161,22 @@ impl AuthService {
     /// Validates the SSH public key format, then stores it for the given actor.
     /// No proof signature is required because the caller is already authenticated
     /// via OIDC bearer token.
-    pub async fn add_ssh_key(&self, actor_id: &str, key_id: &str, public_key_str: &str) -> Result<()> {
+    pub async fn add_ssh_key(
+        &self,
+        actor_id: &str,
+        key_id: &str,
+        public_key_str: &str,
+    ) -> Result<()> {
         let ssh_pubkey = parse_ssh_public_key(public_key_str)?;
         let algorithm = ssh_pubkey.algorithm().to_string();
 
         self.actor_repo
-            .add_key(actor_id, key_id.to_string(), algorithm, public_key_str.to_string())
+            .add_key(
+                actor_id,
+                key_id.to_string(),
+                algorithm,
+                public_key_str.to_string(),
+            )
             .await?;
 
         Ok(())

@@ -1,10 +1,10 @@
+use super::middleware::extract_actor;
 use super::proto::{
     auth_service_server::AuthService, ActorRef, AddActorKeyRequest, AddActorKeyResponse,
     AuthenticateRequest, AuthenticateResponse, GetAuthConfigRequest, GetAuthConfigResponse,
     IssueTokenRequest, IssueTokenResponse, RegisterActorRequest, RegisterActorResponse,
     RegistrationConfirmationRequest, RegistrationConfirmationResponse,
 };
-use super::middleware::extract_actor;
 use crate::services::AuthService as AuthServiceLogic;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};

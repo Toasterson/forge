@@ -78,9 +78,7 @@ impl ComponentClient {
         let mut c = self.client();
         let resp = c
             .get_component(authenticated_request(
-                api::GetComponentRequest {
-                    id: id.to_string(),
-                },
+                api::GetComponentRequest { id: id.to_string() },
                 token,
             ))
             .await;

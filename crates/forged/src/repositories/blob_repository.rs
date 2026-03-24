@@ -207,6 +207,7 @@ impl ApplicationBlobType {
 
     /// Convert to Jujutsu blob type for SeaweedFS storage
     /// All application blobs are stored as "File" type in the Jujutsu backend
+    #[allow(clippy::wrong_self_convention)]
     fn to_jj_blob_type(&self) -> crate::storage::seaweedfs::client::BlobType {
         crate::storage::seaweedfs::client::BlobType::File
     }

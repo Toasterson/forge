@@ -330,16 +330,11 @@ impl Distribution {
     }
 }
 
-#[derive(Debug, knuffel::Decode, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, knuffel::Decode, Clone, Serialize, Deserialize)]
 pub enum DistributionType {
     Tarbball,
+    #[default]
     IPS,
-}
-
-impl Default for DistributionType {
-    fn default() -> Self {
-        Self::IPS
-    }
 }
 
 impl FromStr for DistributionType {

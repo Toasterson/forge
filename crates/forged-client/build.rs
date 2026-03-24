@@ -25,9 +25,6 @@ fn main() {
     tonic_build::configure()
         .compile_well_known_types(true)
         .protoc_arg("--experimental_allow_proto3_optional")
-        .compile(
-            &["../forged/proto/api_v2.proto"],
-            &["../forged/proto"],
-        )
+        .compile(&["../forged/proto/api_v2.proto"], &["../forged/proto"])
         .expect("failed to compile v2 protos for client");
 }
