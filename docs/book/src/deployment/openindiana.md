@@ -233,6 +233,14 @@ pfexec svcadm enable rabbitmq
 # Wait for RabbitMQ to start, then configure
 sleep 10
 
+# Bind RabbitMQ to localhost only (not exposed to the network)
+pfexec mkdir -p /opt/rabbitmq/etc/rabbitmq
+cat <<'CONF' | pfexec tee /opt/rabbitmq/etc/rabbitmq/rabbitmq.conf
+listeners.tcp.local = 127.0.0.1:5672
+CONF
+pfexec svcadm restart rabbitmq
+sleep 5
+
 # rabbitmqctl must read the Erlang cookie from the rabbitmq user's home directory.
 # Set HOME so it finds the right cookie:
 export RABBITMQ_HOME=/var/rabbitmq
