@@ -46,7 +46,9 @@ pub struct Args {
     pub repo_context: Option<String>,
 
     /// Skip TLS certificate verification (for testing with staging certificates).
-    #[arg(long = "tls-insecure", global = true)]
+    /// NOTE: Currently not functional — reserved for future use when tonic supports
+    /// accepting invalid certificates.
+    #[arg(long = "tls-insecure", global = true, hide = true)]
     pub tls_insecure: bool,
 
     #[command(subcommand)]
