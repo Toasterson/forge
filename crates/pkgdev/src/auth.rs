@@ -473,6 +473,8 @@ struct OidcDiscovery {
 }
 
 /// Response from the device authorization endpoint.
+/// Some providers (e.g., Barycenter) support auto-registration and return
+/// client_id/client_secret in the response when client_id is omitted from the request.
 #[derive(Debug, Deserialize)]
 struct DeviceAuthResponse {
     device_code: String,
@@ -481,6 +483,12 @@ struct DeviceAuthResponse {
     #[serde(default = "default_poll_interval")]
     interval: u64,
     expires_in: u64,
+    /// Auto-registered client ID (returned by providers that support dynamic registration)
+    #[serde(default)]
+    client_id: Option<String>,
+    /// Auto-registered client secret
+    #[serde(default)]
+    client_secret: Option<String>,
 }
 
 fn default_poll_interval() -> u64 {
@@ -577,38 +585,82 @@ pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::
     })?;
 
     // 3. Request device authorization
+    // Try with client_id first; if the provider rejects it (e.g., unregistered client),
+    // retry without client_id to trigger auto-registration (RFC 7591 / provider-specific).
     debug!(endpoint = %device_auth_endpoint, "requesting device authorization");
-    let resp = http
-        .post(&device_auth_endpoint)
-        .form(&[
-            ("client_id", client_id.as_str()),
-            ("scope", "openid profile email"),
-        ])
-        .send()
-        .await
-        .map_err(|e| {
-            miette::miette!(
-                "device authorization request to {} failed: {}",
-                device_auth_endpoint,
-                e
-            )
-        })?;
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(miette::miette!(
-            "device authorization failed (HTTP {}):\n  {}\n\n\
-             Ensure the client '{}' is registered with the OIDC provider at {}.\n\
-             The client must support the 'urn:ietf:params:oauth:grant-type:device_code' grant type.",
-            status, body, client_id, issuer_url,
-        ));
-    }
+    let device_resp = {
+        let mut form_params: Vec<(&str, &str)> = vec![("scope", "openid profile email")];
+        if !client_id.is_empty() {
+            form_params.push(("client_id", &client_id));
+        }
 
-    let device_resp: DeviceAuthResponse = resp
+        let resp = http
+            .post(&device_auth_endpoint)
+            .form(&form_params)
+            .send()
+            .await
+            .map_err(|e| {
+                miette::miette!(
+                    "device authorization request to {} failed: {}",
+                    device_auth_endpoint,
+                    e
+                )
+            })?;
+
+        if !resp.status().is_success() && !client_id.is_empty() {
+            // Retry without client_id for providers that support auto-registration
+            info!("device authorization with client_id failed, retrying with auto-registration");
+            let resp = http
+                .post(&device_auth_endpoint)
+                .form(&[("scope", "openid profile email")])
+                .send()
+                .await
+                .map_err(|e| {
+                    miette::miette!(
+                        "device authorization request to {} failed: {}",
+                        device_auth_endpoint,
+                        e
+                    )
+                })?;
+
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                return Err(miette::miette!(
+                    "device authorization failed (HTTP {}):\n  {}\n\n\
+                     The OIDC provider rejected both client_id='{}' and auto-registration.",
+                    status,
+                    body,
+                    client_id,
+                ));
+            }
+            resp
+        } else if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(miette::miette!(
+                "device authorization failed (HTTP {}):\n  {}",
+                status,
+                body,
+            ));
+        } else {
+            resp
+        }
+    };
+
+    let device_resp: DeviceAuthResponse = device_resp
         .json()
         .await
         .map_err(|e| miette::miette!("failed to parse device authorization response: {}", e))?;
+
+    // Use auto-registered client_id if the provider returned one
+    let effective_client_id = device_resp
+        .client_id
+        .as_deref()
+        .unwrap_or(&client_id)
+        .to_string();
+    let effective_client_secret = device_resp.client_secret.clone();
 
     // 4. Display instructions
     eprintln!();
@@ -638,13 +690,17 @@ pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::
             ));
         }
 
+        let mut token_form: Vec<(&str, &str)> = vec![
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+            ("device_code", &device_resp.device_code),
+            ("client_id", &effective_client_id),
+        ];
+        if let Some(secret) = &effective_client_secret {
+            token_form.push(("client_secret", secret));
+        }
         let resp = http
             .post(&discovery.token_endpoint)
-            .form(&[
-                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-                ("device_code", &device_resp.device_code),
-                ("client_id", &client_id),
-            ])
+            .form(&token_form)
             .send()
             .await
             .map_err(|e| {
