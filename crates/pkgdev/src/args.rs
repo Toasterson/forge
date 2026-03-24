@@ -1294,15 +1294,23 @@ fn resolve_host_or_selected(host_arg: Option<String>) -> miette::Result<String> 
     if let Some(h) = host_arg {
         return Ok(h);
     }
+    // Check selected context in auth state
     let path = default_auth_state_path();
-    let state = AuthState::load(&path)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to load auth state from {}", path.display()))?;
-    if let Some(sel) = state.get_selected() {
-        Ok(sel.host.clone())
-    } else {
-        Err(miette::miette!("--host not provided and no selected context found. Use 'pkgdev auth login --select' or specify --host"))
+    if let Ok(state) = AuthState::load(&path).into_diagnostic() {
+        if let Some(sel) = state.get_selected() {
+            return Ok(sel.host.clone());
+        }
     }
+    // Fall back to token store — if there's exactly one host stored, use it
+    let store = TokenStore::load();
+    let hosts = store.hosts();
+    if hosts.len() == 1 {
+        return Ok(hosts[0].to_string());
+    }
+    Err(miette::miette!(
+        "--host not provided and no selected context found.\n\
+         Use 'pkgdev auth login --host <url> --select' or specify --host."
+    ))
 }
 
 fn actor_kind_str(k: ActorKind) -> String {
