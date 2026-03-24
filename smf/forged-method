@@ -34,7 +34,7 @@ start)
         exit "$SMF_EXIT_ERR_FATAL"
     fi
 
-    FORGED_CONFIG="$config" exec "$FORGED_BIN" &
+    FORGED_CONFIG="$config" exec "$FORGED_BIN"
     ;;
 
 stop)

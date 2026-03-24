@@ -100,6 +100,7 @@ sha2 = "0.10"
 typed-builder = "0.20"
 
 # TLS + ACME
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 instant-acme = { version = "0.8", features = ["rcgen"] }
 rcgen = "0.13"
 rustls-pemfile = "2"

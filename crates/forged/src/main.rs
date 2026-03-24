@@ -10,6 +10,11 @@ use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
+    // Install rustls crypto provider before any TLS/ACME code runs
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     if let Err(e) = telemetry::init_tracing("forged") {
         eprintln!("Failed to initialize telemetry: {e:?}");
     }

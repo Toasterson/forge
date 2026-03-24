@@ -56,6 +56,11 @@
                  exec=":kill"
                  timeout_seconds="30" />
 
+    <!-- forged runs in the foreground; tell SMF the start method IS the daemon -->
+    <property_group name="startd" type="framework">
+      <propval name="duration" type="astring" value="child" />
+    </property_group>
+
     <!-- Service-specific properties -->
     <property_group name="application" type="application">
       <propval name="config_file" type="astring"
