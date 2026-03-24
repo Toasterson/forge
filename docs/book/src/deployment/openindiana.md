@@ -194,7 +194,7 @@ pfexec chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
       <service_fmri value="svc:/milestone/network:default"/>
     </dependency>
     <exec_method type="method" name="start"
-      exec="/opt/rabbitmq/sbin/rabbitmq-server"
+      exec="/usr/bin/bash -c 'exec /opt/rabbitmq/sbin/rabbitmq-server'"
       timeout_seconds="60">
       <method_context>
         <method_credential user="rabbitmq" group="rabbitmq"/>
@@ -205,16 +205,10 @@ pfexec chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
         </method_environment>
       </method_context>
     </exec_method>
-    <exec_method type="method" name="stop"
-      exec="/opt/rabbitmq/sbin/rabbitmqctl stop"
-      timeout_seconds="30">
-      <method_context>
-        <method_credential user="rabbitmq" group="rabbitmq"/>
-        <method_environment>
-          <envvar name="HOME" value="/var/rabbitmq"/>
-        </method_environment>
-      </method_context>
-    </exec_method>
+    <exec_method type="method" name="stop" exec=":kill" timeout_seconds="30"/>
+    <property_group name="startd" type="framework">
+      <propval name="duration" type="astring" value="child"/>
+    </property_group>
     <stability value="Unstable"/>
     <template>
       <common_name><loctext xml:lang="C">RabbitMQ Message Broker</loctext></common_name>
