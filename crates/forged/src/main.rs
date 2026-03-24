@@ -67,6 +67,27 @@ async fn main() {
                     std::process::exit(1);
                 }
             };
+
+            // Pre-flight: verify we can bind the HTTP-01 challenge port before
+            // contacting Let's Encrypt. This prevents hammering the ACME server
+            // with orders that will inevitably fail validation.
+            match tokio::net::TcpListener::bind(http_addr).await {
+                Ok(listener) => {
+                    drop(listener); // Release for the actual challenge server
+                    info!(%http_addr, "HTTP-01 challenge port is available");
+                }
+                Err(e) => {
+                    error!(
+                        %http_addr,
+                        error = %e,
+                        "Cannot bind HTTP-01 challenge port.\n\
+                         On illumos, ensure the SMF manifest grants net_privaddr privilege.\n\
+                         Check that no other service is using the port."
+                    );
+                    std::process::exit(1);
+                }
+            }
+
             let tokens = acme_manager.challenge_tokens();
             let cancel_http = cancel.clone();
             tokio::spawn(async move {
@@ -76,6 +97,25 @@ async fn main() {
                     error!(error = ?e, "HTTP-01 challenge server error");
                 }
             });
+
+            // Give the challenge server a moment to start, then verify it responds
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            match reqwest::get(format!("http://127.0.0.1:{}/self-check", http_addr.port())).await {
+                Ok(resp) if resp.status() == 404 => {
+                    info!("HTTP-01 challenge server self-check passed");
+                }
+                Ok(resp) => {
+                    info!(status = %resp.status(), "HTTP-01 challenge server is responding");
+                }
+                Err(e) => {
+                    error!(
+                        error = %e,
+                        "HTTP-01 challenge server self-check failed.\n\
+                         The server bound the port but is not responding to HTTP requests."
+                    );
+                    std::process::exit(1);
+                }
+            }
         }
 
         if let Err(e) = acme_manager.ensure_certificate().await {
