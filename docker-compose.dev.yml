@@ -29,7 +29,7 @@ services:
       - "seaweedfs-volume:/data"
 
   rabbitmq:
-    image: rabbitmq:3.12-management
+    image: rabbitmq:4-management
     environment:
       RABBITMQ_DEFAULT_VHOST: "master"
       RABBITMQ_DEFAULT_USER: "dev"

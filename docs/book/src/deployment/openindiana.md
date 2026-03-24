@@ -163,7 +163,7 @@ If RabbitMQ is not packaged, download and install it. Note: the illumos `tar` si
 ```bash
 # Download RabbitMQ generic Unix package
 curl -L -o /tmp/rabbitmq.tar.xz \
-  https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-generic-unix-3.12.14.tar.xz
+  https://github.com/rabbitmq/rabbitmq-server/releases/download/v4.2.5/rabbitmq-server-generic-unix-4.2.5.tar.xz
 
 pfexec mkdir -p /opt/rabbitmq
 cd /opt/rabbitmq && pfexec gtar xJf /tmp/rabbitmq.tar.xz --strip-components=1
