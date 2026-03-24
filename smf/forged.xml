@@ -42,7 +42,8 @@
                  exec="/opt/forge/lib/svc/method/forged-method start"
                  timeout_seconds="60">
       <method_context>
-        <method_credential user="forged" group="forged" />
+        <method_credential user="forged" group="forged"
+                              privileges="basic,net_privaddr" />
         <method_environment>
           <envvar name="FORGED_CONFIG" value="/etc/forged/forged.toml" />
           <envvar name="RUST_LOG" value="forged=info,warn" />

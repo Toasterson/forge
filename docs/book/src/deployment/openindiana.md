@@ -381,13 +381,9 @@ When `tls.mode = "acme"` is set, Forge automatically obtains a TLS certificate f
 - DNS must resolve `forge.example.com` to this server's public IP
 - The `forged` user must be able to bind port 80
 
-### Allow Binding to Privileged Ports
+### Privileged Ports
 
-On illumos, non-root processes cannot bind ports below 1024 by default. Since the server listens on port 443 (gRPC/TLS) and port 80 (ACME HTTP-01), grant the `net_privaddr` privilege:
-
-```bash
-pfexec usermod -K defaultpriv=basic,net_privaddr forged
-```
+The server listens on port 443 (gRPC/TLS) and port 80 (ACME HTTP-01), both below 1024. The SMF manifest grants the `net_privaddr` privilege to the `forged` user via `method_credential`, so no additional configuration is needed.
 
 ### Certificate Lifecycle
 
