@@ -82,9 +82,6 @@ pfexec mkdir -p /opt/seaweedfs/smf
                 restart_on="error" type="service">
       <service_fmri value="svc:/milestone/network:default"/>
     </dependency>
-    <property_group name="startd" type="framework">
-      <propval name="duration" type="astring" value="child"/>
-    </property_group>
     <exec_method type="method" name="start"
       exec="/usr/bin/weed master -mdir=/var/seaweedfs/master -ip=127.0.0.1 -port=9333"
       timeout_seconds="60">
@@ -93,6 +90,9 @@ pfexec mkdir -p /opt/seaweedfs/smf
       </method_context>
     </exec_method>
     <exec_method type="method" name="stop" exec=":kill" timeout_seconds="30"/>
+    <property_group name="startd" type="framework">
+      <propval name="duration" type="astring" value="child"/>
+    </property_group>
     <stability value="Unstable"/>
     <template>
       <common_name><loctext xml:lang="C">SeaweedFS Master</loctext></common_name>
@@ -114,9 +114,6 @@ pfexec mkdir -p /opt/seaweedfs/smf
                 restart_on="error" type="service">
       <service_fmri value="svc:/network/seaweedfs/master:default"/>
     </dependency>
-    <property_group name="startd" type="framework">
-      <propval name="duration" type="astring" value="child"/>
-    </property_group>
     <exec_method type="method" name="start"
       exec="/usr/bin/weed volume -mserver=127.0.0.1:9333 -port=8080 -dir=/var/seaweedfs/volume -publicUrl=localhost:8080"
       timeout_seconds="60">
@@ -125,6 +122,9 @@ pfexec mkdir -p /opt/seaweedfs/smf
       </method_context>
     </exec_method>
     <exec_method type="method" name="stop" exec=":kill" timeout_seconds="30"/>
+    <property_group name="startd" type="framework">
+      <propval name="duration" type="astring" value="child"/>
+    </property_group>
     <stability value="Unstable"/>
     <template>
       <common_name><loctext xml:lang="C">SeaweedFS Volume Server</loctext></common_name>
