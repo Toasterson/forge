@@ -12,6 +12,7 @@ WORKDIR /app
 
 # Copy workspace manifests and source
 COPY Cargo.lock Cargo.toml ./
+COPY src ./src
 COPY crates ./crates
 
 # Build only the server binary (release)

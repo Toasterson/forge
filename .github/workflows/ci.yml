@@ -79,12 +79,19 @@ jobs:
         run: |
           docker run -d --name seaweedfs-master --network host \
             chrislusf/seaweedfs:latest master -ip=127.0.0.1 -port=9333
-          sleep 5
+          # Wait for master to elect leader
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9333/cluster/status && break
+            sleep 1
+          done
           docker run -d --name seaweedfs-volume --network host \
             chrislusf/seaweedfs:latest volume -mserver=127.0.0.1:9333 -port=8080 -publicUrl=localhost:8080
-          sleep 3
-          # Verify SeaweedFS is up
-          curl -sf http://localhost:9333/cluster/status
+          # Wait for volume to register with master
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9333/dir/assign && break
+            sleep 1
+          done
+          echo "SeaweedFS ready"
 
       - name: Run e2e tests
         env:
