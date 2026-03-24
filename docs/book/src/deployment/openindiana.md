@@ -155,10 +155,10 @@ You should see a JSON response with cluster information.
 RabbitMQ requires Erlang. On OpenIndiana:
 
 ```bash
-pfexec pkg install runtime/erlang
+pfexec pkg install runtime/erlang archiver/gnu-tar
 ```
 
-If RabbitMQ is not packaged, download and install it:
+If RabbitMQ is not packaged, download and install it. Note: the illumos `tar` silently fails to extract xz archives -- use `gtar` instead:
 
 ```bash
 # Download RabbitMQ generic Unix package
@@ -166,7 +166,7 @@ curl -L -o /tmp/rabbitmq.tar.xz \
   https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-generic-unix-3.12.14.tar.xz
 
 pfexec mkdir -p /opt/rabbitmq
-cd /opt/rabbitmq && pfexec tar xJf /tmp/rabbitmq.tar.xz --strip-components=1
+cd /opt/rabbitmq && pfexec gtar xJf /tmp/rabbitmq.tar.xz --strip-components=1
 ```
 
 ### Create User and Directories
