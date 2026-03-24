@@ -233,19 +233,23 @@ pfexec svcadm enable rabbitmq
 # Wait for RabbitMQ to start, then configure
 sleep 10
 
+# rabbitmqctl must read the Erlang cookie from the rabbitmq user's home directory.
+# Set HOME so it finds the right cookie:
+export RABBITMQ_HOME=/var/rabbitmq
+
 # Enable management plugin (optional, for web UI on port 15672)
-pfexec /opt/rabbitmq/sbin/rabbitmq-plugins enable rabbitmq_management
+HOME=$RABBITMQ_HOME pfexec /opt/rabbitmq/sbin/rabbitmq-plugins enable rabbitmq_management
 
 # Create vhost and user for Forge
-pfexec /opt/rabbitmq/sbin/rabbitmqctl add_vhost master
-pfexec /opt/rabbitmq/sbin/rabbitmqctl add_user forged changeme-use-a-strong-password
-pfexec /opt/rabbitmq/sbin/rabbitmqctl set_permissions -p master forged ".*" ".*" ".*"
+HOME=$RABBITMQ_HOME pfexec /opt/rabbitmq/sbin/rabbitmqctl add_vhost master
+HOME=$RABBITMQ_HOME pfexec /opt/rabbitmq/sbin/rabbitmqctl add_user forged changeme-use-a-strong-password
+HOME=$RABBITMQ_HOME pfexec /opt/rabbitmq/sbin/rabbitmqctl set_permissions -p master forged ".*" ".*" ".*"
 ```
 
 ### Verify
 
 ```bash
-pfexec /opt/rabbitmq/sbin/rabbitmqctl status
+HOME=/var/rabbitmq pfexec /opt/rabbitmq/sbin/rabbitmqctl status
 ```
 
 ## 4. Install Forge
@@ -560,11 +564,11 @@ svcs -xv seaweedfs/volume
 ### RabbitMQ Connection Refused
 
 ```bash
-pfexec /opt/rabbitmq/sbin/rabbitmqctl status
+HOME=/var/rabbitmq pfexec /opt/rabbitmq/sbin/rabbitmqctl status
 # Check vhost exists:
-pfexec /opt/rabbitmq/sbin/rabbitmqctl list_vhosts
+HOME=/var/rabbitmq pfexec /opt/rabbitmq/sbin/rabbitmqctl list_vhosts
 # Check user permissions:
-pfexec /opt/rabbitmq/sbin/rabbitmqctl list_permissions -p master
+HOME=/var/rabbitmq pfexec /opt/rabbitmq/sbin/rabbitmqctl list_permissions -p master
 ```
 
 ### ACME Certificate Issues
