@@ -27,7 +27,7 @@ OpenIndiana ships PostgreSQL in the repository. The service comes with the data 
 ```bash
 pfexec pkg install pkg://openindiana.org/database/postgres-16 \
   pkg://openindiana.org/service/database/postgres-16
-pfexec svcadm enable postgresql:version_16
+pfexec svcadm enable postgresql_16:default
 ```
 
 ### Create the Forge Database and User
@@ -438,7 +438,7 @@ svcs -a | grep -E 'postgres|seaweedfs|rabbitmq|forge'
 Expected output:
 
 ```
-online  svc:/application/database/postgresql:version_16
+online  svc:/application/database/postgresql_16:default
 online  svc:/network/seaweedfs/master:default
 online  svc:/network/seaweedfs/volume:default
 online  svc:/application/rabbitmq:default
