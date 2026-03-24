@@ -53,26 +53,6 @@ jobs:
         ports:
           - 5432:5432
 
-      seaweedfs-master:
-        image: chrislusf/seaweedfs:latest
-        options: >-
-          --health-cmd "wget -q --spider http://localhost:9333/cluster/status || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 9333:9333
-
-      seaweedfs-volume:
-        image: chrislusf/seaweedfs:latest
-        options: >-
-          --health-cmd "wget -q --spider http://localhost:8080/status || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 8080:8080
-
       rabbitmq:
         image: rabbitmq:4-management
         env:
@@ -95,6 +75,17 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      - name: Start SeaweedFS
+        run: |
+          docker run -d --name seaweedfs-master --network host \
+            chrislusf/seaweedfs:latest master -ip=127.0.0.1 -port=9333
+          sleep 5
+          docker run -d --name seaweedfs-volume --network host \
+            chrislusf/seaweedfs:latest volume -mserver=127.0.0.1:9333 -port=8080 -publicUrl=localhost:8080
+          sleep 3
+          # Verify SeaweedFS is up
+          curl -sf http://localhost:9333/cluster/status
+
       - name: Run e2e tests
         env:
           TEST_DATABASE_URL: postgresql://forged:forged@localhost/forged_test
@@ -108,6 +99,12 @@ jobs:
           TEST_SEAWEEDFS_URL: http://localhost:9333
           RUST_LOG: forged=info,warn
         run: cargo test -p forged --test integration_test --locked -- --ignored --nocapture
+
+      - name: Stop SeaweedFS
+        if: always()
+        run: |
+          docker stop seaweedfs-volume seaweedfs-master || true
+          docker rm seaweedfs-volume seaweedfs-master || true
 
   docker:
     name: Build and publish Docker image

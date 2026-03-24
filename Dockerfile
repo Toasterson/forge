@@ -1,19 +1,18 @@
 # Multi-stage build for forged server container
 # Builder stage
-FROM rust:1.85-bookworm AS builder
+FROM rust:1.86-bookworm AS builder
 
 # Install build dependencies (protoc for tonic/prost, clang for rocksdb-sys, OpenSSL)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential pkg-config libssl-dev protobuf-compiler clang \
+        build-essential pkg-config libssl-dev libarchive-dev protobuf-compiler clang \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Cache dependencies
+# Copy workspace manifests and source
 COPY Cargo.lock Cargo.toml ./
 COPY crates ./crates
-COPY forged.toml ./forged.toml
 
 # Build only the server binary (release)
 RUN cargo build -p forged --release
