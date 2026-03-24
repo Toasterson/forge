@@ -359,10 +359,23 @@ pub fn server_url_from_host(host: &str) -> String {
 }
 
 /// Connect to a gRPC endpoint with improved error diagnostics for TLS failures.
-async fn connect_grpc(url: &str) -> miette::Result<Channel> {
+///
+/// If `tls_insecure` is true and the URL uses https://, TLS certificate
+/// verification is skipped (useful for testing against staging certificates).
+pub async fn connect_grpc(url: &str, tls_insecure: bool) -> miette::Result<Channel> {
     let is_tls = url.starts_with("https://");
-    let endpoint = Channel::from_shared(url.to_string())
+    let mut endpoint = Channel::from_shared(url.to_string())
         .map_err(|_| miette::miette!("invalid gRPC endpoint: {}", url))?;
+
+    if is_tls && tls_insecure {
+        // tonic 0.11 doesn't expose danger_accept_invalid_certs, so we
+        // downgrade to plaintext HTTP/2 when --tls-insecure is set.
+        // The server must accept h2c (plaintext HTTP/2) on the same port.
+        info!("TLS verification disabled (--tls-insecure), connecting without TLS");
+        let insecure_url = url.replacen("https://", "http://", 1);
+        endpoint = Channel::from_shared(insecure_url.clone())
+            .map_err(|_| miette::miette!("invalid gRPC endpoint: {}", insecure_url))?;
+    }
 
     match endpoint.connect().await {
         Ok(channel) => Ok(channel),
@@ -378,12 +391,10 @@ async fn connect_grpc(url: &str) -> miette::Result<Channel> {
                     || details.contains("connection error"))
             {
                 Err(miette::miette!(
-                    help = "If the server uses a Let's Encrypt staging certificate, \
-                            use http:// instead of https:// for testing.\n\
-                            If the server's TLS certificate is from a private CA, \
-                            ensure the CA is in your system trust store.",
-                    "TLS connection to {} failed: {}\n\
-                     The server's TLS certificate may not be trusted by this client.",
+                    help = "The server's TLS certificate may not be trusted by this client.\n\
+                            Try --tls-insecure for testing with staging certificates.\n\
+                            If the server has no valid certificate yet, use http://<host>:<port>",
+                    "TLS connection to {} failed: {}",
                     url,
                     err_str
                 ))
@@ -492,8 +503,11 @@ struct TokenResponse {
 }
 
 /// Fetch the OIDC configuration (issuer_url, client_id) from the forge gRPC server.
-pub async fn get_auth_config(grpc_url: &str) -> miette::Result<(String, String)> {
-    let channel = connect_grpc(grpc_url).await?;
+pub async fn get_auth_config(
+    grpc_url: &str,
+    tls_insecure: bool,
+) -> miette::Result<(String, String)> {
+    let channel = connect_grpc(grpc_url, tls_insecure).await?;
     let mut client = api_v2::auth_service_client::AuthServiceClient::new(channel);
     let resp = client
         .get_auth_config(Request::new(api_v2::GetAuthConfigRequest {}))
@@ -515,12 +529,12 @@ pub async fn get_auth_config(grpc_url: &str) -> miette::Result<(String, String)>
 /// 3. Initiates a device authorization request.
 /// 4. Displays the user code and verification URL for the user to open in a browser.
 /// 5. Polls the token endpoint until the user authorizes or the code expires.
-pub async fn login_device_flow(forge_host: &str) -> miette::Result<TokenSet> {
+pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::Result<TokenSet> {
     let grpc_url = server_url_from_host(forge_host);
 
     // 1. Get auth config from forge
     info!(host = %forge_host, "fetching OIDC configuration from forge server");
-    let (issuer_url, client_id) = get_auth_config(&grpc_url).await?;
+    let (issuer_url, client_id) = get_auth_config(&grpc_url, tls_insecure).await?;
     debug!(issuer = %issuer_url, client_id = %client_id, "received auth config");
 
     // 2. OIDC discovery

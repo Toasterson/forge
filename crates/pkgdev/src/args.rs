@@ -45,6 +45,10 @@ pub struct Args {
     #[arg(long = "repo-context", global = true)]
     pub repo_context: Option<String>,
 
+    /// Skip TLS certificate verification (for testing with staging certificates).
+    #[arg(long = "tls-insecure", global = true)]
+    pub tls_insecure: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -375,7 +379,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
     match args.command {
         Commands::Auth { cmd } => match cmd {
             AuthCmd::Login { host, select } => {
-                let token_set = login_device_flow(&host)
+                let token_set = login_device_flow(&host, args.tls_insecure)
                     .await
                     .wrap_err("device authorization flow failed")?;
 
