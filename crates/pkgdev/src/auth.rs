@@ -358,6 +358,48 @@ pub fn server_url_from_host(host: &str) -> String {
     }
 }
 
+/// Connect to a gRPC endpoint with improved error diagnostics for TLS failures.
+async fn connect_grpc(url: &str) -> miette::Result<Channel> {
+    let is_tls = url.starts_with("https://");
+    let endpoint = Channel::from_shared(url.to_string())
+        .map_err(|_| miette::miette!("invalid gRPC endpoint: {}", url))?;
+
+    match endpoint.connect().await {
+        Ok(channel) => Ok(channel),
+        Err(e) => {
+            let err_str = format!("{}", e);
+            let details = format!("{:?}", e);
+
+            if is_tls
+                && (details.contains("certificate")
+                    || details.contains("ssl")
+                    || details.contains("tls")
+                    || details.contains("h2 protocol error")
+                    || details.contains("connection error"))
+            {
+                Err(miette::miette!(
+                    help = "If the server uses a Let's Encrypt staging certificate, \
+                            use http:// instead of https:// for testing.\n\
+                            If the server's TLS certificate is from a private CA, \
+                            ensure the CA is in your system trust store.",
+                    "TLS connection to {} failed: {}\n\
+                     The server's TLS certificate may not be trusted by this client.",
+                    url,
+                    err_str
+                ))
+            } else {
+                Err(miette::miette!(
+                    help = "Check that the server is running and the address is correct.\n\
+                            Use http:// for plaintext or https:// for TLS connections.",
+                    "failed to connect to forge at {}: {}",
+                    url,
+                    err_str
+                ))
+            }
+        }
+    }
+}
+
 // ============================================================
 // OAuth 2.0 Device Authorization Grant (RFC 8628)
 // ============================================================
@@ -418,12 +460,7 @@ struct TokenResponse {
 
 /// Fetch the OIDC configuration (issuer_url, client_id) from the forge gRPC server.
 pub async fn get_auth_config(grpc_url: &str) -> miette::Result<(String, String)> {
-    let endpoint = Channel::from_shared(grpc_url.to_string())
-        .map_err(|_| miette::miette!("invalid gRPC endpoint: {}", grpc_url))?;
-    let channel = endpoint
-        .connect()
-        .await
-        .map_err(|e| miette::miette!("failed to connect to forge at {}: {}", grpc_url, e))?;
+    let channel = connect_grpc(grpc_url).await?;
     let mut client = api_v2::auth_service_client::AuthServiceClient::new(channel);
     let resp = client
         .get_auth_config(Request::new(api_v2::GetAuthConfigRequest {}))
