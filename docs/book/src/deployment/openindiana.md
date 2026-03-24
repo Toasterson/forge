@@ -58,7 +58,8 @@ The package installs the `weed` binary but does not include SMF service manifest
 
 ```bash
 pfexec mkdir -p /var/seaweedfs/master /var/seaweedfs/volume
-pfexec useradd -d /var/seaweedfs -s /usr/bin/false seaweedfs
+pfexec groupadd seaweedfs
+pfexec useradd -g seaweedfs -d /var/seaweedfs -s /usr/bin/false seaweedfs
 pfexec chown -R seaweedfs:seaweedfs /var/seaweedfs
 ```
 
@@ -165,7 +166,8 @@ cd /opt/rabbitmq && pfexec tar xJf /tmp/rabbitmq.tar.xz --strip-components=1
 ### Create User and Directories
 
 ```bash
-pfexec useradd -d /var/rabbitmq -s /usr/bin/false rabbitmq
+pfexec groupadd rabbitmq
+pfexec useradd -g rabbitmq -d /var/rabbitmq -s /usr/bin/false rabbitmq
 pfexec mkdir -p /var/rabbitmq /var/log/rabbitmq
 pfexec chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
 ```
@@ -244,7 +246,8 @@ pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl status"
 ### Create User and Directories
 
 ```bash
-pfexec useradd -d /opt/forge -s /usr/bin/false forged
+pfexec groupadd forged
+pfexec useradd -g forged -d /opt/forge -s /usr/bin/false forged
 pfexec mkdir -p /opt/forge/bin /opt/forge/lib/svc/method
 pfexec mkdir -p /etc/forged
 pfexec mkdir -p /var/lib/forged/jj-repos /var/lib/forged/acme
