@@ -167,6 +167,12 @@ curl -L -o /tmp/rabbitmq.tar.xz \
 
 pfexec mkdir -p /opt/rabbitmq
 cd /opt/rabbitmq && pfexec gtar xJf /tmp/rabbitmq.tar.xz --strip-components=1
+
+# RabbitMQ scripts use bashisms (local keyword) incompatible with illumos ksh.
+# Patch all shell scripts to use bash:
+pfexec find /opt/rabbitmq -name "*.sh" -o -name "rabbitmq-*" | while read f; do
+  head -1 "$f" | grep -q '^#!/bin/sh' && pfexec sed -i 's|#!/bin/sh|#!/usr/bin/bash|' "$f"
+done
 ```
 
 ### Create User and Directories
@@ -194,7 +200,7 @@ pfexec chown rabbitmq:rabbitmq /var/rabbitmq /var/log/rabbitmq
       <service_fmri value="svc:/milestone/network:default"/>
     </dependency>
     <exec_method type="method" name="start"
-      exec="/usr/bin/bash -c 'exec /opt/rabbitmq/sbin/rabbitmq-server'"
+      exec="/opt/rabbitmq/sbin/rabbitmq-server"
       timeout_seconds="60">
       <method_context>
         <method_credential user="rabbitmq" group="rabbitmq"/>
