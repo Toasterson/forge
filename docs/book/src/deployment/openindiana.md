@@ -169,9 +169,10 @@ pfexec mkdir -p /opt/rabbitmq
 cd /opt/rabbitmq && pfexec gtar xJf /tmp/rabbitmq.tar.xz --strip-components=1
 
 # RabbitMQ scripts use bashisms (local keyword) incompatible with illumos ksh.
-# Patch all shell scripts to use bash:
-pfexec find /opt/rabbitmq -name "*.sh" -o -name "rabbitmq-*" | while read f; do
-  head -1 "$f" | grep -q '^#!/bin/sh' && pfexec sed -i 's|#!/bin/sh|#!/usr/bin/bash|' "$f"
+# Patch all shell scripts under sbin/ and escript/ to use bash:
+for f in /opt/rabbitmq/sbin/* /opt/rabbitmq/escript/*; do
+  [ -f "$f" ] && head -1 "$f" | grep -q '^#!/bin/sh' && \
+    pfexec sed -i 's|#!/bin/sh|#!/usr/bin/bash|' "$f"
 done
 ```
 
@@ -233,18 +234,18 @@ pfexec svcadm enable rabbitmq
 sleep 10
 
 # Enable management plugin (optional, for web UI on port 15672)
-pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmq-plugins enable rabbitmq_management"
+pfexec /opt/rabbitmq/sbin/rabbitmq-plugins enable rabbitmq_management
 
 # Create vhost and user for Forge
-pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl add_vhost master"
-pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl add_user forged changeme-use-a-strong-password"
-pfexec su - rabbitmq -c '/opt/rabbitmq/sbin/rabbitmqctl set_permissions -p master forged ".*" ".*" ".*"'
+pfexec /opt/rabbitmq/sbin/rabbitmqctl add_vhost master
+pfexec /opt/rabbitmq/sbin/rabbitmqctl add_user forged changeme-use-a-strong-password
+pfexec /opt/rabbitmq/sbin/rabbitmqctl set_permissions -p master forged ".*" ".*" ".*"
 ```
 
 ### Verify
 
 ```bash
-pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl status"
+pfexec /opt/rabbitmq/sbin/rabbitmqctl status
 ```
 
 ## 4. Install Forge
@@ -559,11 +560,11 @@ svcs -xv seaweedfs/volume
 ### RabbitMQ Connection Refused
 
 ```bash
-pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl status"
+pfexec /opt/rabbitmq/sbin/rabbitmqctl status
 # Check vhost exists:
-pfexec su - rabbitmq -c "/opt/rabbitmq/sbin/rabbitmqctl list_vhosts"
+pfexec /opt/rabbitmq/sbin/rabbitmqctl list_vhosts
 # Check user permissions:
-pfexec su - rabbitmq -c '/opt/rabbitmq/sbin/rabbitmqctl list_permissions -p master'
+pfexec /opt/rabbitmq/sbin/rabbitmqctl list_permissions -p master
 ```
 
 ### ACME Certificate Issues
