@@ -90,6 +90,11 @@ jobs:
           done
           docker run -d --name seaweedfs-volume --network host \
             chrislusf/seaweedfs:latest volume -mserver=127.0.0.1:9333 -port=8080 -publicUrl=localhost:8080
+          # Wait for volume server to be reachable
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/status && break
+            sleep 1
+          done
           # Wait for volume to register with master
           for i in $(seq 1 30); do
             curl -sf http://localhost:9333/dir/assign && break
@@ -187,4 +192,6 @@ jobs:
       - name: Package chart
         run: helm package charts/forged --version ${{ steps.vars.outputs.chart_version }} --app-version ${{ steps.vars.outputs.image_tag }}
       - name: Push chart
-        run: helm push forged-${{ steps.vars.outputs.chart_version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          helm push forged-${{ steps.vars.outputs.chart_version }}.tgz oci://ghcr.io/${OWNER}/charts

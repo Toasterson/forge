@@ -172,4 +172,5 @@ jobs:
             --app-version ${{ steps.ver.outputs.version }}
       - name: Push chart to GHCR OCI
         run: |
-          helm push forged-${{ steps.ver.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          helm push forged-${{ steps.ver.outputs.version }}.tgz oci://ghcr.io/${OWNER}/charts
