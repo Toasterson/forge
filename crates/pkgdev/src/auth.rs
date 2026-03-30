@@ -590,7 +590,8 @@ pub async fn login_device_flow(forge_host: &str, tls_insecure: bool) -> miette::
     debug!(endpoint = %device_auth_endpoint, "requesting device authorization");
 
     let device_resp = {
-        let mut form_params: Vec<(&str, &str)> = vec![("scope", "openid profile email offline_access")];
+        let mut form_params: Vec<(&str, &str)> =
+            vec![("scope", "openid profile email offline_access")];
         if !client_id.is_empty() {
             form_params.push(("client_id", &client_id));
         }

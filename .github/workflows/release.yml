@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: false
       - uses: dtolnay/rust-toolchain@stable
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler clang pkg-config libssl-dev libarchive-dev
@@ -86,6 +88,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: false
       - name: Compute version from tag or release
         id: ver
         shell: bash
@@ -132,6 +136,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: false
       - name: Compute version from tag or release
         id: ver
         shell: bash
