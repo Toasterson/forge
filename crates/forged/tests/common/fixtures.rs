@@ -1,5 +1,6 @@
 use crate::common::TestContext;
-use forged::entities::{actor, component, gate};
+use forged::entities::{actor, component, gate, server_member};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 pub struct TestFixtures;
 
@@ -13,8 +14,38 @@ impl TestFixtures {
             .expect("Failed to create test actor")
     }
 
+    /// Grant gate_create server permission to an actor
+    async fn grant_gate_create(ctx: &TestContext, actor_id: &str) {
+        let existing = server_member::Entity::find()
+            .filter(server_member::Column::ActorId.eq(actor_id))
+            .one(ctx.db.as_ref())
+            .await
+            .expect("Failed to query server_member");
+
+        if existing.is_some() {
+            return;
+        }
+
+        let now = chrono::Utc::now().fixed_offset();
+        let active = server_member::ActiveModel {
+            actor_id: Set(actor_id.to_string()),
+            roles: Set(serde_json::json!(["gate_creator"])),
+            permissions: Set(serde_json::json!(["gate_create"])),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        active
+            .insert(ctx.db.as_ref())
+            .await
+            .expect("Failed to grant gate_create permission to test actor");
+    }
+
     /// Create test gate with owner
     pub async fn gate(ctx: &TestContext, owner: &actor::Model, name: &str) -> gate::Model {
+        // Ensure the owner has gate_create permission
+        Self::grant_gate_create(ctx, &owner.id).await;
+
         let gate_kdl = format!(
             "name \"{name}\"\nversion \"0.5.11\"\nbranch \"2024.0.0\"\npublisher \"test.example.com\""
         );

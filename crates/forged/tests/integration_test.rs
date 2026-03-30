@@ -7,7 +7,9 @@
 //
 // NOTE: Tests run sequentially to avoid database conflicts
 
+use forged::entities::server_member;
 use forged::{AppState, Settings};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 /// Test database connection and migrations
 #[tokio::test]
@@ -79,13 +81,15 @@ async fn test_gate_lifecycle() {
         .await
         .expect("Failed to create actor");
 
-    // Create gate
+    // Grant gate_create permission and create gate
+    grant_gate_create(&app_state, &actor.id).await;
     let gate = app_state
         .gate_manager
         .create_gate(
             &actor.id,
             "test-gate".to_string(),
-            "gate { name = \"test-gate\" }".to_string(),
+            "name \"test-gate\"\nversion \"0.5.11\"\nbranch \"2024.0.0\"\npublisher \"test\""
+                .to_string(),
         )
         .await
         .expect("Failed to create gate");
@@ -119,12 +123,13 @@ async fn test_component_with_files() {
         .await
         .expect("Failed to create actor");
 
+    grant_gate_create(&app_state, &actor.id).await;
     let gate = app_state
         .gate_manager
         .create_gate(
             &actor.id,
             "component-test-gate".to_string(),
-            "gate { }".to_string(),
+            "name \"component-test-gate\"\nversion \"0.5.11\"\nbranch \"2024.0.0\"\npublisher \"test\"".to_string(),
         )
         .await
         .expect("Failed to create gate");
@@ -136,7 +141,7 @@ async fn test_component_with_files() {
             &actor.id,
             &gate.id,
             "test-component".to_string(),
-            "component { }".to_string(),
+            "name \"test-component\"\nsummary \"Test component\"\nversion \"1.0.0\"".to_string(),
         )
         .await
         .expect("Failed to create component");
@@ -193,9 +198,15 @@ async fn test_rbac_enforcement() {
         .expect("Failed to create member");
 
     // Create gate
+    grant_gate_create(&app_state, &owner.id).await;
     let gate = app_state
         .gate_manager
-        .create_gate(&owner.id, "rbac-gate".to_string(), "gate { }".to_string())
+        .create_gate(
+            &owner.id,
+            "rbac-gate".to_string(),
+            "name \"rbac-gate\"\nversion \"0.5.11\"\nbranch \"2024.0.0\"\npublisher \"test\""
+                .to_string(),
+        )
         .await
         .expect("Failed to create gate");
 
@@ -242,6 +253,32 @@ async fn test_rbac_enforcement() {
 }
 
 // Helper functions
+
+async fn grant_gate_create(app_state: &AppState, actor_id: &str) {
+    let existing = server_member::Entity::find()
+        .filter(server_member::Column::ActorId.eq(actor_id))
+        .one(app_state.db.as_ref())
+        .await
+        .expect("Failed to query server_member");
+
+    if existing.is_some() {
+        return; // Already has a server_member entry
+    }
+
+    let now = chrono::Utc::now().fixed_offset();
+    let active = server_member::ActiveModel {
+        actor_id: Set(actor_id.to_string()),
+        roles: Set(serde_json::json!(["gate_creator"])),
+        permissions: Set(serde_json::json!(["gate_create"])),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    };
+    active
+        .insert(app_state.db.as_ref())
+        .await
+        .expect("Failed to grant gate_create permission");
+}
 
 async fn setup_test_app_state() -> AppState {
     let settings = Settings {
