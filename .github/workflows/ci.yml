@@ -127,7 +127,7 @@ jobs:
           TEST_DATABASE_URL: postgresql://forged:forged@localhost/forged_test
           TEST_SEAWEEDFS_URL: http://localhost:9333
           RUST_LOG: forged=info,warn
-        run: cargo test -p forged --test integration_test --locked -- --ignored --nocapture
+        run: cargo test -p forged --test integration_test --locked -- --ignored --nocapture --test-threads=1
 
       - name: Stop SeaweedFS
         if: always()
