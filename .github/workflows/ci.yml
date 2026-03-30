@@ -89,12 +89,25 @@ jobs:
             sleep 1
           done
           docker run -d --name seaweedfs-volume --network host \
-            chrislusf/seaweedfs:latest volume -mserver=127.0.0.1:9333 -port=8080 -publicUrl=localhost:8080
+            chrislusf/seaweedfs:latest volume \
+            -mserver=127.0.0.1:9333 \
+            -ip=127.0.0.1 \
+            -port=8080 \
+            -publicUrl=127.0.0.1:8080
           # Wait for volume server to be reachable
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:8080/status && break
+          VOLUME_READY=false
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8080/status > /dev/null 2>&1; then
+              VOLUME_READY=true
+              break
+            fi
             sleep 1
           done
+          if [ "$VOLUME_READY" != "true" ]; then
+            echo "::error::SeaweedFS volume server not reachable after 60s"
+            docker logs seaweedfs-volume
+            exit 1
+          fi
           # Wait for volume to register with master
           for i in $(seq 1 30); do
             curl -sf http://localhost:9333/dir/assign && break
