@@ -6,12 +6,9 @@ use chrono::{DateTime, Utc};
 use miette::Diagnostic;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::fs;
-use tokio::io::AsyncReadExt;
 use tracing::{debug, info, warn};
 
 // Use client types generated from proto in this crate (see build.rs)
-use crate::api::forged::api::v1 as api;
 use crate::api::forged::api::v2 as api_v2;
 use tonic::transport::Channel;
 use tonic::Request;
@@ -22,15 +19,6 @@ use tonic::Request;
 pub enum ActorKind {
     User,
     Service,
-}
-
-impl From<ActorKind> for api::ActorKind {
-    fn from(value: ActorKind) -> Self {
-        match value {
-            ActorKind::User => api::ActorKind::User,
-            ActorKind::Service => api::ActorKind::Service,
-        }
-    }
 }
 
 #[derive(Error, Debug, Diagnostic)]
@@ -74,80 +62,8 @@ impl AuthClient {
         Ok(Self { server, channel })
     }
 
-    fn client(&self) -> api::auth_service_client::AuthServiceClient<Channel> {
-        api::auth_service_client::AuthServiceClient::new(self.channel.clone())
-    }
-
-    pub async fn register_actor(
-        &self,
-        actor_id: String,
-        email: String,
-        kind: ActorKind,
-        public_key_path: &Path,
-        algorithm_hint: Option<String>,
-        token: &str,
-    ) -> Result<()> {
-        // Read SSH public key file (OpenSSH format recommended)
-        let mut file = fs::File::open(public_key_path).await.map_err(|e| {
-            info!(path=%public_key_path.display(), error=?e, "failed to open public key");
-            e
-        })?;
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).await.map_err(|e| {
-            info!(path=%public_key_path.display(), error=?e, "failed to read public key");
-            e
-        })?;
-
-        let algorithm = algorithm_hint.unwrap_or_else(|| guess_ssh_algorithm(&buf));
-        debug!(algorithm=%algorithm, bytes=%buf.len(), "using algorithm for public key");
-
-        let pk = api::PublicKey {
-            key_id: "initial".to_string(),
-            algorithm,
-            public_key: buf,
-        };
-        // Minimal proof placeholder (server-side currently not verifying)
-        let proof = api::SignedMessage {
-            algorithm: String::new(),
-            message: vec![],
-            signature: vec![],
-            key_id: String::new(),
-        };
-
-        let req = api::RegisterActorRequest {
-            actor_id,
-            actor_kind: api::ActorKind::from(kind) as i32,
-            public_key: Some(pk),
-            proof: Some(proof),
-            email,
-        };
-
-        let mut client = self.client();
-        let _resp = client
-            .register_actor(authenticated_request(req, token))
-            .await?;
-        Ok(())
-    }
-
-    pub async fn confirm_registration(
-        &self,
-        actor_id: String,
-        kind: ActorKind,
-        envelope: &str,
-        token: &str,
-    ) -> Result<()> {
-        // The envelope is provided directly (Base64-URL or raw JSON). Send as-is.
-        let envelope_bytes = envelope.as_bytes().to_vec();
-        let req = api::RegistrationConfirmationRequest {
-            actor_id,
-            actor_kind: api::ActorKind::from(kind) as i32,
-            confirmation_envelope: envelope_bytes,
-        };
-        let mut client = self.client();
-        let _resp = client
-            .registration_confirmation(authenticated_request(req, token))
-            .await?;
-        Ok(())
+    fn client(&self) -> api_v2::auth_service_client::AuthServiceClient<Channel> {
+        api_v2::auth_service_client::AuthServiceClient::new(self.channel.clone())
     }
 
     /// Confirm registration using an age-encrypted envelope addressed to the actor's SSH key.
@@ -156,7 +72,6 @@ impl AuthClient {
     pub async fn confirm_registration_encrypted(
         &self,
         actor_id: String,
-        kind: ActorKind,
         encrypted_b64: &str,
         identity_path: &Path,
         token: &str,
@@ -171,11 +86,10 @@ impl AuthClient {
             e
         })?;
         let reader = BufReader::new(Cursor::new(ident_bytes));
-        let identity = age::ssh::Identity::from_buffer(reader, None)
-            .map_err(|e| {
-                info!(path=%identity_path.display(), error=?e, "invalid SSH identity (is it encrypted?)");
-                std::io::Error::other("invalid SSH identity")
-            })?;
+        let identity = age::ssh::Identity::from_buffer(reader, None).map_err(|e| {
+            info!(path=%identity_path.display(), error=?e, "invalid SSH identity (is it encrypted?)");
+            std::io::Error::other("invalid SSH identity")
+        })?;
         let decryptor = Decryptor::new(Cursor::new(cipher)).map_err(|e| {
             info!(error=?e, "invalid age ciphertext for envelope");
             std::io::Error::other("invalid age ciphertext")
@@ -186,14 +100,14 @@ impl AuthClient {
                 info!(error=?e, "failed to decrypt envelope with provided identity");
                 std::io::Error::other("decrypt failed")
             })?;
-        let mut envelope_bytes = Vec::new();
-        r.read_to_end(&mut envelope_bytes)?;
+        let mut decrypted = Vec::new();
+        r.read_to_end(&mut decrypted)?;
+        let challenge = String::from_utf8(decrypted)
+            .map_err(|_| std::io::Error::other("decrypted challenge is not valid UTF-8"))?;
 
-        // Send the decrypted raw JSON envelope
-        let req = api::RegistrationConfirmationRequest {
+        let req = api_v2::RegistrationConfirmationRequest {
             actor_id,
-            actor_kind: api::ActorKind::from(kind) as i32,
-            confirmation_envelope: envelope_bytes,
+            decrypted_challenge: challenge,
         };
         let mut client = self.client();
         let _resp = client
@@ -227,26 +141,6 @@ fn decode_b64_any(input: &[u8]) -> Vec<u8> {
         }
     }
     input.to_vec()
-}
-
-fn guess_ssh_algorithm(key_bytes: &[u8]) -> String {
-    // Heuristic: look at OpenSSH header prefix
-    let s = std::str::from_utf8(key_bytes).unwrap_or("");
-    if s.contains("ssh-ed25519") {
-        "ed25519".to_string()
-    } else if s.contains("ecdsa-sha2-nistp256") {
-        "ecdsa-p256".to_string()
-    } else if s.contains("ecdsa-sha2-nistp384") {
-        "ecdsa-p384".to_string()
-    } else if s.contains("ecdsa-sha2-nistp521") {
-        "ecdsa-p521".to_string()
-    } else if s.contains("ssh-rsa") {
-        // Prefer rsa-pss naming if server expects; keep generic
-        "rsa-ssh".to_string()
-    } else {
-        // Fallback – server will validate
-        "unknown".to_string()
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

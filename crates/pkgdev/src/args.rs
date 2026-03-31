@@ -509,7 +509,6 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 client
                     .confirm_registration_encrypted(
                         actor_id.clone(),
-                        kind,
                         &envelope,
                         &identity_path,
                         &token,
