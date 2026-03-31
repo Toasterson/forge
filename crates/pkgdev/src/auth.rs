@@ -253,6 +253,8 @@ fn guess_ssh_algorithm(key_bytes: &[u8]) -> String {
 pub struct LoginEntry {
     pub actor_id: String,
     pub kind: ActorKind,
+    #[serde(default)]
+    pub display_name: String,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -268,6 +270,8 @@ pub struct AuthState {
 pub struct LoginEntryKey {
     pub actor_id: String,
     pub kind: ActorKind,
+    #[serde(default)]
+    pub display_name: String,
 }
 
 impl From<&LoginEntry> for LoginEntryKey {
@@ -275,6 +279,7 @@ impl From<&LoginEntry> for LoginEntryKey {
         LoginEntryKey {
             actor_id: e.actor_id.clone(),
             kind: e.kind,
+            display_name: e.display_name.clone(),
         }
     }
 }
@@ -317,6 +322,7 @@ impl AuthState {
                     .map(|k| LoginEntry {
                         actor_id: k.actor_id.clone(),
                         kind: k.kind,
+                        display_name: k.display_name.clone(),
                     })
                     .collect()
             })

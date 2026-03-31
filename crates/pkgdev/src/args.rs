@@ -419,6 +419,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         LoginEntry {
                             actor_id: actor.id.clone(),
                             kind,
+                            display_name: resp.display_name.clone(),
                         },
                     );
                     state.set_selected(host.clone(), actor.id.clone(), kind);
@@ -530,6 +531,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             LoginEntry {
                                 actor_id: actor_id.clone(),
                                 kind,
+                                display_name: String::new(),
                             },
                         );
                     }
@@ -555,7 +557,11 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             println!("no logins for host {}", h);
                         } else {
                             for e in entries {
-                                println!("{}\t{:?}", e.actor_id, e.kind);
+                                if e.display_name.is_empty() {
+                                    println!("{}\t{:?}", e.actor_id, e.kind);
+                                } else {
+                                    println!("{}\t{:?}\t{}", e.display_name, e.kind, e.actor_id);
+                                }
                             }
                         }
                     }
@@ -566,7 +572,11 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         for (h, set) in state.logins.iter() {
                             println!("{}:", h);
                             for k in set.iter() {
-                                println!("  {}\t{:?}", k.actor_id, k.kind);
+                                if k.display_name.is_empty() {
+                                    println!("  {}\t{:?}", k.actor_id, k.kind);
+                                } else {
+                                    println!("  {}\t{:?}\t{}", k.display_name, k.kind, k.actor_id);
+                                }
                             }
                         }
                     }
