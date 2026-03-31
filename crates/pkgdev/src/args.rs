@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::api::forged::api::v1 as api;
 use crate::build::{run_build, BuildArgs};
 use crate::component::open_component_local;
 use crate::create::create_component;
@@ -623,40 +622,44 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 ForgeCmd::Gate { cmd } => match cmd {
                     GateCmd::Open {
                         host,
-                        id,
+                        id: _,
                         name,
-                        owner_id,
-                        owner_kind,
+                        owner_id: _,
+                        owner_kind: _,
                     } => {
                         let host = resolve_host_or_selected(host)?;
                         let token = get_valid_token(&host)
                             .await
                             .wrap_err("authentication required")?;
-                        let url = server_url_from_host(&host);
-                        let client = GateClient::connect(url)
+                        let (actor_id, _) = resolve_owner(&host, None, None)?;
+                        let grpc_url = server_url_from_host(&host);
+                        let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                        let mut client =
+                            api_v2::gate_service_client::GateServiceClient::new(channel);
+                        let gate_name = name.unwrap_or_default();
+                        let req = authenticated_request(
+                            api_v2::CreateGateRequest {
+                                actor: Some(api_v2::ActorRef {
+                                    id: actor_id,
+                                    kind: "user".to_string(),
+                                }),
+                                name: gate_name.clone(),
+                                gate_kdl: String::new(),
+                            },
+                            &token,
+                        );
+                        let resp = client
+                            .create_gate(req)
                             .await
-                            .wrap_err("failed to connect to forge host")?;
-                        let (oid, okind) = resolve_owner(&host, owner_id, owner_kind)?;
-                        let gate = api::Gate {
-                            id,
-                            name: name.unwrap_or_default(),
-                            owner: Some(api::ActorRef {
-                                id: oid,
-                                kind: actor_kind_str(okind),
-                            }),
-                            members: vec![],
-                        };
-                        let created = client
-                            .create_gate(gate, &token)
-                            .await
-                            .wrap_err("create gate RPC failed")?;
-                        println!("gate '{}' created on {}", created.id, host);
+                            .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateGate", e))?;
+                        let created = resp.into_inner().gate.unwrap();
+                        println!("gate '{}' created on {}", created.name, host);
                         Ok(())
                     }
                     GateCmd::Upload {
                         host,
-                        owner_id,
-                        owner_kind,
+                        owner_id: _,
+                        owner_kind: _,
                     } => {
                         let Some(g) = &gate else {
                             return Err(miette::miette!("--gate must be provided for 'forge gate upload' or run in a gate directory"));
@@ -665,26 +668,28 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         let token = get_valid_token(&host)
                             .await
                             .wrap_err("authentication required")?;
-                        let url = server_url_from_host(&host);
-                        let client = GateClient::connect(url)
+                        let (actor_id, _) = resolve_owner(&host, None, None)?;
+                        let grpc_url = server_url_from_host(&host);
+                        let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                        let mut client =
+                            api_v2::gate_service_client::GateServiceClient::new(channel);
+                        let req = authenticated_request(
+                            api_v2::CreateGateRequest {
+                                actor: Some(api_v2::ActorRef {
+                                    id: actor_id,
+                                    kind: "user".to_string(),
+                                }),
+                                name: g.name.clone(),
+                                gate_kdl: String::new(),
+                            },
+                            &token,
+                        );
+                        let resp = client
+                            .create_gate(req)
                             .await
-                            .wrap_err("failed to connect to forge host")?;
-                        let (oid, okind) = resolve_owner(&host, owner_id, owner_kind)?;
-                        let id = g.id.clone().unwrap_or_else(|| g.name.clone());
-                        let gate_msg = api::Gate {
-                            id,
-                            name: g.name.clone(),
-                            owner: Some(api::ActorRef {
-                                id: oid,
-                                kind: actor_kind_str(okind),
-                            }),
-                            members: vec![],
-                        };
-                        let created = client
-                            .create_gate(gate_msg, &token)
-                            .await
-                            .wrap_err("upload gate RPC failed")?;
-                        println!("gate '{}' uploaded to {}", created.id, host);
+                            .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateGate", e))?;
+                        let created = resp.into_inner().gate.unwrap();
+                        println!("gate '{}' uploaded to {}", created.name, host);
                         Ok(())
                     }
                     GateCmd::List { host, no_header } => {
@@ -692,27 +697,23 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         let token = get_valid_token(&host)
                             .await
                             .wrap_err("authentication required")?;
+                        let (actor_id, _) = resolve_owner(&host, None, None)?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
                             .wrap_err("failed to connect to forge host")?;
                         let gates = client
-                            .list_gates(&token)
+                            .list_gates(&actor_id, &token)
                             .await
                             .wrap_err("list gates RPC failed")?;
                         if gates.is_empty() {
                             println!("no gates on {}", host);
                         } else {
                             if !no_header {
-                                println!("ID\tNAME\tOWNER_ID\tOWNER_KIND");
+                                println!("ID\tNAME\tOWNER_ID");
                             }
                             for g in gates {
-                                let (owner_id, owner_kind) = if let Some(o) = g.owner {
-                                    (o.id, o.kind)
-                                } else {
-                                    (String::new(), String::new())
-                                };
-                                println!("{}\t{}\t{}\t{}", g.id, g.name, owner_id, owner_kind);
+                                println!("{}\t{}\t{}", g.id, g.name, g.owner_id);
                             }
                         }
                         Ok(())
@@ -722,12 +723,13 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         let token = get_valid_token(&host)
                             .await
                             .wrap_err("authentication required")?;
+                        let (actor_id, _) = resolve_owner(&host, None, None)?;
                         let url = server_url_from_host(&host);
                         let client = GateClient::connect(url)
                             .await
                             .wrap_err("failed to connect to forge host")?;
                         match client
-                            .get_gate(&id, &token)
+                            .get_gate(&actor_id, &id, &token)
                             .await
                             .wrap_err("get gate RPC failed")?
                         {
@@ -736,33 +738,32 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             }
                             Some(g) => {
                                 println!("id: {}", g.id);
-                                if !g.name.is_empty() {
-                                    println!("name: {}", g.name);
-                                }
-                                if let Some(o) = g.owner {
-                                    println!("owner: {} {}", o.kind, o.id);
-                                }
-                                if g.members.is_empty() {
+                                println!("name: {}", g.name);
+                                println!("owner: {}", g.owner_id);
+                                // List members
+                                let members = client
+                                    .list_members(&actor_id, &g.id, &token)
+                                    .await
+                                    .wrap_err("list members RPC failed")?;
+                                if members.is_empty() {
                                     println!("members: 0");
                                 } else {
                                     println!("members:");
-                                    for m in g.members {
-                                        if let Some(ar) = m.actor.as_ref() {
-                                            let roles = if m.roles.is_empty() {
-                                                String::from("[]")
-                                            } else {
-                                                format!("[{}]", m.roles.join(","))
-                                            };
-                                            let perms = if m.permissions.is_empty() {
-                                                String::from("[]")
-                                            } else {
-                                                format!("[{}]", m.permissions.join(","))
-                                            };
-                                            println!(
-                                                "- {} {} roles:{} perms:{}",
-                                                ar.kind, ar.id, roles, perms
-                                            );
-                                        }
+                                    for m in members {
+                                        let roles = if m.roles.is_empty() {
+                                            String::from("[]")
+                                        } else {
+                                            format!("[{}]", m.roles.join(","))
+                                        };
+                                        let perms = if m.permissions.is_empty() {
+                                            String::from("[]")
+                                        } else {
+                                            format!("[{}]", m.permissions.join(","))
+                                        };
+                                        println!(
+                                            "  - {} roles:{} perms:{}",
+                                            m.actor_id, roles, perms
+                                        );
                                     }
                                 }
                             }
@@ -772,26 +773,38 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 },
                 ForgeCmd::Component { cmd } => {
                     match cmd {
-                        ComponentCmd::Create { host, id, name } => {
+                        ComponentCmd::Create { host, id: _, name } => {
                             let host = resolve_host_or_selected(host)?;
                             let token = get_valid_token(&host)
                                 .await
                                 .wrap_err("authentication required")?;
-                            let url = server_url_from_host(&host);
-                            let client = ComponentClient::connect(url)
+                            let (actor_id, _) = resolve_owner(&host, None, None)?;
+                            let grpc_url = server_url_from_host(&host);
+                            let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                            let mut client =
+                                api_v2::component_service_client::ComponentServiceClient::new(
+                                    channel,
+                                );
+                            let comp_name = name.unwrap_or_default();
+                            // TODO: gate_id should come from a flag or context
+                            let req = authenticated_request(
+                                api_v2::CreateComponentRequest {
+                                    actor: Some(api_v2::ActorRef {
+                                        id: actor_id,
+                                        kind: "user".to_string(),
+                                    }),
+                                    gate_id: None,
+                                    name: comp_name,
+                                    recipe_kdl: String::new(),
+                                },
+                                &token,
+                            );
+                            let resp = client
+                                .create_component(req)
                                 .await
-                                .wrap_err("failed to connect to forge host")?;
-                            let comp = api::Component {
-                                id,
-                                name: name.unwrap_or_default(),
-                                files: None,
-                                base_json: String::new(),
-                            };
-                            let created = client
-                                .create_component(comp, &token)
-                                .await
-                                .wrap_err("create component RPC failed")?;
-                            println!("component '{}' created on {}", created.id, host);
+                                .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateComponent", e))?;
+                            let created = resp.into_inner().component.unwrap();
+                            println!("component '{}' created on {}", created.name, host);
                             Ok(())
                         }
                         ComponentCmd::Upload { host, component } => {
@@ -799,27 +812,35 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             let token = get_valid_token(&host)
                                 .await
                                 .wrap_err("authentication required")?;
-                            let url = server_url_from_host(&host);
-                            let client = ComponentClient::connect(url)
-                                .await
-                                .wrap_err("failed to connect to forge host")?;
+                            let (actor_id, _) = resolve_owner(&host, None, None)?;
+                            let grpc_url = server_url_from_host(&host);
+                            let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                            let mut client =
+                                api_v2::component_service_client::ComponentServiceClient::new(
+                                    channel,
+                                );
                             let comp_local = open_component_local(&component, &gate)
                                 .wrap_err("cannot open component")?;
-                            let id = comp_local.get_name().to_string();
-                            let base_json = serde_json::to_string(&comp_local)
-                                .into_diagnostic()
-                                .wrap_err("serialize component for upload")?;
-                            let comp_msg = api::Component {
-                                id: id.clone(),
-                                name: comp_local.get_name().to_string(),
-                                files: None,
-                                base_json,
-                            };
-                            let created = client
-                                .create_component(comp_msg, &token)
+                            let comp_name = comp_local.get_name().to_string();
+                            // TODO: gate_id should come from a flag or context
+                            let req = authenticated_request(
+                                api_v2::CreateComponentRequest {
+                                    actor: Some(api_v2::ActorRef {
+                                        id: actor_id,
+                                        kind: "user".to_string(),
+                                    }),
+                                    gate_id: None,
+                                    name: comp_name.clone(),
+                                    recipe_kdl: String::new(),
+                                },
+                                &token,
+                            );
+                            let resp = client
+                                .create_component(req)
                                 .await
-                                .wrap_err("upload component RPC failed")?;
-                            println!("component '{}' uploaded to {}", created.id, host);
+                                .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateComponent", e))?;
+                            let created = resp.into_inner().component.unwrap();
+                            println!("component '{}' uploaded to {}", created.name, host);
                             Ok(())
                         }
                         ComponentCmd::List { host, no_header } => {
@@ -827,23 +848,32 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             let token = get_valid_token(&host)
                                 .await
                                 .wrap_err("authentication required")?;
+                            let (actor_id, _) = resolve_owner(&host, None, None)?;
+                            // List gates first, then list components per gate
                             let url = server_url_from_host(&host);
-                            let client = ComponentClient::connect(url)
+                            let client = GateClient::connect(url)
                                 .await
                                 .wrap_err("failed to connect to forge host")?;
-                            let components = client
-                                .list_components(&token)
+                            let gates = client
+                                .list_gates(&actor_id, &token)
                                 .await
-                                .wrap_err("list components RPC failed")?;
-                            if components.is_empty() {
-                                println!("no components on {}", host);
-                            } else {
-                                if !no_header {
-                                    println!("ID\tNAME");
-                                }
+                                .wrap_err("list gates RPC failed")?;
+                            let mut any = false;
+                            if !no_header {
+                                println!("GATE\tID\tNAME");
+                            }
+                            for g in &gates {
+                                let components = client
+                                    .list_components(&actor_id, &g.id, &token)
+                                    .await
+                                    .wrap_err("list components RPC failed")?;
                                 for c in components {
-                                    println!("{}\t{}", c.id, c.name);
+                                    any = true;
+                                    println!("{}\t{}\t{}", g.name, c.id, c.name);
                                 }
+                            }
+                            if !any {
+                                println!("no components on {}", host);
                             }
                             Ok(())
                         }
@@ -852,154 +882,29 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             let token = get_valid_token(&host)
                                 .await
                                 .wrap_err("authentication required")?;
+                            let (actor_id, _) = resolve_owner(&host, None, None)?;
                             let url = server_url_from_host(&host);
                             let client = ComponentClient::connect(url)
                                 .await
                                 .wrap_err("failed to connect to forge host")?;
 
                             let remote = client
-                                .get_component(&id, &token)
+                                .get_component(&actor_id, &id, &token)
                                 .await
                                 .wrap_err("get component RPC failed")?;
 
-                            println!("Component: {}", id);
                             if let Some(rc) = &remote {
-                                println!("  Name: {}", rc.name);
-                                if let Some(files) = rc.files.as_ref() {
-                                    if files.patches.is_empty() {
-                                        println!("  Patches: 0");
-                                    } else {
-                                        println!("  Patches ({}):", files.patches.len());
-                                        for f in &files.patches {
-                                            println!("    - {} ({})", f.name, f.rel_path);
-                                        }
+                                println!("id: {}", rc.id);
+                                println!("name: {}", rc.name);
+                                println!("gate: {}", rc.gate_id);
+                                if !rc.recipe_kdl.is_empty() {
+                                    println!("\nrecipe:");
+                                    for line in rc.recipe_kdl.lines() {
+                                        println!("  {}", line);
                                     }
-                                    if files.licenses.is_empty() {
-                                        println!("  Licenses: 0");
-                                    } else {
-                                        println!("  Licenses ({}):", files.licenses.len());
-                                        for f in &files.licenses {
-                                            println!("    - {} ({})", f.name, f.rel_path);
-                                        }
-                                    }
-                                    if files.scripts.is_empty() {
-                                        println!("  Scripts: 0");
-                                    } else {
-                                        println!("  Scripts ({}):", files.scripts.len());
-                                        for f in &files.scripts {
-                                            println!("    - {} ({})", f.name, f.rel_path);
-                                        }
-                                    }
-                                }
-
-                                // Render package.kdl description from the forge (base_json)
-                                if !rc.base_json.is_empty() {
-                                    match serde_json::from_str::<Component>(&rc.base_json) {
-                                        Ok(model) => {
-                                            println!("\nPackage KDL (describe) [from forge]:");
-                                            println!("  Name: {}", model.get_name());
-                                            let r = &model.recipe;
-                                            if let Some(v) = &r.version {
-                                                println!("  Version: {}", v);
-                                            }
-                                            if let Some(rev) = &r.revision {
-                                                println!("  Revision: {}", rev);
-                                            }
-                                            if let Some(s) = &r.summary {
-                                                println!("  Summary: {}", s);
-                                            }
-                                            if let Some(u) = &r.project_url {
-                                                println!("  Project URL: {}", u);
-                                            }
-                                            if let Some(l) = &r.license {
-                                                println!("  License: {}", l);
-                                            }
-                                            if let Some(c) = &r.classification {
-                                                println!("  Classification: {}", c);
-                                            }
-                                            if !r.maintainers.is_empty() {
-                                                println!(
-                                                    "  Maintainers ({}):",
-                                                    r.maintainers.len()
-                                                );
-                                                for m in &r.maintainers {
-                                                    println!("    - {}", m);
-                                                }
-                                            }
-                                            if r.sources.is_empty() {
-                                                println!("  Sources: 0");
-                                            } else {
-                                                println!(
-                                                    "  Sources ({}):",
-                                                    r.sources
-                                                        .iter()
-                                                        .map(|s| s.sources.len())
-                                                        .sum::<usize>()
-                                                );
-                                                for (i, section) in r.sources.iter().enumerate() {
-                                                    for src in &section.sources {
-                                                        match src {
-                                                            SourceNode::Archive(a) => {
-                                                                println!(
-                                                                    "    - archive: {}",
-                                                                    a.src
-                                                                );
-                                                            }
-                                                            other => {
-                                                                println!("    - {:?}", other);
-                                                            }
-                                                        }
-                                                    }
-                                                    if i + 1 < r.sources.len() {
-                                                        // spacer between sections
-                                                    }
-                                                }
-                                            }
-                                            if r.build_sections.is_empty() {
-                                                println!("  Build: 0 sections");
-                                            } else {
-                                                println!(
-                                                    "  Build sections ({}):",
-                                                    r.build_sections.len()
-                                                );
-                                                for (idx, b) in r.build_sections.iter().enumerate()
-                                                {
-                                                    let mut kinds: Vec<&str> = Vec::new();
-                                                    if b.cargo.is_some() {
-                                                        kinds.push("cargo");
-                                                    }
-                                                    if b.script.is_some() {
-                                                        kinds.push("script");
-                                                    }
-                                                    if b.configure.is_some() {
-                                                        kinds.push("configure");
-                                                    }
-                                                    if b.cmake.is_some() {
-                                                        kinds.push("cmake");
-                                                    }
-                                                    if b.meson.is_some() {
-                                                        kinds.push("meson");
-                                                    }
-                                                    if kinds.is_empty() {
-                                                        kinds.push("custom");
-                                                    }
-                                                    println!(
-                                                        "    - [{}] {}",
-                                                        idx + 1,
-                                                        kinds.join(", ")
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        Err(_) => {
-                                            println!("\nPackage KDL (describe): unable to parse stored base component");
-                                        }
-                                    }
-                                } else {
-                                    println!("\nPackage KDL (describe): no base information stored on server");
                                 }
                             } else {
-                                println!("  Not found on host {}", host);
+                                println!("component '{}' not found on {}", id, host);
                             }
 
                             Ok(())
@@ -1342,13 +1247,6 @@ fn resolve_host_or_selected(host_arg: Option<String>) -> miette::Result<String> 
         "--host not provided and no selected context found.\n\
          Use 'pkgdev auth login --host <url> --select' or specify --host."
     ))
-}
-
-fn actor_kind_str(k: ActorKind) -> String {
-    match k {
-        ActorKind::User => "user".to_string(),
-        ActorKind::Service => "service".to_string(),
-    }
 }
 
 fn resolve_owner(

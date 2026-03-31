@@ -1,4 +1,4 @@
-use crate::api::forged::api::v1 as api;
+use crate::api::forged::api::v2 as api_v2;
 use crate::auth::authenticated_request;
 use miette::Diagnostic;
 use thiserror::Error;
@@ -38,22 +38,24 @@ impl GateClient {
         Ok(Self { server, channel })
     }
 
-    fn client(&self) -> api::gate_service_client::GateServiceClient<Channel> {
-        api::gate_service_client::GateServiceClient::new(self.channel.clone())
+    fn client(&self) -> api_v2::gate_service_client::GateServiceClient<Channel> {
+        api_v2::gate_service_client::GateServiceClient::new(self.channel.clone())
     }
 
-    pub async fn create_gate(&self, gate: api::Gate, token: &str) -> Result<api::Gate> {
-        let req = api::CreateGateRequest { gate: Some(gate) };
-        let mut c = self.client();
-        let resp = c.create_gate(authenticated_request(req, token)).await?;
-        Ok(resp.into_inner().gate.unwrap_or_default())
+    fn actor_ref(actor_id: &str) -> Option<api_v2::ActorRef> {
+        Some(api_v2::ActorRef {
+            id: actor_id.to_string(),
+            kind: "user".to_string(),
+        })
     }
 
-    pub async fn list_gates(&self, token: &str) -> Result<Vec<api::Gate>> {
+    pub async fn list_gates(&self, actor_id: &str, token: &str) -> Result<Vec<api_v2::GateInfo>> {
         let mut c = self.client();
         let resp = c
             .list_gates(authenticated_request(
-                api::ListGatesRequest {
+                api_v2::ListGatesRequest {
+                    actor: Self::actor_ref(actor_id),
+                    owner_id: None,
                     page_size: 0,
                     page_token: String::new(),
                 },
@@ -63,11 +65,21 @@ impl GateClient {
         Ok(resp.into_inner().gates)
     }
 
-    pub async fn get_gate(&self, id: &str, token: &str) -> Result<Option<api::Gate>> {
+    pub async fn get_gate(
+        &self,
+        actor_id: &str,
+        gate_id: &str,
+        token: &str,
+    ) -> Result<Option<api_v2::GateInfo>> {
         let mut c = self.client();
         let resp = c
             .get_gate(authenticated_request(
-                api::GetGateRequest { id: id.to_string() },
+                api_v2::GetGateRequest {
+                    actor: Self::actor_ref(actor_id),
+                    gate_id: Some(api_v2::GateId {
+                        id: gate_id.to_string(),
+                    }),
+                },
                 token,
             ))
             .await;
@@ -81,5 +93,51 @@ impl GateClient {
                 }
             }
         }
+    }
+
+    pub async fn list_members(
+        &self,
+        actor_id: &str,
+        gate_id: &str,
+        token: &str,
+    ) -> Result<Vec<api_v2::GateMemberInfo>> {
+        let mut c = self.client();
+        let resp = c
+            .list_members(authenticated_request(
+                api_v2::ListMembersRequest {
+                    actor: Self::actor_ref(actor_id),
+                    gate_id: Some(api_v2::GateId {
+                        id: gate_id.to_string(),
+                    }),
+                    page_size: 0,
+                    page_token: String::new(),
+                },
+                token,
+            ))
+            .await?;
+        Ok(resp.into_inner().members)
+    }
+
+    pub async fn list_components(
+        &self,
+        actor_id: &str,
+        gate_id: &str,
+        token: &str,
+    ) -> Result<Vec<api_v2::ComponentInfo>> {
+        let mut c = self.client();
+        let resp = c
+            .list_components(authenticated_request(
+                api_v2::ListComponentsRequest {
+                    actor: Self::actor_ref(actor_id),
+                    gate_id: Some(api_v2::GateId {
+                        id: gate_id.to_string(),
+                    }),
+                    page_size: 0,
+                    page_token: String::new(),
+                },
+                token,
+            ))
+            .await?;
+        Ok(resp.into_inner().components)
     }
 }

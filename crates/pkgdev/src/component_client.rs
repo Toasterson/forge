@@ -1,4 +1,4 @@
-use crate::api::forged::api::v1 as api;
+use crate::api::forged::api::v2 as api_v2;
 use crate::auth::authenticated_request;
 use miette::Diagnostic;
 use thiserror::Error;
@@ -41,44 +41,29 @@ impl ComponentClient {
         Ok(Self { server, channel })
     }
 
-    fn client(&self) -> api::component_service_client::ComponentServiceClient<Channel> {
-        api::component_service_client::ComponentServiceClient::new(self.channel.clone())
+    fn actor_ref(actor_id: &str) -> Option<api_v2::ActorRef> {
+        Some(api_v2::ActorRef {
+            id: actor_id.to_string(),
+            kind: "user".to_string(),
+        })
     }
 
-    pub async fn create_component(
+    pub async fn get_component(
         &self,
-        component: api::Component,
+        actor_id: &str,
+        component_id: &str,
         token: &str,
-    ) -> Result<api::Component> {
-        let req = api::CreateComponentRequest {
-            component: Some(component),
-        };
-        let mut c = self.client();
-        let resp = c
-            .create_component(authenticated_request(req, token))
-            .await?;
-        Ok(resp.into_inner().component.unwrap_or_default())
-    }
-
-    pub async fn list_components(&self, token: &str) -> Result<Vec<api::Component>> {
-        let mut c = self.client();
-        let resp = c
-            .list_components(authenticated_request(
-                api::ListComponentsRequest {
-                    page_size: 0,
-                    page_token: String::new(),
-                },
-                token,
-            ))
-            .await?;
-        Ok(resp.into_inner().components)
-    }
-
-    pub async fn get_component(&self, id: &str, token: &str) -> Result<Option<api::Component>> {
-        let mut c = self.client();
-        let resp = c
+    ) -> Result<Option<api_v2::ComponentInfo>> {
+        let mut client =
+            api_v2::component_service_client::ComponentServiceClient::new(self.channel.clone());
+        let resp = client
             .get_component(authenticated_request(
-                api::GetComponentRequest { id: id.to_string() },
+                api_v2::GetComponentRequest {
+                    actor: Self::actor_ref(actor_id),
+                    component_id: Some(api_v2::ComponentId {
+                        id: component_id.to_string(),
+                    }),
+                },
                 token,
             ))
             .await;
