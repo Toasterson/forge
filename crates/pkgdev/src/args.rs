@@ -383,18 +383,52 @@ pub async fn run(args: Args) -> miette::Result<()> {
 
                 // Store the token
                 let mut store = TokenStore::load();
+                let access_token = token_set.access_token.clone();
                 store.set(host.clone(), token_set);
                 store.save().wrap_err("failed to save token")?;
 
-                // Always set this host as the selected context
+                // Call Authenticate RPC to get actor identity
+                let grpc_url = server_url_from_host(&host);
+                let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                let mut auth_client = api_v2::auth_service_client::AuthServiceClient::new(channel);
+                let req = authenticated_request(
+                    api_v2::AuthenticateRequest {
+                        oidc_token: access_token.clone(),
+                    },
+                    &access_token,
+                );
+                let auth_resp = auth_client
+                    .authenticate(req)
+                    .await
+                    .map_err(|e| diagnose_rpc_error(&grpc_url, "Authenticate", e))?;
+                let resp = auth_resp.into_inner();
+                let actor = resp.actor.ok_or_else(|| {
+                    miette::miette!("server returned no actor in authenticate response")
+                })?;
+                let kind = match actor.kind.as_str() {
+                    "service" => ActorKind::Service,
+                    _ => ActorKind::User,
+                };
+
+                // Record login and set as selected context
                 {
                     let path = default_auth_state_path();
                     let mut state = AuthState::load(&path).unwrap_or_default();
-                    state.set_selected(host.clone(), host.clone(), ActorKind::User);
-                    let _ = state.save(&path);
+                    state.add_login(
+                        &host,
+                        LoginEntry {
+                            actor_id: actor.id.clone(),
+                            kind,
+                        },
+                    );
+                    state.set_selected(host.clone(), actor.id.clone(), kind);
+                    state
+                        .save(&path)
+                        .into_diagnostic()
+                        .wrap_err("failed to save auth state")?;
                 }
 
-                println!("authenticated successfully on {}", host);
+                println!("authenticated as {} on {}", resp.display_name, host);
                 Ok(())
             }
             AuthCmd::Status { host } => {
