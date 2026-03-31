@@ -1,0 +1,48 @@
+name "application/rabbitmq"
+project-name "rabbitmq-server"
+classification "System/Services"
+summary "RabbitMQ message broker"
+license "MPL-2.0"
+version "4.2.5"
+project-url "https://www.rabbitmq.com"
+maintainer "The OpenIndiana Maintainers"
+
+source {
+    archive "https://github.com/rabbitmq/rabbitmq-server/releases/download/v4.2.5/rabbitmq-server-generic-unix-4.2.5.tar.xz" \
+        sha256="placeholder"
+}
+
+build {
+    script {
+        // Extract tarball contents into /usr/rabbitmq and patch shebangs.
+        // illumos /bin/sh is ksh93 which lacks bashisms used by RabbitMQ scripts.
+        script "build.sh"
+    }
+}
+
+files {
+    install "smf/rabbitmq.xml" "lib/svc/manifest/application/rabbitmq.xml"
+    install "files/rabbitmq.conf" "etc/rabbitmq/rabbitmq.conf"
+}
+
+group "rabbitmq" gid=10020
+user "rabbitmq" uid=10020 group="rabbitmq" \
+    home="/var/rabbitmq" \
+    shell="/usr/bin/false" \
+    description="RabbitMQ message broker daemon"
+
+dependency "runtime/erlang" kind="require"
+dependency "archiver/gnu-tar" kind="require"
+dependency "system/library" kind="require"
+
+package {
+    file path="usr/rabbitmq/.*"
+
+    file path="lib/svc/manifest/.*" restart-fmri="svc:/system/manifest-import:default"
+
+    file path="etc/rabbitmq/.*" preserve="true" mode="0640" owner="root" group="rabbitmq"
+
+    dir path="var/rabbitmq" owner="rabbitmq" group="rabbitmq" mode="0755"
+    dir path="var/log/rabbitmq" owner="rabbitmq" group="rabbitmq" mode="0755"
+    dir path="etc/rabbitmq" owner="root" group="rabbitmq" mode="0755"
+}

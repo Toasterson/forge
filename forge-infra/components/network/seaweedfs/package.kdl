@@ -1,0 +1,42 @@
+name "network/seaweedfs"
+project-name "seaweedfs"
+classification "System/Services"
+summary "SeaweedFS distributed object store with SMF service integration"
+license "Apache-2.0"
+version "3.80"
+project-url "https://github.com/seaweedfs/seaweedfs"
+maintainer "The OpenIndiana Maintainers"
+
+source {
+    archive "https://github.com/seaweedfs/seaweedfs/releases/download/3.80/linux_amd64_full.tar.gz" \
+        sha256="placeholder"
+}
+
+build {
+    script {
+        install src="weed" target="usr/bin" name="weed"
+    }
+}
+
+files {
+    install "smf/seaweedfs-master.xml" "lib/svc/manifest/network/seaweedfs-master.xml"
+    install "smf/seaweedfs-volume.xml" "lib/svc/manifest/network/seaweedfs-volume.xml"
+}
+
+group "seaweedfs" gid=10010
+user "seaweedfs" uid=10010 group="seaweedfs" \
+    home="/var/seaweedfs" \
+    shell="/usr/bin/false" \
+    description="SeaweedFS daemon"
+
+dependency "system/library" kind="require"
+
+package {
+    file path="usr/bin/weed"
+
+    file path="lib/svc/manifest/.*" restart-fmri="svc:/system/manifest-import:default"
+
+    dir path="var/seaweedfs" owner="seaweedfs" group="seaweedfs" mode="0755"
+    dir path="var/seaweedfs/master" owner="seaweedfs" group="seaweedfs" mode="0755"
+    dir path="var/seaweedfs/volume" owner="seaweedfs" group="seaweedfs" mode="0755"
+}

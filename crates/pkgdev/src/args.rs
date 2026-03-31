@@ -133,35 +133,19 @@ pub struct ComponentArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum GateCmd {
-    /// Open (create or update) a gate on the forge
+    /// Create a gate on the forge from the local gate.kdl file.
+    /// Reads gate metadata from --gate (or cwd/gate.kdl).
     Open {
         /// Forge hostname (or hostname:port). If omitted, uses selected context.
         #[arg(long)]
         host: Option<String>,
-        /// Gate identifier (stable id)
-        #[arg(long)]
-        id: String,
-        /// Human-friendly name for the gate
-        #[arg(long)]
-        name: Option<String>,
-        /// Owner actor id; if omitted, will use the selected login for this host (or first recorded login)
-        #[arg(long)]
-        owner_id: Option<String>,
-        /// Owner actor kind (defaults to User)
-        #[arg(long, value_enum)]
-        owner_kind: Option<ActorKind>,
     },
-    /// Upload local gate metadata to the forge (upsert)
+    /// Upload (update) local gate metadata to the forge.
+    /// Reads gate metadata from --gate (or cwd/gate.kdl).
     Upload {
         /// Forge hostname (or hostname:port). If omitted, uses selected context.
         #[arg(long)]
         host: Option<String>,
-        /// Owner actor id; if omitted, will use the selected login for this host (or first recorded login)
-        #[arg(long)]
-        owner_id: Option<String>,
-        /// Owner actor kind (defaults to User)
-        #[arg(long, value_enum)]
-        owner_kind: Option<ActorKind>,
     },
     /// List all gates on the forge
     List {
@@ -185,24 +169,29 @@ pub enum GateCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum ComponentCmd {
-    /// Create (upsert) a component on the forge
+    /// Create a component on the forge from a local package.kdl.
+    /// Resolves the component folder relative to the gate's components/ directory.
     Create {
         /// Forge hostname (or hostname:port). If omitted, uses selected context.
         #[arg(long)]
         host: Option<String>,
-        /// Component identifier (stable id)
+        /// Gate ID on the forge to add this component to.
         #[arg(long)]
-        id: String,
-        /// Human-friendly name for the component
-        #[arg(long)]
-        name: Option<String>,
+        gate_id: String,
+        /// Component folder path relative to the gate's components directory (e.g., `web/curl`).
+        /// If omitted, current directory is used. Absolute paths are accepted.
+        #[arg(value_name = "COMPONENT", index = 1, default_value = ".")]
+        component: PathBuf,
     },
-    /// Upload local component metadata to the forge (upsert)
+    /// Upload (update) local component metadata to the forge.
     Upload {
         /// Forge hostname (or hostname:port). If omitted, uses selected context.
         #[arg(long)]
         host: Option<String>,
-        /// Component folder path relative to the gate's components directory (e.g., `ffmpeg` or `web/firefox`).
+        /// Gate ID on the forge this component belongs to.
+        #[arg(long)]
+        gate_id: String,
+        /// Component folder path relative to the gate's components directory (e.g., `web/curl`).
         /// If omitted, current directory is used. Absolute paths are accepted.
         #[arg(value_name = "COMPONENT", index = 1, default_value = ".")]
         component: PathBuf,
@@ -216,7 +205,7 @@ pub enum ComponentCmd {
         #[arg(long = "no-header")]
         no_header: bool,
     },
-    /// Show details for a specific component, rendering its package.kdl summary from the forge
+    /// Show details for a specific component
     Show {
         /// Forge hostname (or hostname:port). If omitted, uses selected context.
         #[arg(long)]
@@ -619,49 +608,12 @@ pub async fn run(args: Args) -> miette::Result<()> {
         Commands::Forge { cmd } => {
             match cmd {
                 ForgeCmd::Gate { cmd } => match cmd {
-                    GateCmd::Open {
-                        host,
-                        id: _,
-                        name,
-                        owner_id: _,
-                        owner_kind: _,
-                    } => {
-                        let host = resolve_host_or_selected(host)?;
-                        let token = get_valid_token(&host)
-                            .await
-                            .wrap_err("authentication required")?;
-                        let (actor_id, _) = resolve_owner(&host, None, None)?;
-                        let grpc_url = server_url_from_host(&host);
-                        let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
-                        let mut client =
-                            api_v2::gate_service_client::GateServiceClient::new(channel);
-                        let gate_name = name.unwrap_or_default();
-                        let req = authenticated_request(
-                            api_v2::CreateGateRequest {
-                                actor: Some(api_v2::ActorRef {
-                                    id: actor_id,
-                                    kind: "user".to_string(),
-                                }),
-                                name: gate_name.clone(),
-                                gate_kdl: String::new(),
-                            },
-                            &token,
-                        );
-                        let resp = client
-                            .create_gate(req)
-                            .await
-                            .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateGate", e))?;
-                        let created = resp.into_inner().gate.unwrap();
-                        println!("gate '{}' created on {}", created.name, host);
-                        Ok(())
-                    }
-                    GateCmd::Upload {
-                        host,
-                        owner_id: _,
-                        owner_kind: _,
-                    } => {
+                    GateCmd::Open { host } => {
                         let Some(g) = &gate else {
-                            return Err(miette::miette!("--gate must be provided for 'forge gate upload' or run in a gate directory"));
+                            return Err(miette::miette!(
+                                "No gate.kdl found.\n\
+                                 Provide --gate <path> or run from a directory containing gate.kdl."
+                            ));
                         };
                         let host = resolve_host_or_selected(host)?;
                         let token = get_valid_token(&host)
@@ -672,6 +624,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                         let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
                         let mut client =
                             api_v2::gate_service_client::GateServiceClient::new(channel);
+                        let gate_kdl = g.to_document().to_string();
                         let req = authenticated_request(
                             api_v2::CreateGateRequest {
                                 actor: Some(api_v2::ActorRef {
@@ -679,7 +632,7 @@ pub async fn run(args: Args) -> miette::Result<()> {
                                     kind: "user".to_string(),
                                 }),
                                 name: g.name.clone(),
-                                gate_kdl: String::new(),
+                                gate_kdl,
                             },
                             &token,
                         );
@@ -688,7 +641,49 @@ pub async fn run(args: Args) -> miette::Result<()> {
                             .await
                             .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateGate", e))?;
                         let created = resp.into_inner().gate.unwrap();
-                        println!("gate '{}' uploaded to {}", created.name, host);
+                        println!(
+                            "gate '{}' created (id: {}) on {}",
+                            created.name, created.id, host
+                        );
+                        Ok(())
+                    }
+                    GateCmd::Upload { host } => {
+                        let Some(g) = &gate else {
+                            return Err(miette::miette!(
+                                "No gate.kdl found.\n\
+                                 Provide --gate <path> or run from a directory containing gate.kdl."
+                            ));
+                        };
+                        let host = resolve_host_or_selected(host)?;
+                        let token = get_valid_token(&host)
+                            .await
+                            .wrap_err("authentication required")?;
+                        let (actor_id, _) = resolve_owner(&host, None, None)?;
+                        let grpc_url = server_url_from_host(&host);
+                        let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                        let mut client =
+                            api_v2::gate_service_client::GateServiceClient::new(channel);
+                        let gate_kdl = g.to_document().to_string();
+                        let req = authenticated_request(
+                            api_v2::CreateGateRequest {
+                                actor: Some(api_v2::ActorRef {
+                                    id: actor_id,
+                                    kind: "user".to_string(),
+                                }),
+                                name: g.name.clone(),
+                                gate_kdl,
+                            },
+                            &token,
+                        );
+                        let resp = client
+                            .create_gate(req)
+                            .await
+                            .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateGate", e))?;
+                        let created = resp.into_inner().gate.unwrap();
+                        println!(
+                            "gate '{}' uploaded (id: {}) to {}",
+                            created.name, created.id, host
+                        );
                         Ok(())
                     }
                     GateCmd::List { host, no_header } => {
@@ -772,65 +767,45 @@ pub async fn run(args: Args) -> miette::Result<()> {
                 },
                 ForgeCmd::Component { cmd } => {
                     match cmd {
-                        ComponentCmd::Create { host, id: _, name } => {
-                            let host = resolve_host_or_selected(host)?;
-                            let token = get_valid_token(&host)
-                                .await
-                                .wrap_err("authentication required")?;
-                            let (actor_id, _) = resolve_owner(&host, None, None)?;
-                            let grpc_url = server_url_from_host(&host);
-                            let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
-                            let mut client =
-                                api_v2::component_service_client::ComponentServiceClient::new(
-                                    channel,
-                                );
-                            let comp_name = name.unwrap_or_default();
-                            // TODO: gate_id should come from a flag or context
-                            let req = authenticated_request(
-                                api_v2::CreateComponentRequest {
-                                    actor: Some(api_v2::ActorRef {
-                                        id: actor_id,
-                                        kind: "user".to_string(),
-                                    }),
-                                    gate_id: None,
-                                    name: comp_name,
-                                    recipe_kdl: String::new(),
-                                },
-                                &token,
-                            );
-                            let resp = client
-                                .create_component(req)
-                                .await
-                                .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateComponent", e))?;
-                            let created = resp.into_inner().component.unwrap();
-                            println!("component '{}' created on {}", created.name, host);
-                            Ok(())
-                        }
-                        ComponentCmd::Upload { host, component } => {
-                            let host = resolve_host_or_selected(host)?;
-                            let token = get_valid_token(&host)
-                                .await
-                                .wrap_err("authentication required")?;
-                            let (actor_id, _) = resolve_owner(&host, None, None)?;
-                            let grpc_url = server_url_from_host(&host);
-                            let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
-                            let mut client =
-                                api_v2::component_service_client::ComponentServiceClient::new(
-                                    channel,
-                                );
+                        ComponentCmd::Create {
+                            host,
+                            gate_id,
+                            component,
+                        } => {
                             let comp_local = open_component_local(&component, &gate)
                                 .wrap_err("cannot open component")?;
                             let comp_name = comp_local.get_name().to_string();
-                            // TODO: gate_id should come from a flag or context
+                            // Read raw package.kdl content for recipe_kdl
+                            let resolved = component.canonicalize().unwrap_or(component.clone());
+                            let kdl_path = resolved.join("package.kdl");
+                            let recipe_kdl = if kdl_path.exists() {
+                                fs::read_to_string(&kdl_path)
+                                    .into_diagnostic()
+                                    .wrap_err("failed to read package.kdl")?
+                            } else {
+                                String::new()
+                            };
+
+                            let host = resolve_host_or_selected(host)?;
+                            let token = get_valid_token(&host)
+                                .await
+                                .wrap_err("authentication required")?;
+                            let (actor_id, _) = resolve_owner(&host, None, None)?;
+                            let grpc_url = server_url_from_host(&host);
+                            let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                            let mut client =
+                                api_v2::component_service_client::ComponentServiceClient::new(
+                                    channel,
+                                );
                             let req = authenticated_request(
                                 api_v2::CreateComponentRequest {
                                     actor: Some(api_v2::ActorRef {
                                         id: actor_id,
                                         kind: "user".to_string(),
                                     }),
-                                    gate_id: None,
+                                    gate_id: Some(api_v2::GateId { id: gate_id }),
                                     name: comp_name.clone(),
-                                    recipe_kdl: String::new(),
+                                    recipe_kdl,
                                 },
                                 &token,
                             );
@@ -839,7 +814,62 @@ pub async fn run(args: Args) -> miette::Result<()> {
                                 .await
                                 .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateComponent", e))?;
                             let created = resp.into_inner().component.unwrap();
-                            println!("component '{}' uploaded to {}", created.name, host);
+                            println!(
+                                "component '{}' created (id: {}) on {}",
+                                created.name, created.id, host
+                            );
+                            Ok(())
+                        }
+                        ComponentCmd::Upload {
+                            host,
+                            gate_id,
+                            component,
+                        } => {
+                            let comp_local = open_component_local(&component, &gate)
+                                .wrap_err("cannot open component")?;
+                            let comp_name = comp_local.get_name().to_string();
+                            let resolved = component.canonicalize().unwrap_or(component.clone());
+                            let kdl_path = resolved.join("package.kdl");
+                            let recipe_kdl = if kdl_path.exists() {
+                                fs::read_to_string(&kdl_path)
+                                    .into_diagnostic()
+                                    .wrap_err("failed to read package.kdl")?
+                            } else {
+                                String::new()
+                            };
+
+                            let host = resolve_host_or_selected(host)?;
+                            let token = get_valid_token(&host)
+                                .await
+                                .wrap_err("authentication required")?;
+                            let (actor_id, _) = resolve_owner(&host, None, None)?;
+                            let grpc_url = server_url_from_host(&host);
+                            let channel = connect_grpc(&grpc_url, args.tls_insecure).await?;
+                            let mut client =
+                                api_v2::component_service_client::ComponentServiceClient::new(
+                                    channel,
+                                );
+                            let req = authenticated_request(
+                                api_v2::CreateComponentRequest {
+                                    actor: Some(api_v2::ActorRef {
+                                        id: actor_id,
+                                        kind: "user".to_string(),
+                                    }),
+                                    gate_id: Some(api_v2::GateId { id: gate_id }),
+                                    name: comp_name.clone(),
+                                    recipe_kdl,
+                                },
+                                &token,
+                            );
+                            let resp = client
+                                .create_component(req)
+                                .await
+                                .map_err(|e| diagnose_rpc_error(&grpc_url, "CreateComponent", e))?;
+                            let created = resp.into_inner().component.unwrap();
+                            println!(
+                                "component '{}' uploaded (id: {}) to {}",
+                                created.name, created.id, host
+                            );
                             Ok(())
                         }
                         ComponentCmd::List { host, no_header } => {

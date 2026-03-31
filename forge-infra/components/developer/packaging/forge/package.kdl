@@ -1,0 +1,59 @@
+name "developer/packaging/forge"
+project-name "forge"
+classification "Development/Distribution Tools"
+summary "Code forge and IPS packaging platform"
+license "MPL-2.0"
+license-file "LICENSE"
+version "0.1.0"
+project-url "https://github.com/Toasterson/forge"
+maintainer "The Forge Contributors"
+
+metadata {
+    repology-id "forge"
+}
+
+source {
+    git "https://github.com/Toasterson/forge.git" tag="v0.1.0"
+}
+
+build {
+    cargo {
+        packages "forged" "pkgdev"
+        install-root "/opt/forge"
+        env OPENSSL_DIR="/usr/openssl/3.1"
+        env PKG_CONFIG_PATH="/usr/lib/amd64/pkgconfig"
+    }
+}
+
+files {
+    install "smf/forged.xml" "lib/svc/manifest/application/forge-forged.xml"
+    install "smf/forged-method" "opt/forge/lib/svc/method/forged-method" mode="0555"
+    install "files/forged.toml" "etc/forged/forged.toml"
+}
+
+group "forged" gid=10001
+user "forged" uid=10001 group="forged" \
+    home="/var/lib/forged" \
+    shell="/usr/bin/false" \
+    description="Forge server daemon"
+
+dependency "system/library" kind="require"
+dependency "system/library/gcc-14-runtime" kind="require"
+dependency "system/library/g++-14-runtime" kind="require"
+dependency "library/security/openssl-31" kind="require"
+dependency "database/postgres-16" kind="require"
+dependency "network/seaweedfs" kind="require"
+dependency "application/rabbitmq" kind="require"
+
+package {
+    file path="opt/forge/bin/.*"
+    file path="opt/forge/lib/.*"
+
+    dir path="var/lib/forged" owner="forged" group="forged" mode="0755"
+    dir path="var/lib/forged/jj-repos" owner="forged" group="forged" mode="0755"
+    dir path="var/lib/forged/acme" owner="forged" group="forged" mode="0700"
+    dir path="etc/forged" owner="root" group="forged" mode="0755"
+
+    file path="etc/forged/.*" preserve="true" mode="0640" owner="root" group="forged"
+    file path="lib/svc/manifest/.*" restart-fmri="svc:/system/manifest-import:default"
+}

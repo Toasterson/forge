@@ -1,0 +1,4 @@
+name "forge-infra"
+version "0.5.11"
+branch "2024.0.0"
+publisher "openindiana.org"
